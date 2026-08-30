@@ -1,0 +1,6 @@
+{
+  "name": "AI-NOC",
+  "description": "ระบบวิเคราะห์ปัญหาเครือข่ายเสมือนบนแพลตฟอร์ม Virtualization ด้วยปัญญาประดิษฐ์และข้อมูลเชิงสังเกตหลายแหล่ง (AI Network Operation Center)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

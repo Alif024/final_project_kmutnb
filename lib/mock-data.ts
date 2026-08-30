@@ -1,0 +1,854 @@
+import {
+  Hypervisor,
+  VirtualMachine,
+  NetworkDevice,
+  TopologyNode,
+  TopologyEdge,
+  Alert,
+  Incident,
+  Diagnosis,
+  Recommendation,
+  ApprovalRequest,
+  AuditLog,
+  ChatSession,
+  ChatMessage,
+  SyslogEntry
+} from '@/types/ai-noc';
+
+export const initialHypervisors: Hypervisor[] = [
+  {
+    id: 'hyp-01',
+    name: 'ESXi-Host-01',
+    ipAddress: '10.0.0.101',
+    type: 'vmware-esxi',
+    version: 'VMware ESXi 7.0 U3',
+    status: 'warning',
+    cpuUsage: 65,
+    memoryUsage: 72,
+    storageUsage: 81,
+    totalVcpu: 64,
+    usedVcpu: 46,
+    totalMemoryGb: 256,
+    usedMemoryGb: 184,
+    totalStorageTb: 3.2,
+    usedStorageTb: 2.6,
+    vmCount: 24,
+    vmCapacity: 32,
+    alertCount: 2,
+    uptimeSeconds: 1327980,
+    cpuReadyTimePercent: 4.8,
+    memoryBallooningMb: 1024,
+    storageLatencyMs: 38.6,
+    vswitchDroppedPackets: 120,
+    lastUpdate: '2026-05-24T15:42:18+07:00'
+  },
+  {
+    id: 'hyp-02',
+    name: 'ESXi-Host-02',
+    ipAddress: '10.0.0.102',
+    type: 'vmware-esxi',
+    version: 'VMware ESXi 7.0 U3',
+    status: 'healthy',
+    cpuUsage: 28,
+    memoryUsage: 45,
+    storageUsage: 62,
+    totalVcpu: 64,
+    usedVcpu: 18,
+    totalMemoryGb: 256,
+    usedMemoryGb: 115,
+    totalStorageTb: 3.2,
+    usedStorageTb: 2.0,
+    vmCount: 18,
+    vmCapacity: 32,
+    alertCount: 0,
+    uptimeSeconds: 2450000,
+    cpuReadyTimePercent: 1.2,
+    memoryBallooningMb: 0,
+    storageLatencyMs: 4.2,
+    vswitchDroppedPackets: 0,
+    lastUpdate: '2026-05-24T15:42:18+07:00'
+  },
+  {
+    id: 'hyp-03',
+    name: 'Proxmox-Node-01',
+    ipAddress: '10.0.0.201',
+    type: 'proxmox-ve',
+    version: 'Proxmox VE 8.1.4',
+    status: 'healthy',
+    cpuUsage: 40,
+    memoryUsage: 58,
+    storageUsage: 70,
+    totalVcpu: 128,
+    usedVcpu: 51,
+    totalMemoryGb: 512,
+    usedMemoryGb: 297,
+    totalStorageTb: 6.0,
+    usedStorageTb: 4.2,
+    vmCount: 36,
+    vmCapacity: 60,
+    alertCount: 1,
+    uptimeSeconds: 604800,
+    cpuReadyTimePercent: 2.1,
+    memoryBallooningMb: 256,
+    storageLatencyMs: 6.8,
+    vswitchDroppedPackets: 15,
+    lastUpdate: '2026-05-24T15:42:18+07:00'
+  },
+  {
+    id: 'hyp-04',
+    name: 'Proxmox-Node-02',
+    ipAddress: '10.0.0.202',
+    type: 'proxmox-ve',
+    version: 'Proxmox VE 8.1.4',
+    status: 'healthy',
+    cpuUsage: 33,
+    memoryUsage: 49,
+    storageUsage: 55,
+    totalVcpu: 128,
+    usedVcpu: 42,
+    totalMemoryGb: 512,
+    usedMemoryGb: 251,
+    totalStorageTb: 6.0,
+    usedStorageTb: 3.3,
+    vmCount: 28,
+    vmCapacity: 60,
+    alertCount: 0,
+    uptimeSeconds: 1892000,
+    cpuReadyTimePercent: 0.9,
+    memoryBallooningMb: 0,
+    storageLatencyMs: 3.5,
+    vswitchDroppedPackets: 0,
+    lastUpdate: '2026-05-24T15:42:18+07:00'
+  },
+  {
+    id: 'hyp-05',
+    name: 'Proxmox-Node-03',
+    ipAddress: '10.0.0.203',
+    type: 'proxmox-ve',
+    version: 'Proxmox VE 8.1.4',
+    status: 'warning',
+    cpuUsage: 62,
+    memoryUsage: 77,
+    storageUsage: 83,
+    totalVcpu: 128,
+    usedVcpu: 79,
+    totalMemoryGb: 512,
+    usedMemoryGb: 394,
+    totalStorageTb: 6.0,
+    usedStorageTb: 4.98,
+    vmCount: 32,
+    vmCapacity: 60,
+    alertCount: 1,
+    uptimeSeconds: 1209600,
+    cpuReadyTimePercent: 5.6,
+    memoryBallooningMb: 512,
+    storageLatencyMs: 14.2,
+    vswitchDroppedPackets: 45,
+    lastUpdate: '2026-05-24T15:42:18+07:00'
+  },
+  {
+    id: 'hyp-06',
+    name: 'ESXi-Host-03',
+    ipAddress: '10.0.0.103',
+    type: 'vmware-esxi',
+    version: 'VMware ESXi 7.0 U3',
+    status: 'healthy',
+    cpuUsage: 25,
+    memoryUsage: 38,
+    storageUsage: 46,
+    totalVcpu: 64,
+    usedVcpu: 16,
+    totalMemoryGb: 256,
+    usedMemoryGb: 97,
+    totalStorageTb: 3.2,
+    usedStorageTb: 1.47,
+    vmCount: 22,
+    vmCapacity: 32,
+    alertCount: 0,
+    uptimeSeconds: 3120000,
+    cpuReadyTimePercent: 0.8,
+    memoryBallooningMb: 0,
+    storageLatencyMs: 2.9,
+    vswitchDroppedPackets: 0,
+    lastUpdate: '2026-05-24T15:42:18+07:00'
+  }
+];
+
+export const initialVMs: VirtualMachine[] = [
+  {
+    id: 'vm-fw',
+    name: 'Firewall-VM',
+    ipAddress: '10.0.0.1',
+    hypervisorId: 'hyp-03',
+    status: 'running',
+    health: 'critical',
+    role: 'firewall',
+    vendorModel: 'pfSense 2.7.2',
+    cpuUsage: 92,
+    memoryUsage: 65,
+    storageUsage: 41,
+    ioWaitPercent: 28.4,
+    uptimeSeconds: 652000,
+    activeAlerts: 2,
+    lastSeen: '1 นาทีที่แล้ว'
+  },
+  {
+    id: 'vm-erp',
+    name: 'ERP-VM',
+    ipAddress: '10.0.1.20',
+    hypervisorId: 'hyp-01',
+    status: 'running',
+    health: 'warning',
+    role: 'app',
+    vendorModel: 'Ubuntu 22.04 LTS (SAP ERP)',
+    cpuUsage: 78,
+    memoryUsage: 88,
+    storageUsage: 85,
+    ioWaitPercent: 45.2,
+    uptimeSeconds: 432000,
+    activeAlerts: 1,
+    lastSeen: '1 นาทีที่แล้ว'
+  },
+  {
+    id: 'vm-web1',
+    name: 'Web-VM-01',
+    ipAddress: '10.0.1.10',
+    hypervisorId: 'hyp-01',
+    status: 'running',
+    health: 'warning',
+    role: 'web',
+    vendorModel: 'Nginx 1.24 / Alpine',
+    cpuUsage: 45,
+    memoryUsage: 82,
+    storageUsage: 35,
+    ioWaitPercent: 12.1,
+    uptimeSeconds: 1296000,
+    activeAlerts: 1,
+    lastSeen: '2 นาทีที่แล้ว'
+  },
+  {
+    id: 'vm-db1',
+    name: 'DB-VM-01',
+    ipAddress: '10.0.1.30',
+    hypervisorId: 'hyp-02',
+    status: 'running',
+    health: 'healthy',
+    role: 'db',
+    vendorModel: 'PostgreSQL 16 Cluster',
+    cpuUsage: 35,
+    memoryUsage: 68,
+    storageUsage: 72,
+    ioWaitPercent: 3.2,
+    uptimeSeconds: 2160000,
+    activeAlerts: 0,
+    lastSeen: '1 นาทีที่แล้ว'
+  },
+  {
+    id: 'vm-ids',
+    name: 'IDS-VM-01',
+    ipAddress: '10.0.1.40',
+    hypervisorId: 'hyp-05',
+    status: 'running',
+    health: 'warning',
+    role: 'ids',
+    vendorModel: 'Suricata / Zeek',
+    cpuUsage: 72,
+    memoryUsage: 81,
+    storageUsage: 60,
+    ioWaitPercent: 8.5,
+    uptimeSeconds: 864000,
+    activeAlerts: 1,
+    lastSeen: '1 นาทีที่แล้ว'
+  },
+  {
+    id: 'vm-mon',
+    name: 'Monitoring-VM',
+    ipAddress: '10.0.2.10',
+    hypervisorId: 'hyp-03',
+    status: 'running',
+    health: 'healthy',
+    role: 'monitoring',
+    vendorModel: 'AI-NOC Unified Collector',
+    cpuUsage: 38,
+    memoryUsage: 54,
+    storageUsage: 48,
+    ioWaitPercent: 2.1,
+    uptimeSeconds: 1580000,
+    activeAlerts: 0,
+    lastSeen: '30 วินาทีที่แล้ว'
+  },
+  {
+    id: 'vm-log',
+    name: 'Log-Server-VM',
+    ipAddress: '10.0.2.20',
+    hypervisorId: 'hyp-03',
+    status: 'running',
+    health: 'healthy',
+    role: 'log',
+    vendorModel: 'Elasticsearch / Syslog',
+    cpuUsage: 42,
+    memoryUsage: 64,
+    storageUsage: 79,
+    ioWaitPercent: 4.5,
+    uptimeSeconds: 1580000,
+    activeAlerts: 0,
+    lastSeen: '30 วินาทีที่แล้ว'
+  },
+  {
+    id: 'vm-dns',
+    name: 'DNS-VM',
+    ipAddress: '10.0.1.53',
+    hypervisorId: 'hyp-01',
+    status: 'running',
+    health: 'warning',
+    role: 'app',
+    vendorModel: 'BIND 9.18',
+    cpuUsage: 58,
+    memoryUsage: 89,
+    storageUsage: 25,
+    ioWaitPercent: 1.5,
+    uptimeSeconds: 980000,
+    activeAlerts: 1,
+    lastSeen: '1 นาทีที่แล้ว'
+  }
+];
+
+export const initialTopologyNodes: TopologyNode[] = [
+  { id: 'node-internet', label: 'Internet', ipAddress: '0.0.0.0/0', nodeType: 'internet', status: 'healthy', alertBadge: 0, position: { x: 300, y: 30 } },
+  { id: 'node-fw', label: 'Firewall-VM', ipAddress: '10.0.0.1', nodeType: 'firewall', status: 'critical', alertBadge: 2, position: { x: 300, y: 120 } },
+  { id: 'node-sw', label: 'Core-Switch-01', ipAddress: '10.0.0.2', nodeType: 'switch', status: 'healthy', alertBadge: 1, position: { x: 300, y: 210 } },
+  { id: 'node-router', label: 'Edge-Router-01', ipAddress: '10.0.1.1', nodeType: 'router', status: 'healthy', alertBadge: 0, position: { x: 80, y: 300 } },
+  { id: 'node-web', label: 'Web-VM-01', ipAddress: '10.0.1.10', nodeType: 'vm', status: 'healthy', alertBadge: 1, position: { x: 190, y: 300 }, role: 'web' },
+  { id: 'node-app', label: 'App-VM-01', ipAddress: '10.0.1.20', nodeType: 'vm', status: 'warning', alertBadge: 1, position: { x: 300, y: 300 }, role: 'app' },
+  { id: 'node-db', label: 'DB-VM-01', ipAddress: '10.0.1.30', nodeType: 'vm', status: 'healthy', alertBadge: 0, position: { x: 410, y: 300 }, role: 'db' },
+  { id: 'node-ids', label: 'IDS-VM-01', ipAddress: '10.0.1.40', nodeType: 'vm', status: 'warning', alertBadge: 1, position: { x: 520, y: 300 }, role: 'ids' },
+  { id: 'node-mon', label: 'Monitoring-VM', ipAddress: '10.0.2.10', nodeType: 'vm', status: 'healthy', alertBadge: 0, position: { x: 190, y: 400 }, role: 'monitoring' },
+  { id: 'node-log', label: 'Log-Server-VM', ipAddress: '10.0.2.20', nodeType: 'vm', status: 'healthy', alertBadge: 0, position: { x: 300, y: 400 }, role: 'log' },
+  { id: 'node-backup', label: 'Backup-VM', ipAddress: '10.0.2.30', nodeType: 'vm', status: 'healthy', alertBadge: 0, position: { x: 410, y: 400 }, role: 'backup' }
+];
+
+export const initialTopologyEdges: TopologyEdge[] = [
+  { id: 'e1', source: 'node-internet', target: 'node-fw', linkStatus: 'up', bandwidthMbps: 1000 },
+  { id: 'e2', source: 'node-fw', target: 'node-sw', linkStatus: 'degraded', bandwidthMbps: 1000 },
+  { id: 'e3', source: 'node-sw', target: 'node-router', linkStatus: 'up', bandwidthMbps: 10000 },
+  { id: 'e4', source: 'node-sw', target: 'node-web', linkStatus: 'up', bandwidthMbps: 10000 },
+  { id: 'e5', source: 'node-sw', target: 'node-app', linkStatus: 'degraded', bandwidthMbps: 10000 },
+  { id: 'e6', source: 'node-sw', target: 'node-db', linkStatus: 'up', bandwidthMbps: 10000 },
+  { id: 'e7', source: 'node-sw', target: 'node-ids', linkStatus: 'up', bandwidthMbps: 10000 },
+  { id: 'e8', source: 'node-app', target: 'node-mon', linkStatus: 'up', bandwidthMbps: 1000 },
+  { id: 'e9', source: 'node-app', target: 'node-log', linkStatus: 'up', bandwidthMbps: 1000 },
+  { id: 'e10', source: 'node-db', target: 'node-backup', linkStatus: 'up', bandwidthMbps: 1000 }
+];
+
+export const initialRecentAlerts: Alert[] = [
+  {
+    id: 'alt-01',
+    title: 'Storage latency สูงบน ESXi Host-01',
+    entityId: 'hyp-01',
+    entityName: 'Host-01',
+    severity: 'critical',
+    status: 'active',
+    occurrenceCount: 12,
+    firstSeen: '2569-05-24T13:10:00+07:00',
+    lastSeen: '2 นาทีที่แล้ว',
+    incidentId: 'INC-2569-0524-0001'
+  },
+  {
+    id: 'alt-02',
+    title: 'CPU Usage สูงบน Firewall-VM',
+    entityId: 'vm-fw',
+    entityName: 'Firewall-VM',
+    severity: 'warning',
+    status: 'active',
+    occurrenceCount: 8,
+    firstSeen: '2569-05-24T13:15:00+07:00',
+    lastSeen: '5 นาทีที่แล้ว',
+    incidentId: 'INC-2569-0524-0001'
+  },
+  {
+    id: 'alt-03',
+    title: 'Packet Loss บน Interface Gi0/1',
+    entityId: 'dev-sw01',
+    entityName: 'Core-Switch-01',
+    severity: 'warning',
+    status: 'active',
+    occurrenceCount: 6,
+    firstSeen: '2569-05-24T13:00:00+07:00',
+    lastSeen: '10 นาทีที่แล้ว'
+  },
+  {
+    id: 'alt-04',
+    title: 'Memory Usage สูงบน Web-VM',
+    entityId: 'vm-web1',
+    entityName: 'Web-VM',
+    severity: 'warning',
+    status: 'active',
+    occurrenceCount: 5,
+    firstSeen: '2569-05-24T12:45:00+07:00',
+    lastSeen: '15 นาทีที่แล้ว'
+  },
+  {
+    id: 'alt-05',
+    title: 'Backup Job ล้มเหลว',
+    entityId: 'vm-backup',
+    entityName: 'Backup-Server',
+    severity: 'warning',
+    status: 'active',
+    occurrenceCount: 3,
+    firstSeen: '2569-05-24T12:30:00+07:00',
+    lastSeen: '20 นาทีที่แล้ว'
+  }
+];
+
+export const sampleIncident: Incident = {
+  id: 'INC-2569-0524-0001',
+  title: 'Users cannot access ERP System',
+  severity: 'critical',
+  status: 'open',
+  detectedAt: '24/05/2569 13:18:45',
+  startedAt: '24/05/2569 13:10:21',
+  durationSeconds: 8580, // 2h 23m
+  affectedUsers: 245,
+  detectedBy: 'ai-engine',
+  rootCauseCategory: 'performance-resource'
+};
+
+export const sampleDiagnosis: Diagnosis = {
+  id: 'diag-001',
+  incidentId: 'INC-2569-0524-0001',
+  confidence: 96,
+  rootCauseTitle: 'Storage latency on ESXi Host-01',
+  rootCauseSummary: 'พบความหน่วงของ Storage บน ESXi Host-01 ส่งผลให้ VM หลายตัวทำงานช้าลง โดยเฉพาะ Firewall-VM และ ERP-VM ทำให้ผู้ใช้งานไม่สามารถเข้าระบบ ERP ได้',
+  impactLevel: 'high',
+  modelUsed: 'Gemini 3.6 Flash AI-NOC Engine',
+  generatedAt: '2026-05-24T13:18:45+07:00',
+  chain: [
+    {
+      order: 1,
+      title: 'Storage Latency สูง',
+      entityName: 'ESXi Host-01',
+      timestamp: '13:10',
+      severity: 'critical',
+      description: 'พบค่า Latency สูงผิดปกติที่ Datastore: datastore1'
+    },
+    {
+      order: 2,
+      title: 'VM I/O Wait สูงขึ้น',
+      entityName: 'Firewall-VM, ERP-VM',
+      timestamp: '13:12',
+      severity: 'warning',
+      description: 'VM มีค่า I/O Wait สูงขึ้นอย่างต่อเนื่อง'
+    },
+    {
+      order: 3,
+      title: 'Firewall Response ช้า',
+      entityName: 'Firewall-VM',
+      timestamp: '13:15',
+      severity: 'warning',
+      description: 'Firewall ประมวลผล Packet ช้าลง'
+    },
+    {
+      order: 4,
+      title: 'ERP Application Timeout',
+      entityName: 'ERP-VM',
+      timestamp: '13:18',
+      severity: 'critical',
+      description: 'แอปพลิเคชัน ERP ไม่ตอบสนอง'
+    },
+    {
+      order: 5,
+      title: 'User Report',
+      entityName: 'Users',
+      timestamp: '13:19',
+      severity: 'info',
+      description: 'ผู้ใช้งานแจ้งว่าไม่สามารถใช้งาน ERP ได้'
+    }
+  ],
+  evidence: [
+    {
+      metricName: 'Datastore Latency',
+      source: 'datastore1 (ESXi Host-01)',
+      value: 38.6,
+      unit: 'ms',
+      threshold: 10,
+      thresholdOperator: '<',
+      breached: true,
+      series: [
+        { t: '13:00', v: 4.2 },
+        { t: '13:05', v: 5.1 },
+        { t: '13:10', v: 28.4 },
+        { t: '13:15', v: 35.8 },
+        { t: '13:20', v: 38.6 }
+      ]
+    },
+    {
+      metricName: 'VM I/O Wait (ERP-VM)',
+      source: 'ERP-VM',
+      value: 45.2,
+      unit: '%',
+      threshold: 15,
+      thresholdOperator: '<',
+      breached: true,
+      series: [
+        { t: '13:00', v: 2.1 },
+        { t: '13:05', v: 3.5 },
+        { t: '13:10', v: 18.2 },
+        { t: '13:15', v: 39.0 },
+        { t: '13:20', v: 45.2 }
+      ]
+    },
+    {
+      metricName: 'Firewall CPU Usage',
+      source: 'Firewall-VM',
+      value: 92,
+      unit: '%',
+      threshold: 80,
+      thresholdOperator: '<',
+      breached: true,
+      series: [
+        { t: '13:00', v: 42 },
+        { t: '13:05', v: 45 },
+        { t: '13:10', v: 78 },
+        { t: '13:15', v: 89 },
+        { t: '13:20', v: 92 }
+      ]
+    },
+    {
+      metricName: 'Network RTT (User → ERP)',
+      source: 'From Monitoring VM',
+      value: 286,
+      unit: 'ms',
+      threshold: 100,
+      thresholdOperator: '<',
+      breached: true,
+      series: [
+        { t: '13:00', v: 12 },
+        { t: '13:05', v: 15 },
+        { t: '13:10', v: 120 },
+        { t: '13:15', v: 240 },
+        { t: '13:20', v: 286 }
+      ]
+    }
+  ]
+};
+
+export const initialRecommendations: Recommendation[] = [
+  {
+    id: 'rec-01',
+    title: 'ย้าย VM (Live Migration)',
+    description: 'ย้าย ERP-VM จาก ESXi-Host-01 ไปยัง ESXi-Host-02 เนื่องจาก Storage Latency สูง',
+    sourceType: 'ai-diagnosis',
+    sourceRefId: 'INC-2569-0524-0001',
+    priority: 'critical',
+    confidence: 96,
+    status: 'pending-approval',
+    createdAt: '13:18'
+  },
+  {
+    id: 'rec-02',
+    title: 'เพิ่ม CPU Reservation ให้ Firewall-VM',
+    description: 'CPU Ready Time สูง (45%) อาจทำให้เกิดความช้า',
+    sourceType: 'ai-analysis',
+    sourceRefId: 'PERF-2525-0524-0012',
+    priority: 'high',
+    confidence: 92,
+    status: 'pending-action',
+    createdAt: '13:15'
+  },
+  {
+    id: 'rec-03',
+    title: 'รีสตาร์ท Service: DNS Service',
+    description: 'DNS Service ใช้หน่วยความจำผิดปกติ',
+    sourceType: 'ai-analysis',
+    sourceRefId: 'LOG-2025-0524-0103',
+    priority: 'high',
+    confidence: 90,
+    status: 'pending-approval',
+    createdAt: '13:10'
+  },
+  {
+    id: 'rec-04',
+    title: 'ปรับขนาด Disk I/O ให้ VM: Web-VM',
+    description: 'พบ Disk I/O Wait สูงเกินเกณฑ์ (>15%)',
+    sourceType: 'ai-analysis',
+    sourceRefId: 'PERF-2025-0524-0013',
+    priority: 'medium',
+    confidence: 78,
+    status: 'pending-action',
+    createdAt: '13:05'
+  },
+  {
+    id: 'rec-05',
+    title: 'ตรวจสอบ Network Path ระหว่าง ESXi Host และ Storage',
+    description: 'พบ Packet Loss 2% ในช่วงเวลา 13:00-13:10',
+    sourceType: 'ai-diagnosis',
+    sourceRefId: 'NET-2025-0524-0008',
+    priority: 'medium',
+    confidence: 75,
+    status: 'pending-action',
+    createdAt: '12:58'
+  },
+  {
+    id: 'rec-06',
+    title: 'เคลียร์ Memory Cache บน ESXi-Host-01',
+    description: 'Memory Usage สูงต่อเนื่องเกิน 85% ขึ้นไป',
+    sourceType: 'ai-analysis',
+    sourceRefId: 'PERF-2025-0524-0011',
+    priority: 'low',
+    confidence: 65,
+    status: 'not-recommended',
+    createdAt: '12:45'
+  }
+];
+
+export const initialApprovals: ApprovalRequest[] = [
+  {
+    id: 'appr-01',
+    recommendationId: 'rec-01',
+    actionType: 'live-migration',
+    actionTitle: 'Live Migration: ERP-VM',
+    reason: 'ตรวจพบ Storage Latency สูง (38.6 ms) บน ESXi-Host-01 ส่งผลกระทบต่อประสิทธิภาพของ ERP-VM',
+    parameters: {
+      'Action Type': 'Live Migration',
+      'Source Host': 'ESXi-Host-01 (10.0.0.101)',
+      'Target Host': 'ESXi-Host-02 (10.0.0.102)',
+      'VM Name': 'ERP-VM',
+      'Impact': 'ไม่มี Downtime',
+      'Estimated Time': '2-3 นาที'
+    },
+    expectedImpacts: [
+      { text: 'บริการไม่หยุดชะงัก (Zero Downtime vMotion)', tone: 'positive' },
+      { text: 'ลด Latency ได้ ~35%', tone: 'positive' },
+      { text: 'เพิ่มประสิทธิภาพโดยรวมของ ERP System', tone: 'positive' }
+    ],
+    estimatedTimeMinutes: 3,
+    confidence: 96,
+    commandPreview: `# VMware PowerCLI Live vMotion Command
+$vm = Get-VM -Name "ERP-VM"
+$targetHost = Get-VMHost -Name "10.0.0.102"
+Move-VM -VM $vm -Destination $targetHost -Priority High -NetworkPriority High`,
+    status: 'pending',
+    requiresRole: 'admin',
+    createdAt: '2569-05-24T13:18:45+07:00'
+  },
+  {
+    id: 'appr-02',
+    recommendationId: 'rec-03',
+    actionType: 'restart-service',
+    actionTitle: 'Restart Service: DNS Service',
+    reason: 'DNS Service บน DNS-VM ใช้ Memory สูงผิดปกติ (512 MB / 1 GB) อาจทำให้การตอบสนองล่าช้า',
+    parameters: {
+      'Action Type': 'Restart Service',
+      'Target VM': 'DNS-VM (10.0.1.53)',
+      'Service': 'DNS (BIND9)',
+      'Impact': 'บริการอาจหยุดชั่วคราว ~ 5 วินาที',
+      'Estimated Time': '1 นาที'
+    },
+    expectedImpacts: [
+      { text: 'บริการอาจหยุดชั่วคราว ~5 วินาที', tone: 'caution' },
+      { text: 'ผู้ใช้อาจพบ Timeout ชั่วคราว', tone: 'caution' },
+      { text: 'เคลียร์ Memory leak ของ BIND service', tone: 'positive' }
+    ],
+    estimatedTimeMinutes: 1,
+    confidence: 90,
+    commandPreview: `# SSH Remote Command Execution
+ssh root@10.0.1.53 "systemctl restart bind9 && systemctl status bind9 --no-pager"`,
+    status: 'pending',
+    requiresRole: 'operator',
+    createdAt: '2569-05-24T13:10:22+07:00'
+  },
+  {
+    id: 'appr-03',
+    recommendationId: 'rec-02',
+    actionType: 'update-vm-resource',
+    actionTitle: 'Increase CPU Reservation: Firewall-VM',
+    reason: 'CPU Ready Time สูง (45%) ทำให้ Firewall-VM ประมวลผลช้าและกระทบต่อการเชื่อมต่อ',
+    parameters: {
+      'Action Type': 'Update VM Resource',
+      'Target VM': 'Firewall-VM (10.0.0.1)',
+      'Resource': 'CPU Reservation',
+      'Current': '1 vCPU (0 MHz Reserved)',
+      'New Value': '2 vCPU (3200 MHz Reserved)',
+      'Impact': 'ไม่มี Downtime',
+      'Estimated Time': '1 นาที'
+    },
+    expectedImpacts: [
+      { text: 'ลด CPU Ready Time จาก 45% เป็น <5%', tone: 'positive' },
+      { text: 'เพิ่มประสิทธิภาพ Firewall throughput', tone: 'positive' },
+      { text: 'ไม่มีผลกระทบต่อบริการในขณะปรับเปลี่ยน', tone: 'positive' }
+    ],
+    estimatedTimeMinutes: 1,
+    confidence: 92,
+    commandPreview: `# Proxmox VE API Resource Update
+pvesh set /nodes/pve-node-01/qemu/101/config -cores 2 -cpulimit 2`,
+    status: 'pending',
+    requiresRole: 'admin',
+    createdAt: '2569-05-24T13:15:33+07:00'
+  }
+];
+
+export const initialAuditLogs: AuditLog[] = [
+  {
+    id: 'audit-01',
+    timestamp: '2569-05-24 12:30:15',
+    userRole: 'admin',
+    actionTitle: 'vMotion ERP-VM to ESXi-Host-02',
+    decision: 'Approved & Executed',
+    commandExecuted: 'Move-VM -VM ERP-VM -Destination ESXi-Host-02',
+    detailsReason: 'ย้าย VM สำเร็จ โหลดของ Host-01 ลดลงทันที 40%',
+    username: 'admin',
+    role: 'admin',
+    action: 'APPROVE_ACTION',
+    targetEntity: 'ERP-VM (vMotion)',
+    result: 'success',
+    ipAddress: '10.0.0.50'
+  },
+  {
+    id: 'audit-02',
+    timestamp: '2569-05-24 11:15:42',
+    userRole: 'engineer',
+    actionTitle: 'Clear Memory Cache on ESXi-Host-01',
+    decision: 'Rejected',
+    commandExecuted: 'N/A',
+    detailsReason: 'ปฏิเสธเนื่องจากมีความเสี่ยงส่งผลกระทบช่วงเวลาทำการ (Peak Hour)',
+    username: 'operator1',
+    role: 'operator',
+    action: 'REJECT_ACTION',
+    targetEntity: 'Clear Cache on ESXi-Host-01',
+    result: 'success',
+    ipAddress: '10.0.0.52'
+  },
+  {
+    id: 'audit-03',
+    timestamp: '2569-05-24 09:00:00',
+    userRole: 'admin',
+    actionTitle: 'Update System Threshold Rules',
+    decision: 'Approved & Executed',
+    commandExecuted: 'Set alert threshold to Critical & Warning',
+    detailsReason: 'ปรับแต่งค่า Threshold ตามรอบการบำรุงรักษาระบบ',
+    username: 'admin',
+    role: 'admin',
+    action: 'UPDATE_TELEGRAM_BOT',
+    targetEntity: 'Telegram Notification Rules',
+    result: 'success',
+    ipAddress: '10.0.0.50'
+  }
+];
+
+export const initialChatSessions: ChatSession[] = [
+  {
+    id: 'chat-01',
+    title: 'ทำไมผู้ใช้เข้า ERP ไม่ได้?',
+    timestamp: '15:41',
+    lastMessage: 'จากการวิเคราะห์ข้อมูลทั้งหมด พบว่าสาเหตุหลักคือ Storage latency ที่สูงบน ESXi Host-01'
+  },
+  {
+    id: 'chat-02',
+    title: 'เครื่องไหนเสี่ยงลุ่ม?',
+    timestamp: '15:35',
+    lastMessage: 'ESXi-Host-01 และ Proxmox-Node-03 อยู่ในสถานะ Warning'
+  },
+  {
+    id: 'chat-03',
+    title: 'CPU Ready Time คืออะไร?',
+    timestamp: '15:20',
+    lastMessage: 'CPU Ready Time คือเวลารอของ Virtual Machine ที่ต้องการใช้ CPU...'
+  },
+  {
+    id: 'chat-04',
+    title: 'ขอสรุปปัญหาที่เกิดขึ้นวันนี้',
+    timestamp: '15:10',
+    lastMessage: 'สรุป Incident หลัก 1 รายการ: INC-2569-0524-0001...'
+  }
+];
+
+export const initialChatMessages: ChatMessage[] = [
+  {
+    id: 'msg-01',
+    sessionId: 'chat-01',
+    role: 'user',
+    content: 'ทำไมผู้ใช้เข้า ERP ไม่ได้?',
+    timestamp: '15:41'
+  },
+  {
+    id: 'msg-02',
+    sessionId: 'chat-01',
+    role: 'assistant',
+    content: `จากการวิเคราะห์ข้อมูลทั้งหมด พบว่าสาเหตุหลักคือ **Storage latency** ที่สูงบน **ESXi Host-01** ส่งผลให้ VM หลายตัวทำงานช้าลง โดยเฉพาะ **Firewall-VM** และ **ERP-VM** ทำให้ผู้ใช้งานไม่สามารถเข้าระบบ ERP ได้
+
+### สรุปสาเหตุ (Root Cause):
+1. **Datastore**: \`datastore1\` มีค่า Latency สูงถึง **38.6 ms** (เกินเกณฑ์ปกติ < 10 ms)
+2. **VM I/O Wait**: ทำให้ VM I/O Wait สูงขึ้น (ERP-VM = 45.2%)
+3. **Firewall**: Firewall ประมวลผลช้าลง (CPU Usage 92%)
+4. **Application**: ERP Application ไม่ตอบสนอง (Timeout)
+
+### ผลกระทบ:
+- ผู้ใช้งาน **245 คน** ไม่สามารถเข้าใช้งาน ERP ได้
+- ธุรกรรมบางส่วนช้าเสี่ยงเกิดสั่งซื้อ Timeout
+- ความเสี่ยง: หากไม่แก้ไข อาจส่งผลกระทบต่อระบบอื่นเพิ่มเติม
+
+### คำแนะนำเบื้องต้น:
+- ✅ **ตรวจสอบ Storage array** หรือ Datastore ที่มีปัญหา
+- ✅ **พิจารณา vMotion ERP-VM** และ Firewall-VM ไปยัง Host อื่นชั่วคราว
+- ✅ **ตรวจสอบ Network path** ระหว่าง ESXi Host และ Storage
+
+ต้องการให้ดิฉันช่วยตรวจสอบข้อมูลส่วนไหนเพิ่มเติมไหมคะ?`,
+    timestamp: '15:41',
+    citedEntities: ['ESXi Host-01', 'Firewall-VM', 'ERP-VM']
+  }
+];
+
+export const sampleSyslogs: SyslogEntry[] = [
+  {
+    id: 'sys-01',
+    timestamp: '13:10:21',
+    sourceId: 'hyp-01',
+    sourceName: 'ESXi-Host-01',
+    facility: 'storage',
+    severityLevel: 2,
+    message: 'WARNING: Datastore datastore1 latency spiked to 38.6ms (Threshold: 10ms)'
+  },
+  {
+    id: 'sys-02',
+    timestamp: '13:12:05',
+    sourceId: 'vm-erp',
+    sourceName: 'ERP-VM',
+    facility: 'kernel',
+    severityLevel: 3,
+    message: 'kernel: [432001.120] task postgres:1423 blocked for more than 120 seconds due to I/O wait'
+  },
+  {
+    id: 'sys-03',
+    timestamp: '13:15:10',
+    sourceId: 'vm-fw',
+    sourceName: 'Firewall-VM',
+    facility: 'pfSense',
+    severityLevel: 3,
+    message: 'dpinger: WAN_DHCP 10.0.0.1: Alarm latency 286ms loss 2%'
+  },
+  {
+    id: 'sys-04',
+    timestamp: '13:18:45',
+    sourceId: 'vm-mon',
+    sourceName: 'Monitoring-VM',
+    facility: 'ai-engine',
+    severityLevel: 1,
+    message: 'CRITICAL ALERT: Root cause identified for INC-2569-0524-0001 (Confidence 96%)'
+  }
+];
+
+// Alias Exports matching app imports
+export const MOCK_HYPERVISORS = initialHypervisors;
+export const MOCK_VMS = initialVMs;
+export const MOCK_TOPOLOGY_NODES = initialTopologyNodes;
+export const MOCK_TOPOLOGY_EDGES = initialTopologyEdges;
+export const MOCK_ALERTS = initialRecentAlerts;
+export const MOCK_INCIDENT_01 = sampleIncident;
+export const MOCK_DIAGNOSIS_01 = sampleDiagnosis;
+export const MOCK_RECOMMENDATIONS = initialRecommendations;
+export const MOCK_APPROVALS = initialApprovals;
+export const MOCK_AUDIT_LOGS = initialAuditLogs;
+export const MOCK_CHAT_SESSIONS = initialChatSessions;
+export const MOCK_CHAT_MESSAGES = initialChatMessages;
+export const MOCK_SYSLOGS = sampleSyslogs;
+

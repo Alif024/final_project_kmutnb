@@ -1,0 +1,238 @@
+export type Severity = 'critical' | 'warning' | 'info';
+export type HealthStatus = 'healthy' | 'warning' | 'critical' | 'unknown';
+export type UserRole = 'admin' | 'operator' | 'engineer' | 'viewer';
+
+export interface Hypervisor {
+  id: string;
+  name: string;                 // "ESXi-Host-01"
+  ipAddress: string;            // "10.0.0.101"
+  type: 'vmware-esxi' | 'proxmox-ve';
+  version: string;              // "7.0 U3"
+  status: HealthStatus;
+  cpuUsage: number;             // 0-100
+  memoryUsage: number;
+  storageUsage: number;
+  totalVcpu: number;
+  usedVcpu: number;
+  totalMemoryGb: number;
+  usedMemoryGb: number;
+  totalStorageTb: number;
+  usedStorageTb: number;
+  vmCount: number;
+  vmCapacity: number;           // max vms limit e.g. 32
+  alertCount: number;
+  uptimeSeconds: number;
+  // Specific Virtualization Metrics
+  cpuReadyTimePercent: number;
+  memoryBallooningMb: number;
+  storageLatencyMs: number;
+  vswitchDroppedPackets: number;
+  lastUpdate: string;           // ISO 8601
+}
+
+export interface VirtualMachine {
+  id: string;
+  name: string;                 // "ERP-VM"
+  ipAddress: string;
+  hypervisorId: string;
+  status: 'running' | 'stopped' | 'suspended';
+  health: HealthStatus;
+  role: 'firewall' | 'router' | 'web' | 'app' | 'db' | 'ids' | 'monitoring' | 'log' | 'backup' | 'other';
+  vendorModel?: string;         // "pfSense 2.7.2"
+  cpuUsage: number;
+  memoryUsage: number;
+  storageUsage: number;
+  ioWaitPercent: number;
+  uptimeSeconds: number;
+  activeAlerts: number;
+  lastSeen: string;
+}
+
+export interface NetworkInterface {
+  name: string;                 // "Gi0/1"
+  adminStatus: 'up' | 'down';
+  operStatus: 'up' | 'down';
+  inOctets: number;
+  outOctets: number;
+  errorRate: number;
+  packetLossPercent: number;
+  utilizationPercent: number;
+}
+
+export interface NetworkDevice {
+  id: string;
+  name: string;
+  ipAddress: string;
+  type: 'router' | 'switch' | 'firewall' | 'load-balancer';
+  isVirtual: boolean;
+  status: HealthStatus;
+  interfaces: NetworkInterface[];
+  snmpCommunity?: string;
+  lastSeen: string;
+}
+
+export interface TopologyNode {
+  id: string;
+  label: string;
+  ipAddress: string;
+  nodeType: 'internet' | 'firewall' | 'switch' | 'router' | 'vm' | 'hypervisor';
+  status: HealthStatus;
+  alertBadge: number;
+  position: { x: number; y: number };
+  role?: string;
+}
+
+export interface TopologyEdge {
+  id: string;
+  source: string;
+  target: string;
+  linkStatus: 'up' | 'down' | 'degraded';
+  bandwidthMbps?: number;
+}
+
+export interface SyslogEntry {
+  id: string;
+  timestamp: string;            // NTP synced
+  sourceId: string;
+  sourceName: string;
+  facility: string;
+  severityLevel: number;        // 0-7
+  message: string;
+  parsedFields?: Record<string, string>;
+}
+
+export interface MetricSample {
+  timestamp: string;
+  entityId: string;
+  metricName: string;
+  value: number;
+  unit: string;
+}
+
+export interface Alert {
+  id: string;
+  title: string;
+  entityId: string;
+  entityName: string;
+  severity: Severity;
+  status: 'active' | 'acknowledged' | 'resolved';
+  occurrenceCount: number;
+  firstSeen: string;
+  lastSeen: string;
+  incidentId?: string;
+}
+
+export interface Incident {
+  id: string;                   // "INC-2569-0524-0001"
+  title: string;                // "Users cannot access ERP System"
+  severity: Severity;
+  status: 'open' | 'investigating' | 'resolved';
+  detectedAt: string;
+  startedAt: string;
+  resolvedAt?: string;
+  durationSeconds: number;
+  affectedUsers: number;
+  detectedBy: 'ai-engine' | 'manual' | 'threshold';
+  rootCauseCategory: 'performance-resource' | 'network-connectivity'
+                   | 'configuration-change' | 'security' | 'hardware-failure' | 'other';
+}
+
+export interface RootCauseStep {
+  order: number;
+  title: string;
+  entityName: string;
+  timestamp: string;
+  severity: Severity;
+  description: string;
+}
+
+export interface Evidence {
+  metricName: string;
+  source: string;
+  value: number;
+  unit: string;
+  threshold: number;
+  thresholdOperator: '<' | '>';
+  breached: boolean;
+  series: { t: string; v: number }[];
+}
+
+export interface Diagnosis {
+  id: string;
+  incidentId: string;
+  confidence: number;           // 0-100
+  rootCauseTitle: string;
+  rootCauseSummary: string;
+  impactLevel: 'high' | 'medium' | 'low';
+  chain: RootCauseStep[];
+  evidence: Evidence[];
+  modelUsed: string;
+  generatedAt: string;
+}
+
+export interface Recommendation {
+  id: string;
+  title: string;
+  description: string;
+  sourceType: 'ai-diagnosis' | 'ai-analysis';
+  sourceRefId: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  confidence: number;
+  status: 'pending-action' | 'pending-approval' | 'executed' | 'not-recommended' | 'rejected';
+  createdAt: string;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  recommendationId: string;
+  actionType: 'live-migration' | 'restart-service' | 'update-vm-resource'
+            | 'clear-cache' | 'adjust-disk-io' | 'check-network-path';
+  actionTitle: string;
+  reason: string;
+  parameters: Record<string, string>;
+  expectedImpacts: { text: string; tone: 'positive' | 'caution' | 'negative' }[];
+  estimatedTimeMinutes: number;
+  confidence: number;
+  commandPreview: string;
+  status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed' | 'scheduled';
+  requiresRole: 'admin' | 'operator';
+  createdAt: string;
+  decidedBy?: string;
+  decidedAt?: string;
+  rejectReason?: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  userRole: UserRole;
+  actionTitle: string;
+  decision: 'Approved & Executed' | 'Rejected' | 'Pending';
+  commandExecuted?: string;
+  detailsReason?: string;
+  username?: string;
+  role?: UserRole;
+  action?: string;
+  targetEntity?: string;
+  result?: 'success' | 'failed';
+  ipAddress?: string;
+}
+
+export type AuditLog = AuditLogEntry;
+
+export interface ChatMessage {
+  id: string;
+  sessionId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  citedEntities?: string[];
+  feedback?: 'up' | 'down';
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  timestamp: string;
+  lastMessage: string;
+}
