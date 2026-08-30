@@ -4,19 +4,13 @@ import React, { useState } from 'react';
 import {
   Brain,
   Sparkles,
-  AlertTriangle,
-  Clock,
   Send,
   Copy,
   ThumbsUp,
   ThumbsDown,
   Share2,
-  CheckCircle2,
   ArrowRight,
-  ChevronRight,
   Database,
-  Layers,
-  ShieldAlert,
   Search,
   Plus,
   MessageSquare,
@@ -27,9 +21,6 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
-  XAxis,
-  YAxis,
-  Tooltip,
 } from 'recharts';
 import { Diagnosis, Incident, ChatSession, ChatMessage } from '@/types/ai-noc';
 
@@ -57,6 +48,9 @@ export default function AIAnalysisView({
   const [inputQuery, setInputQuery] = useState('');
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState('chat-01');
+
+  // Only show messages that belong to the currently selected chat session
+  const visibleMessages = messages.filter((m) => m.sessionId === activeSessionId);
 
   // Handle sending chat query to Gemini API
   const handleSendMessage = async (textToSend?: string) => {
@@ -354,7 +348,6 @@ export default function AIAnalysisView({
                   onClick={() => {
                     const newId = `chat-${chatSessions.length + 1}`;
                     setActiveSessionId(newId);
-                    setMessages([]);
                   }}
                   className="px-2.5 py-1 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
                 >
@@ -403,7 +396,13 @@ export default function AIAnalysisView({
           <div className="lg:col-span-8 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 flex flex-col justify-between shadow-lg relative">
             {/* Chat Messages Stream */}
             <div className="flex-1 space-y-4 overflow-y-auto pr-2 mb-4">
-              {messages.map((msg) => (
+              {visibleMessages.length === 0 && !isLoadingAi && (
+                <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 gap-2 py-10">
+                  <Brain className="w-8 h-8 text-slate-600" />
+                  <p className="text-xs">เริ่มบทสนทนาใหม่ได้เลย พิมพ์คำถามด้านล่าง</p>
+                </div>
+              )}
+              {visibleMessages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}

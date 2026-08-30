@@ -7,20 +7,13 @@ import {
   Sliders,
   Users,
   Shield,
-  CheckCircle2,
-  XCircle,
-  RefreshCw,
   Plus,
   Save,
-  Key,
-  Bell,
-  Cpu,
   Brain,
   Lock,
   Eye,
   UserCheck,
-  Clock,
-  Terminal
+  Clock
 } from 'lucide-react';
 import { UserRole, AuditLogEntry } from '@/types/ai-noc';
 

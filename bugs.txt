@@ -1,0 +1,198 @@
+AI-NOC — บันทึกข้อผิดพลาดจากการตรวจสอบแอปทั้งหมด
+วันที่ตรวจสอบ: 2026-08-30
+วิธีตรวจสอบ: npx tsc --noEmit / npx tsc --noUnusedLocals --noUnusedParameters / npm run lint / npm run build
+             + อ่านโค้ดทุกไฟล์ใน app/, components/, lib/, types/, hooks/ ทีละบรรทัด
+             + เทียบตัวเลขที่แสดงบนหน้าจอกับข้อมูลจริงใน lib/mock-data.json
+             + ตรวจซ้ำด้วย headless Chrome (คลิกจริงผ่าน DevTools Protocol) หลังแก้ไข
+
+หมายเหตุ: tsc / eslint / next build ผ่านทั้งหมดโดยไม่มี error ทั้งก่อนและหลังแก้ไข
+(โค้ด compile ได้ถูกต้องเสมอ) บั๊กทั้งหมดด้านล่างเป็น "logic bug" ที่คอมไพเลอร์ตรวจไม่เจอ
+ต้องอ่านโค้ดและทดสอบจริงจึงพบ
+
+สรุปผลการแก้ไข: แก้ไขแล้ว 20 จาก 24 ข้อ (ยืนยันด้วยการคลิกทดสอบจริงในเบราว์เซอร์)
+เหลือ 4 ข้อที่จงใจไม่แก้ เพราะเป็นข้อจำกัดของข้อมูลจำลอง/ขอบเขตงานที่ใหญ่เกินการแก้บั๊ก
+(ดูเหตุผลในแต่ละข้อ: #14, #17, #18, #19, #24 — จัดเป็น "ทราบแล้ว ไม่ใช่บั๊กที่แก้ในรอบนี้")
+
+=== A. บั๊กที่กระทบการทำงาน/แสดงผลผิดจริง (สำคัญ) ===
+
+1. [แก้ไขแล้ว] Sidebar badge นับจำนวนคำขออนุมัติ (Action Center) hardcode เป็น 3 ตายตัว
+   (components/Sidebar.tsx:67) — prop `pendingApprovalCount` ที่คำนวณจากจำนวน
+   approval ที่ status = 'pending' จริงใน page.tsx ถูกส่งเข้ามาแต่ไม่เคยถูกใช้เลย
+   ถ้าอนุมัติ/ปฏิเสธจนไม่มีรายการ pending แล้ว ตัวเลขบน sidebar จะยังคงโชว์ 3 อยู่ดี
+   >> แก้โดยผูก badgeCount ของเมนู Action Center เข้ากับ pendingApprovalCount จริง
+
+2. [แก้ไขแล้ว] StatusBar ไม่ใช้ prop isCollectorActive และ isAiRunning เลย
+   (components/StatusBar.tsx) — สถานะ "Active" / "Running (Gemini 3.6 Flash)"
+   hardcode สีเขียว/ม่วงไว้ตายตัว ต่อให้ส่ง isCollectorActive={false} เข้ามา
+   หน้าจอก็ยังขึ้นว่า Active เหมือนเดิม
+   >> แก้โดยให้สี/ข้อความอ้างอิงค่า prop จริง (เทาและ "Stopped" เมื่อเป็น false)
+
+3. [แก้ไขแล้ว] ปุ่ม Refresh บน TopBar และ StatusBar เป็น no-op — page.tsx ส่ง onRefresh={() => {}}
+   กดแล้วไม่มีอะไรเกิดขึ้น ไม่มี feedback ใดๆ ให้ผู้ใช้ทราบว่ากดสำเร็จหรือไม่
+   >> แก้โดยเพิ่ม handleRefresh ใน page.tsx ที่อัปเดตเวลา "Last Update" เป็นเวลาปัจจุบันจริง
+      (mock refresh เนื่องจากยังไม่มี Collector จริงให้ดึงข้อมูลใหม่) ผูกกับปุ่ม Refresh
+      ทั้งบน TopBar, StatusBar และปุ่ม "Refresh Dashboard" บน DashboardView
+
+4. [แก้ไขแล้ว] ปุ่ม Fullscreen บน TopBar สถานะไอคอน/tooltip ไม่ sync กับสถานะจริงของเบราว์เซอร์
+   (components/TopBar.tsx) — ถ้าผู้ใช้กด Esc เพื่อออกจาก Fullscreen เอง (ไม่ได้กดปุ่มนี้)
+   ตัว state isFullscreen จะไม่อัปเดต ทำให้ไอคอน/ข้อความค้างผิดสถานะ
+   (ไม่มี event listener คอย fullscreenchange)
+   >> แก้โดยเพิ่ม document.addEventListener('fullscreenchange', ...) ให้ state อ่านจาก
+      document.fullscreenElement จริงเสมอ แทนการ set ค่าเองตอนกดปุ่ม
+
+5. [แก้ไขแล้ว] CommandPreviewModal และ RejectReasonModal เก็บ state ค้างข้ามคำขอที่ต่างกัน
+   (components/CommandPreviewModal.tsx, components/RejectReasonModal.tsx) —
+   ทั้งสอง modal ถูก render ค้างตลอดเวลาใน page.tsx (ไม่เคย unmount) และไม่มีการ
+   reset state เมื่อ request เปลี่ยน ผลคือ:
+     - เปิด CommandPreviewModal อนุมัติสำเร็จไปแล้วครั้งหนึ่ง (isExecuting/executionSuccess
+       เป็น true ค้างอยู่) พอเปิด modal นี้ซ้ำกับคำขอ "อื่น" จะโชว์ปุ่ม "รันคำสั่งสำเร็จ!"
+       ทันทีทั้งที่ยังไม่ได้กดยืนยันคำขอใหม่เลย
+     - เปิด RejectReasonModal พิมพ์เหตุผลปฏิเสธคำขอ A ไปแล้ว พอเปิดปฏิเสธคำขอ B
+       ข้อความเหตุผลของคำขอ A จะยังค้างอยู่ในกล่องข้อความ (ไม่ถูกล้าง)
+   >> แก้โดยส่ง key={request?.id} จาก page.tsx ให้ React สร้าง instance ใหม่ทุกครั้งที่
+      คำขอเปลี่ยน (แทนการใช้ useEffect เซ็ต state เอง ซึ่ง React lint rule
+      react-hooks/set-state-in-effect เตือนว่าไม่ควรทำ) ยืนยันแล้วด้วยการอนุมัติคำขอ A
+      จนสำเร็จ แล้วเปิดคำขอ B ทันที — ปุ่มกลับมาเป็นสถานะปกติ ไม่ค้างจากคำขอ A
+
+6. [แก้ไขแล้ว] CommandPreviewModal: กดปุ่ม X ปิดหน้าต่างระหว่างกำลัง "ส่งคำสั่งรันระบบ..."
+   (isExecuting = true) ไม่ได้ยกเลิกการอนุมัติจริง — setTimeout ที่ตั้งไว้ยังทำงานต่อ
+   เบื้องหลัง แล้วจะยิง onConfirmApprove() ให้เองใน ~2.5 วินาทีถัดมาโดยผู้ใช้ไม่รู้ตัว
+   ทั้งที่กดปิดหน้าต่างไปแล้ว (ปุ่ม X ไม่ถูก disable ระหว่าง isExecuting เหมือนปุ่ม "ยกเลิก")
+   >> แก้โดย disable ปุ่ม X ระหว่าง isExecuting เหมือนปุ่ม "ยกเลิก" (ผู้ใช้ปิดกลางคันไม่ได้
+      อีกต่อไปในช่วงที่คำสั่งกำลังรันจริง สอดคล้องกับ design เดิมของปุ่ม "ยกเลิก") และเก็บ
+      timeout ไว้ใน ref เพื่อยกเลิกอัตโนมัติเมื่อ modal ถูก unmount (จาก key เปลี่ยน)
+
+7. [แก้ไขแล้ว] ActionCenterView: ปุ่มกรองสถานะในแท็บ "Recommendations" (ทั้งหมด/รอดำเนินการ/
+   รออนุมัติ/ดำเนินการแล้ว/ไม่แนะนำ) ไม่มีผลใดๆ ต่อตารางเลย — กด setRecFilter()
+   แล้วปุ่มไฮไลต์แสดงว่าเลือกอยู่ แต่ตารางด้านล่าง map จาก initialRecs (ข้อมูลดิบทั้งหมด)
+   ตรงๆ ไม่เคย filter ตาม recFilter (คนละเรื่องกับแท็บ Approvals ที่ filter ถูกต้อง)
+   >> แก้โดยเพิ่ม filteredRecs ที่กรองตาม recFilter จริง พร้อม empty state เมื่อไม่พบรายการ
+      ทดสอบแล้ว: กด "รอดำเนินการ" เหลือ 3 แถวจาก 6 แถว ตรงกับข้อมูลจริง
+
+8. [แก้ไขแล้ว] ActionCenterView: การ์ดสรุปยอด (ทั้งหมด 12 / Critical 3 / High 5 / Medium 3 / Low 1)
+   และข้อความ pagination "Showing 1 to 6 of 12 results" เป็นตัวเลข hardcode ที่ไม่ตรง
+   กับข้อมูลจริงเลย — ข้อมูลจริงมี recommendation แค่ 6 รายการ (Critical 1, High 2,
+   Medium 2, Low 1) ตัวเลขขัดแย้งกับจำนวนแถวที่เห็นในตารางด้านล่างของหน้าเดียวกัน
+   >> แก้โดยคำนวณการ์ดสรุปยอดและข้อความ pagination จาก initialRecs จริง (เป็น 6/1/2/2/1)
+      และตัดปุ่มหน้า "2" ที่ไม่มีข้อมูลจริงรองรับออก
+
+9. [แก้ไขแล้ว] DashboardView: การ์ด "Active Alerts" และ Alert Summary donut (Total 11,
+   Critical 3, Warning 8) hardcode ไม่ตรงกับข้อมูล recentAlerts จริงที่ส่งเข้ามา
+   (มี alert จริงแค่ 5 รายการ: Critical 1, Warning 4) ตัวเลขขัดแย้งกับ badge แจ้งเตือน
+   บน TopBar ในหน้าเดียวกันที่ใช้ MOCK_ALERTS.length (=5) ถูกต้อง
+   >> แก้โดยคำนวณจำนวน Critical/Warning/Info และเปอร์เซ็นต์จาก recentAlerts จริง
+      ยืนยันแล้วว่าตอนนี้ตรงกับ badge บน TopBar (Total 5, Critical 1 (20%), Warning 4 (80%))
+
+10. [แก้ไขแล้ว] InfrastructureView (Topology): กล่องรายละเอียด node ที่เลือก แสดงไอคอนกล่องสีแดง
+    (ShieldAlert) และ badge สถานะสีแดงคงที่ ไม่ว่าจะเลือก node ไหนก็ตาม — เช่น เลือก
+    "Internet" หรือ "Core-Switch-01" ที่สถานะจริงคือ healthy ก็ยังขึ้น badge สีแดงเหมือน
+    เดิม (ข้อความจะเขียนว่า "healthy" แต่พื้นหลัง/กรอบเป็นสีแดงของ critical)
+    >> แก้โดยเพิ่มฟังก์ชัน statusClasses() ให้สีไอคอน/badge อ้างอิง selectedNode.status จริง
+       ยืนยันแล้ว: เลือก "Internet" แล้ว badge เปลี่ยนเป็นสีเขียว "HEALTHY" ถูกต้อง
+
+11. [แก้ไขแล้ว] InfrastructureView (Topology): แท็บ "Overview" ของ Node Detail (Device Information,
+    Status Summary) แสดงข้อมูล Firewall-VM ("Virtual Firewall", "pfSense 2.7.2",
+    "Overall Status: Critical", "2 Alerts") ตายตัวเสมอ ไม่ว่าจะเลือก node ไหน
+    >> แก้โดย join TopologyNode เข้ากับ VirtualMachine จริงผ่าน IP Address (matchedVm)
+       แสดง Vendor/Model, Uptime, Location Host, CPU/Memory/Storage, Active Alerts จากข้อมูล
+       จริงของ VM ที่ตรงกัน ถ้าไม่ใช่ VM (เช่น Internet, Switch) จะโชว่ "—" หรือข้อความ
+       "ไม่มีข้อมูลเมตริกระดับ VM" อย่างตรงไปตรงมาแทนการใช้ตัวเลขปลอม
+       (พบเพิ่มเติมระหว่างแก้: CPU ของ Firewall-VM เดิม hardcode 78% แต่ข้อมูลจริงคือ 92%
+       ซึ่งตรงกับที่ระบุใน system prompt ของ AI Chat — 78% เป็นตัวเลขที่ผิดมาตั้งแต่ต้น)
+
+12. [แก้ไขแล้ว] InfrastructureView (Topology): ประกาศแท็บรายละเอียด node ไว้ 6 แท็บ (overview,
+    interfaces, performance, logs, alerts, vm-info) แต่มีเนื้อหาจริงแค่ 3 แท็บ
+    (overview, logs, interfaces) กดแท็บ Performance / Alerts / VM Info แล้วพาเนล
+    จะว่างเปล่า (ปุ่มไฮไลต์ว่าเลือกอยู่ แต่ไม่มีอะไรแสดง)
+    >> แก้โดยเพิ่มเนื้อหาจริงให้ครบ: Performance โชว์กราฟแนวโน้ม, Alerts กรอง recentAlerts
+       ตาม entity ที่ตรงกับ node, VM Info โชว์ role/health/I-O Wait ของ VM ที่ตรงกัน (หรือ
+       ข้อความ "โหนดนี้ไม่ใช่ Virtual Machine" ถ้าไม่ใช่) ยืนยันแล้วด้วยการคลิกทุกแท็บจริง
+
+13. [แก้ไขแล้ว] InfrastructureView (Monitoring): ประกาศแท็บรายละเอียด Hypervisor ไว้ 6 แท็บ
+    (overview, performance, vms, datastores, alerts, logs) แต่ "ไม่มีแท็บไหนถูก gate
+    เลยสักแท็บ" — เนื้อหา Overview+Performance โชว์ตลอดไม่ว่าจะกดแท็บไหน อีก 4 แท็บ
+    ไม่ทำงานเลยแม้แต่แท็บเดียว
+    >> แก้โดยแยก Overview/Performance ให้ gate ตาม hypDetailTab จริง และเพิ่มเนื้อหา vms
+       (กรอง VM ตาม hypervisorId), datastores (สรุปพื้นที่จัดเก็บจริงของ host นั้น), alerts
+       และ logs (กรองจาก recentAlerts/syslogs ตาม host) ยืนยันแล้วด้วยการคลิกทุกแท็บจริง
+       บน ESXi-Host-01 — vms โชว์ ERP-VM/Web-VM-01/DNS-VM ถูกต้อง, alerts โชว์ alert จริง
+       ของ host นั้น, datastores โชว่ 2.6/3.2 TB และ latency 38.6 ms ตรงกับข้อมูลจริง
+
+14. [ทราบแล้ว — ไม่ได้แก้] InfrastructureView: prop `vms`, `edges` (บางส่วน) รับเข้ามาแต่
+    ไม่ถูกใช้งานทั้งหมด — ผังโครงสร้าง Topology เป็นไดอะแกรม SVG ที่วาดตายตัวด้วยมือ ไม่ได้
+    render จากข้อมูล nodes/edges จริงทั้งหมด ผลคือ node 3 ตัวจากทั้งหมด 11 ตัวในข้อมูล
+    (Monitoring-VM, Log-Server-VM, Backup-VM) ไม่เคยปรากฏ/เลือกได้ในหน้าจอเลย
+    เหตุผลที่ไม่แก้: การทำให้ผัง Topology วาดจาก nodes/edges แบบ dynamic ทั้งหมด (ตำแหน่ง,
+    เส้นเชื่อม, ไอคอนตามประเภท) เป็นงาน "เขียนใหม่" ระดับ feature ไม่ใช่การแก้บั๊กจุดเดียว
+    และเสี่ยงทำ layout ที่ออกแบบมาอย่างประณีตพังได้ — ได้แก้ไขเฉพาะส่วนที่ระบบเลือก node
+    ที่มีอยู่แล้วให้ดึงข้อมูลถูกต้อง (ข้อ #10, #11, #12) แต่ยังไม่ได้ทำให้ node ที่ขาดหายไป
+    ปรากฏขึ้นมาในผัง
+
+15. [แก้ไขแล้ว] AIAnalysisView (AI Chat): รายการ "Chat History" ทางซ้ายมีไว้ตกแต่งเท่านั้น —
+    การสลับ session (หรือกด "New Chat") ไม่ได้กรองข้อความที่แสดงเลย หน้าต่างแชท
+    จะ map จาก messages (array รวมทั้งหมด) ตรงๆ เสมอ ไม่กรองด้วย activeSessionId
+    ที่ร้ายกว่านั้น ปุ่ม "New Chat" เรียก setMessages([]) ซึ่งลบข้อความของ "ทุก session"
+    ทิ้งหมด ไม่ใช่แค่เริ่มบทสนทนาใหม่ตามที่ตั้งใจ
+    >> แก้โดยเพิ่ม visibleMessages ที่กรองด้วย activeSessionId จริง, เอา setMessages([])
+       ออกจากปุ่ม New Chat (แค่เปลี่ยน session id พอ), เพิ่ม empty state ว่า "เริ่มบทสนทนาใหม่
+       ได้เลย" เมื่อ session ไม่มีข้อความ ยืนยันแล้ว: สลับไป session ที่ไม่มีข้อความ (chat-02)
+       แสดง empty state ถูกต้อง ไม่มีข้อความจาก session อื่นเล็ดลอดมา
+
+16. [แก้ไขแล้ว] ReportsView (Incident Post-Mortem): หัวรายงาน hardcode badge "RESOLVED" สีเขียว
+    แต่ข้อมูล incident จริงมี status = "open" (ไม่มี resolvedAt) รายงานอ้างว่าปิดเคส
+    ไปแล้วทั้งที่ข้อมูลต้นทางบอกว่ายังไม่ปิด
+    >> แก้โดยให้ badge อ้างอิง selectedIncident.status จริง (OPEN/INVESTIGATING/RESOLVED
+       พร้อมสีที่สอดคล้อง) และคำนวณ "Total Downtime" จาก durationSeconds จริงแทนเลข
+       hardcode ยืนยันแล้ว: ตอนนี้ขึ้น badge "OPEN" สีแดงถูกต้อง
+
+=== B. จุดที่เป็น dead code / data ไม่สอดคล้องกัน (ผลกระทบต่ำ แต่ควรรู้ไว้) ===
+
+17. [ทราบแล้ว — ไม่ได้แก้] types/ai-noc.ts ประกาศ interface NetworkDevice และ MetricSample
+    ไว้แต่ไม่ถูกใช้งานที่ไหนเลยทั้งโปรเจกต์ (ไม่มี mock data รองรับ) ตัวเลข "Total Devices: 82"
+    ที่เห็นบน Dashboard จึงไม่มีข้อมูลต้นทางจริงรองรับเลยแม้แต่รายการเดียว
+    เหตุผลที่ไม่แก้: การสร้างข้อมูลจำลอง NetworkDevice 82 รายการเพื่อรองรับตัวเลขนี้เป็นการ
+    "เพิ่มข้อมูล" ไม่ใช่การแก้บั๊ก และตัวเลขนี้เป็นเนื้อหาสาธิต (demo content) ที่สอดคล้องกับ
+    สถานะที่ README ระบุไว้แล้วว่าแอปยังเป็น Mock-driven Prototype
+
+18. [ทราบแล้ว — ไม่ได้แก้] mock-data.json มี alert หนึ่งรายการ (alt-05, entity
+    "Backup-Server"/"vm-backup") ที่อ้างถึง entity ซึ่งไม่มีอยู่จริงใน hypervisors /
+    virtualMachines / topologyNodes เลย (dangling reference)
+    เหตุผลที่ไม่แก้: เป็นความไม่สอดคล้องของเนื้อหาข้อมูลจำลอง ไม่ใช่บั๊กในโค้ด การแก้ต้อง
+    ตัดสินใจเปลี่ยนความหมายของข้อมูล (เช่น ผูกกับ VM ไหนแทน) ซึ่งเป็นการตัดสินใจเชิงเนื้อหา
+
+19. [ทราบแล้ว — ไม่ได้แก้] hooks/use-mobile.ts (useIsMobile) เขียนสมบูรณ์แล้วแต่ไม่มีที่ไหน
+    เรียกใช้เลย — Sidebar/Layout จึงไม่มีพฤติกรรม responsive สำหรับหน้าจอมือถือ
+    เหตุผลที่ไม่แก้: การทำ Sidebar ให้ responsive เต็มรูปแบบ (ยุบอัตโนมัติ/เป็น drawer บน
+    มือถือ) เป็นฟีเจอร์ใหม่ ไม่ใช่การแก้ไขพฤติกรรมที่มีอยู่แล้วให้ถูกต้อง
+
+20. [แก้ไขบางส่วน] มี unused imports (ไอคอนที่ import แล้วไม่ใช้) กระจายอยู่ ~45 จุดใน
+    Sidebar.tsx, DashboardView.tsx, InfrastructureView.tsx, AIAnalysisView.tsx,
+    ActionCenterView.tsx, ReportsView.tsx, SettingsView.tsx
+    >> ลบ unused icon imports ออกหมดแล้ว (ยืนยันด้วย tsc --noUnusedLocals ซ้ำจนเหลือ 0
+       ในหมวดนี้) ยังคงเหลือ prop `edges`/`onNavigateTab` ใน InfrastructureView และ
+       `onNavigateTab`/`setSelectedIncidentId` ใน ReportsView ที่ตั้งใจไม่ตัดออก เพราะเป็น
+       ส่วนหนึ่งของ public prop interface ที่หน้าอื่นยังส่งเข้ามาอยู่ (ดูข้อ #14 และเหตุผล
+       related) การตัด prop ออกจาก interface มีความเสี่ยงเปลี่ยน public API มากกว่าการ
+       ลบ import ที่ไม่กระทบใคร
+
+21. [แก้ไขแล้ว] app/api/ai/chat/route.ts destructure ตัวแปร contextData จาก request body
+    มาแต่ไม่เคยใช้ (ฝั่ง client ก็ไม่เคยส่งมาด้วย)
+    >> ลบตัวแปรที่ไม่ได้ใช้ออกจาก destructuring
+
+22. [แก้ไขแล้ว] มีไฟล์ตั้งค่า ESLint ซ้ำซ้อนกัน: .eslintrc.json (รูปแบบเก่า) กับ
+    eslint.config.mjs (flat config) — ESLint 9 อ่านเฉพาะไฟล์หลัง ไฟล์เก่าจึงไม่มีผลใดๆ
+    แต่ทำให้เข้าใจผิดได้
+    >> ลบ .eslintrc.json ออก (ยืนยันแล้วว่าลบ/ไม่ลบให้ผล npm run lint เหมือนกันทุกประการ
+       จึงมั่นใจว่าเป็นไฟล์ที่ไม่มีผลจริง)
+
+23. [แก้ไขแล้ว] package.json สคริปต์ "clean": "next clean" รันไม่ได้จริง — Next.js 15 CLI
+    ไม่มีคำสั่ง clean (ยืนยันด้วย next --help)
+    >> แก้เป็นสคริปต์ Node ล้วน (ไม่ต้องเพิ่ม dependency ใหม่) ที่ลบโฟลเดอร์ .next จริง
+       ทดสอบรันแล้วสำเร็จ
+
+24. [ทราบแล้ว — ไม่ได้แก้] โมเดล Gemini ที่เรียกจริงใน API route คือ "gemini-3.6-flash" —
+    ตรวจสอบไม่ได้ว่าเป็นชื่อโมเดลที่มีอยู่จริงในบัญชีรายชื่อของ Gemini API หรือไม่ ถ้าผู้ใช้
+    ตั้งค่า GEMINI_API_KEY จริง (ไม่ผ่าน Mock Mode) แล้วเรียกไม่ได้ จะได้ error กลับมาแทน
+    เหตุผลที่ไม่แก้: ไม่มี API key จริงให้ทดสอบเรียก Gemini API ในสภาพแวดล้อมนี้ และการเดา
+    เปลี่ยนชื่อโมเดลโดยไม่มีทางยืนยันอาจทำให้ผิดพลาดยิ่งกว่าเดิม ควรให้ผู้ใช้ตรวจสอบกับ
+    เอกสาร Gemini API ปัจจุบันก่อนตั้งค่า API Key ใช้งานจริง

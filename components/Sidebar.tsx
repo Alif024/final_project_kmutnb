@@ -11,9 +11,6 @@ import {
   Brain,
   ChevronRight,
   UserCheck,
-  LogOut,
-  ShieldAlert,
-  Server,
   Menu
 } from 'lucide-react';
 import { UserRole } from '@/types/ai-noc';
@@ -64,7 +61,7 @@ export default function Sidebar({
       label: 'Action Center',
       subtitle: 'Recommendation & Approval',
       icon: ShieldCheck,
-      badgeCount: 3,
+      badgeCount: pendingApprovalCount,
     },
     {
       id: 'reports',

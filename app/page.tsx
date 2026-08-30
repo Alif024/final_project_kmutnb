@@ -48,6 +48,12 @@ export default function Page() {
   const [approveModalReq, setApproveModalReq] = useState<ApprovalRequest | null>(null);
   const [rejectModalReq, setRejectModalReq] = useState<ApprovalRequest | null>(null);
 
+  // Telemetry refresh timestamp (mock — no real collector to poll yet)
+  const [lastUpdate, setLastUpdate] = useState('24/05/2569 15:42:18');
+  const handleRefresh = () => {
+    setLastUpdate(new Date().toLocaleDateString('th-TH') + ' ' + new Date().toLocaleTimeString('th-TH'));
+  };
+
   // Handle Tab Navigation
   const handleNavigateTab = (tab: string, subtab: string = 'default') => {
     setActiveTab(tab);
@@ -147,7 +153,7 @@ export default function Page() {
           <TopBar
             collapsed={collapsed}
             activeAlertCount={MOCK_ALERTS.length}
-            onRefresh={() => {}}
+            onRefresh={handleRefresh}
             title={
               activeTab === 'dashboard'
                 ? 'NOC Dashboard'
@@ -172,6 +178,7 @@ export default function Page() {
                 recentAlerts={MOCK_ALERTS}
                 onNavigateTab={handleNavigateTab}
                 onSelectIncident={() => handleNavigateTab('ai-analysis', 'diagnosis')}
+                onRefresh={handleRefresh}
               />
             )}
 
@@ -232,8 +239,8 @@ export default function Page() {
           {/* Fixed Bottom Status Bar (spans the main content column only) */}
           <StatusBar
             collapsed={collapsed}
-            lastUpdate="24/05/2569 15:42:18"
-            onRefresh={() => {}}
+            lastUpdate={lastUpdate}
+            onRefresh={handleRefresh}
             isCollectorActive={true}
             isAiRunning={true}
           />
@@ -241,14 +248,20 @@ export default function Page() {
       </div>
 
       {/* Human-in-the-Loop Command Execution Preview Modal */}
+      {/* key={approveModalReq?.id} forces a fresh instance per request, so
+          isExecuting/executionSuccess never bleed over from a previous one */}
       <CommandPreviewModal
+        key={approveModalReq?.id}
         request={approveModalReq}
         onClose={() => setApproveModalReq(null)}
         onConfirmApprove={handleConfirmApprove}
       />
 
       {/* Human-in-the-Loop Rejection Reason Modal */}
+      {/* key={rejectModalReq?.id} forces a fresh instance per request, so a
+          previously typed rejection reason never carries over */}
       <RejectReasonModal
+        key={rejectModalReq?.id}
         request={rejectModalReq}
         onClose={() => setRejectModalReq(null)}
         onConfirmReject={handleConfirmReject}

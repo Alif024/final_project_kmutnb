@@ -13,20 +13,24 @@
 > ส่วนติดต่อผู้ใช้ครบทั้ง 6 โมดูลและใช้งานโต้ตอบได้จริงในเบราว์เซอร์
 > ข้อมูลทั้งหมดมาจากไฟล์ชุดข้อมูลจำลองไฟล์เดียวคือ `lib/mock-data.json` ยกเว้น **AI Chat Assistant** ที่เรียก Gemini API จริงผ่าน API Route
 
-**ผลการตรวจสอบล่าสุด (30 สิงหาคม 2568):** ระบบ Build ผ่านสมบูรณ์
+**ผลการตรวจสอบล่าสุด (30 สิงหาคม 2569):** ระบบ Build ผ่านสมบูรณ์ และผ่านการตรวจ Logic Bug
+เชิงลึกทั้งแอป (อ่านโค้ดทุกไฟล์ + ทดสอบคลิกจริงผ่านเบราว์เซอร์) พบ 24 จุด แก้ไขแล้ว 20 จุด —
+รายละเอียดทั้งหมดอยู่ใน [`bugs.txt`](bugs.txt)
 
 | การตรวจสอบ | ผลลัพธ์ |
 |---|---|
 | `npm install` | ✅ ผ่าน (1,002 packages) |
 | `npx tsc --noEmit` | ✅ ผ่าน ไม่มี Type Error |
-| `npm run build` | ✅ ผ่าน — 3 Route (`/` = 256 kB First Load JS, `/_not-found`, `/api/ai/chat`) |
+| `npm run build` | ✅ ผ่าน — 3 Route (`/` = 259 kB First Load JS, `/_not-found`, `/api/ai/chat`) |
 | `npm run lint` | ✅ ผ่าน ไม่มี Warning |
+| ทดสอบคลิกจริงผ่าน Headless Chrome | ✅ ยืนยัน 20 จุดที่แก้ไขทำงานถูกต้องตามที่ตั้งใจ |
 
 | ด้าน | สถานะ |
 |---|---|
 | หน้าจอ/ฟีเจอร์ UI | ✅ ครบทั้ง 6 โมดูล รวม 13 หน้าย่อย |
-| Human-in-the-Loop (อนุมัติ/ปฏิเสธ + Audit Log) | ✅ ทำงานจริงแบบ in-memory |
-| AI Chat Assistant | ✅ ต่อ Gemini API จริง (มี Mock Fallback เมื่อไม่ตั้งค่า API Key) |
+| Human-in-the-Loop (อนุมัติ/ปฏิเสธ + Audit Log) | ✅ ทำงานจริงแบบ in-memory (แก้ปัญหา State ค้างข้ามคำขอแล้ว) |
+| ตัวกรอง/แท็บรายละเอียดใน Action Center และ Infrastructure | ✅ กรอง/สลับเนื้อหาได้จริงทุกปุ่ม (เดิมมีหลายจุดกดแล้วไม่มีผล) |
+| AI Chat Assistant | ✅ ต่อ Gemini API จริง (มี Mock Fallback เมื่อไม่ตั้งค่า API Key), แยกประวัติสนทนาตาม Session ถูกต้อง |
 | AI Diagnosis (RCA) | 🟡 แสดงผลจากชุดข้อมูลจำลอง ยังไม่เรียกโมเดลจริง |
 | การเก็บ Telemetry จริง (vCenter / Proxmox / SNMP / Syslog) | ❌ ยังไม่เชื่อมต่อ (หน้า Integrations เป็น UI Mock) |
 | ฐานข้อมูล / การคงข้อมูลถาวร | ❌ ยังไม่มี — State หายเมื่อรีเฟรชหน้า |
@@ -86,7 +90,7 @@ npm run dev          # เปิดที่ http://localhost:3000
 | `npm run build` | Build สำหรับ Production (โหมด standalone) |
 | `npm run start` | รัน Production Server จากผลลัพธ์ Build |
 | `npm run lint` | ตรวจสอบโค้ดด้วย ESLint |
-| ~~`npm run clean`~~ | ⚠️ ใช้งานไม่ได้ — Next.js CLI ไม่มีคำสั่ง `clean` (ให้ลบโฟลเดอร์ `.next` เองแทน) |
+| `npm run clean` | ลบโฟลเดอร์ `.next` (ใช้สคริปต์ Node ล้วน ไม่พึ่ง `next clean` ซึ่งไม่มีอยู่จริงใน CLI) |
 
 ---
 
@@ -111,8 +115,9 @@ final_project_kmutnb/
 │   ├── mock-data.ts             # ผูก TypeScript types ให้ JSON แล้ว re-export
 │   └── utils.ts                 # `cn()` — clsx + tailwind-merge
 ├── types/ai-noc.ts              # TypeScript Interface ของโดเมนทั้งหมด
-├── hooks/use-mobile.ts          # Media Query Hook
-└── metadata.json                # Manifest สำหรับ Google AI Studio
+├── hooks/use-mobile.ts          # Media Query Hook (ยังไม่มีการเรียกใช้งานจริง)
+├── metadata.json                # Manifest สำหรับ Google AI Studio
+└── bugs.txt                     # บันทึกผลตรวจสอบบั๊กทั้งแอป (รายการที่แก้แล้ว/ยังไม่แก้)
 ```
 
 สถาปัตยกรรมปัจจุบันเป็น **Single-page + Client State** — `app/page.tsx` ถือ State ทั้งหมด
@@ -130,18 +135,26 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 
 ### 2. Infrastructure — Topology & Monitoring
 - **Topology:** ผังลำดับชั้น (Internet → Firewall → Core Switch → Edge/VM) วาดด้วย SVG พร้อม Legend,
-  Minimap, ค้นหา/กรอง และแผงรายละเอียดโหนด 3 แท็บ (Overview / Logs / Interfaces)
+  Minimap, ค้นหา/กรอง และแผงรายละเอียดโหนด 6 แท็บ (Overview / Interfaces / Performance / Logs /
+  Alerts / VM Info) — เมื่อ node ที่เลือกตรงกับ VM จริงในข้อมูล จะดึงเมตริก/สถานะของ VM นั้นมาแสดง
+  จริง (จับคู่ด้วย IP Address); node ที่ไม่ใช่ VM (เช่น Internet, Switch) จะระบุตรงๆ ว่าไม่มีข้อมูล
+  ระดับ VM แทนการโชว์ตัวเลขปลอม *(หมายเหตุ: ผังยังวาดด้วยมือแบบตายตัว ไม่ได้ render จาก
+  nodes/edges ทั้งหมด จึงมี 3 node ในข้อมูลที่ยังไม่ปรากฏบนผัง — ดู `bugs.txt` ข้อ 14)*
 - **Monitoring:** ตาราง Hypervisor พร้อมเมตริกเฉพาะทาง Virtualization —
-  CPU Ready Time, Memory Ballooning, Storage Latency, Virtual Switch Dropped Packets และกราฟย้อนหลัง 1 ชั่วโมง
+  CPU Ready Time, Memory Ballooning, Storage Latency, Virtual Switch Dropped Packets และกราฟย้อนหลัง
+  1 ชั่วโมง พร้อมแผงรายละเอียด Host 6 แท็บ (Overview / Performance / VMs / Datastores / Alerts / Logs)
+  ที่กรองข้อมูลจริงตาม Host ที่เลือก
 
 ### 3. AI Analysis — Diagnosis & Assistant
 - **AI Diagnosis (RCA):** แสดง Root Cause พร้อมคะแนนความเชื่อมั่น, ห่วงโซ่เหตุการณ์ (Evidence Chain)
   และหลักฐานเชิงเมตริกเทียบกับ Threshold *(ข้อมูลจำลอง)*
 - **AI Chat Assistant:** สนทนากับ Gemini ผ่าน `POST /api/ai/chat` — System Prompt ภาษาไทย
-  ฝังบริบท Telemetry ของระบบไว้ พร้อมชุดคำถามแนะนำ *(เรียกโมเดลจริง)*
+  ฝังบริบท Telemetry ของระบบไว้ พร้อมชุดคำถามแนะนำ *(เรียกโมเดลจริง)* แยกประวัติการสนทนาตาม
+  Session จริง (สลับ Session แล้วเห็นเฉพาะข้อความของ Session นั้น, "New Chat" ไม่ลบประวัติ Session อื่น)
 
 ### 4. Action Center — Recommendation & Approval
-- **Recommendations:** ตารางข้อเสนอแนะจาก AI พร้อมลำดับความสำคัญ ความเชื่อมั่น และตัวกรอง
+- **Recommendations:** ตารางข้อเสนอแนะจาก AI พร้อมลำดับความสำคัญ ความเชื่อมั่น และตัวกรองสถานะ
+  ที่กรองข้อมูลจริง (การ์ดสรุปยอดด้านบนคำนวณจากรายการจริงเช่นกัน)
 - **Approvals (Human-in-the-Loop):** การ์ดคำขออนุมัติ 3 คอลัมน์ (บริบท / พารามิเตอร์ / ผลกระทบที่คาดการณ์),
   Modal ดูตัวอย่างคำสั่งก่อนรัน, Modal ระบุเหตุผลการปฏิเสธ, สวิตช์ Auto-Execute Rules (ค่าเริ่มต้นปิด, เฉพาะ Admin)
 
@@ -163,21 +176,33 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 
 ## ข้อจำกัดที่ทราบ (Known Limitations)
 
+> รายการด้านล่างคือสิ่งที่ **ยังไม่แก้ไข** ตามความตั้งใจ (เป็นข้อจำกัดของสถาปัตยกรรม/ข้อมูลจำลอง
+> ไม่ใช่บั๊ก) รายการบั๊กที่ตรวจพบและ **แก้ไขแล้ว** ทั้งหมด (20 จุด) อยู่ใน [`bugs.txt`](bugs.txt)
+
 1. **ข้อมูลไม่ถูกบันทึกถาวร** — State ทั้งหมดเก็บใน React `useState` การรีเฟรชหน้าจะรีเซ็ตกลับสู่ค่าเริ่มต้น
 2. **ไม่มีระบบยืนยันตัวตน** — การสลับบทบาทเป็นเพียงการสาธิต RBAC ไม่มีการบังคับสิทธิ์ฝั่ง Server
 3. **AI Diagnosis ยังไม่เรียกโมเดล** — ผลการวินิจฉัยอ่านจาก `MOCK_DIAGNOSIS_01` แบบตายตัว
-4. **บริบทของ AI Chat ยังฝังแบบ Hard-coded** — API Route รับพารามิเตอร์ `contextData` แต่ฝั่ง Client
-   ยังไม่ได้ส่งมา และค่า `citedEntities` ที่ตอบกลับก็เป็นค่าคงที่
-5. **ปุ่มที่ยังเป็น Stub** — Export PDF/Excel และ Add Integration ยังเรียกแค่ `alert()`;
-   ปุ่ม Refresh บน TopBar/StatusBar ยังไม่ผูกกับการดึงข้อมูลใหม่ และ `lastUpdate` เป็นค่าคงที่
-6. **Badge จำนวนคำขออนุมัติบน Sidebar ยังเป็นค่าคงที่ 3** — Prop `pendingApprovalCount`
-   ถูกส่งเข้าไปแล้วแต่ยังไม่ได้ถูกนำไปใช้แสดงผล
+4. **บริบทของ AI Chat ยังฝังแบบ Hard-coded ใน System Prompt** — ยังไม่มีการส่งข้อมูล Telemetry
+   สดจาก Client ไปกับทุกคำถาม และค่า `citedEntities` ที่ตอบกลับก็เป็นค่าคงที่
+5. **ปุ่มที่ยังเป็น Stub** — Export PDF/Excel และ Add Integration ยังเรียกแค่ `alert()`
+   (ปุ่ม Refresh บน TopBar/StatusBar/Dashboard ทำงานจริงแล้ว คืออัปเดตเวลา "Last Update"
+   เป็นเวลาปัจจุบัน แต่ยังเป็น Mock Refresh เพราะไม่มี Collector จริงให้ดึงข้อมูลใหม่)
+6. **การ Build ต้องใช้อินเทอร์เน็ต** เพราะโหลดฟอนต์ผ่าน `next/font/google`
 7. **ESLint ถูกข้ามตอน Build** (`eslint.ignoreDuringBuilds: true`) — ต้องรัน `npm run lint` แยกเอง
    ส่วนการตรวจชนิดข้อมูลของ TypeScript ยังบังคับใช้อยู่ (`ignoreBuildErrors: false`)
-8. **การ Build ต้องใช้อินเทอร์เน็ต** เพราะโหลดฟอนต์ผ่าน `next/font/google`
-9. **มีไฟล์ตั้งค่า ESLint ซ้ำซ้อน** — `.eslintrc.json` (รูปแบบเดิม) ยังอยู่คู่กับ `eslint.config.mjs`
-   (Flat Config) ซึ่ง ESLint 9 ใช้เฉพาะไฟล์หลัง จึงควรลบไฟล์เดิมทิ้ง
-10. **สคริปต์ `npm run clean` ใช้งานไม่ได้** — ชี้ไปที่คำสั่ง `next clean` ที่ไม่มีอยู่จริง
+8. **ผัง Topology ยังไม่ได้ render จาก `nodes`/`edges` แบบไดนามิกทั้งหมด** — เป็น SVG ที่วาดตายตัว
+   ด้วยมือ ทำให้ node 3 ตัวจากทั้งหมด 11 ตัวในข้อมูลจำลอง (Monitoring-VM, Log-Server-VM,
+   Backup-VM) ยังไม่ปรากฏ/เลือกไม่ได้บนผัง (แผงรายละเอียดของ node ที่ปรากฏอยู่แล้วดึงข้อมูลจริง
+   ถูกต้องแล้ว — ดู `bugs.txt` ข้อ 10-13)
+9. **`hooks/use-mobile.ts` (`useIsMobile`) ยังไม่ถูกเรียกใช้ที่ไหน** — Sidebar ยังไม่มีพฤติกรรม
+   responsive สำหรับหน้าจอมือถือ (ย่ออัตโนมัติ/เปลี่ยนเป็น Drawer)
+10. **ชื่อโมเดล Gemini (`gemini-3.6-flash`) ยังไม่ได้ยืนยันกับบัญชีรายชื่อโมเดลจริง** — หากตั้งค่า
+    `GEMINI_API_KEY` จริงแล้วเรียกไม่สำเร็จ ควรตรวจสอบชื่อโมเดลกับเอกสาร Gemini API ปัจจุบันก่อน
+11. **ข้อมูลจำลองมี Dangling Reference 1 จุด** — Alert รายการหนึ่ง (`alt-05`) อ้างถึง VM
+    (`vm-backup` / "Backup-Server") ที่ไม่มีอยู่จริงใน `lib/mock-data.json`
+12. **`types/ai-noc.ts` มี Type ที่ยังไม่ถูกใช้งาน** — `NetworkDevice` และ `MetricSample` ไม่มี
+    Mock Data หรือ Component ใดอ้างอิงถึง ตัวเลข "Total Devices" ที่เห็นในหน้า Dashboard/Infrastructure
+    จึงเป็นค่าคงที่ที่ไม่มีข้อมูลต้นทางจริงรองรับ
 
 ---
 
@@ -190,6 +215,8 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 - [ ] ทำ Export รายงาน PDF/Excel ให้ใช้งานได้จริง
 - [ ] เชื่อม Notification Gateway (LINE / Webhook) เข้ากับเหตุการณ์จริง
 - [ ] เพิ่มชุดทดสอบและ CI Pipeline
+- [ ] ทำให้ผัง Infrastructure Topology render จาก `nodes`/`edges` แบบไดนามิกทั้งหมด
+- [ ] เพิ่ม Responsive Layout สำหรับหน้าจอมือถือ (นำ `useIsMobile` มาใช้งานจริง)
 
 ---
 

@@ -6,18 +6,12 @@ import {
   Brain,
   Server,
   Cpu,
-  HardDrive,
   AlertTriangle,
-  ArrowUpRight,
-  ArrowDownRight,
-  Clock,
   ChevronRight,
   ExternalLink,
   Layers,
-  Sparkles,
   ShieldAlert,
-  RefreshCw,
-  CheckCircle2
+  RefreshCw
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -26,7 +20,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  Tooltip,
 } from 'recharts';
 import { Hypervisor, Alert } from '@/types/ai-noc';
 
@@ -35,6 +28,7 @@ interface DashboardViewProps {
   recentAlerts: Alert[];
   onNavigateTab: (tab: string, subtab?: string) => void;
   onSelectIncident?: (id: string) => void;
+  onRefresh?: () => void;
 }
 
 export default function DashboardView({
@@ -42,6 +36,7 @@ export default function DashboardView({
   recentAlerts,
   onNavigateTab,
   onSelectIncident,
+  onRefresh,
 }: DashboardViewProps) {
   const [timeRange, setTimeRange] = useState('Last 1 Hour');
 
@@ -65,11 +60,17 @@ export default function DashboardView({
     { v: 8 }, { v: 9 }, { v: 12 }, { v: 10 }, { v: 11 }, { v: 11 }
   ];
 
-  // Alert summary donut data
+  // Alert summary donut data (derived from the real recentAlerts prop)
+  const criticalAlertCount = recentAlerts.filter((a) => a.severity === 'critical').length;
+  const warningAlertCount = recentAlerts.filter((a) => a.severity === 'warning').length;
+  const infoAlertCount = recentAlerts.filter((a) => a.severity === 'info').length;
+  const totalAlertCount = recentAlerts.length;
+  const alertPercent = (count: number) => (totalAlertCount > 0 ? Math.round((count / totalAlertCount) * 100) : 0);
+
   const alertDonutData = [
-    { name: 'Critical', value: 3, color: '#EF4444' },
-    { name: 'Warning', value: 8, color: '#F59E0B' },
-    { name: 'Info', value: 0, color: '#3B82F6' },
+    { name: 'Critical', value: criticalAlertCount, color: '#EF4444' },
+    { name: 'Warning', value: warningAlertCount, color: '#F59E0B' },
+    { name: 'Info', value: infoAlertCount, color: '#3B82F6' },
   ];
 
   const topIssues = [
@@ -104,7 +105,7 @@ export default function DashboardView({
           </select>
 
           <button
-            onClick={() => {}}
+            onClick={onRefresh}
             className="p-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors shadow-sm"
             title="Refresh Dashboard"
           >
@@ -252,12 +253,12 @@ export default function DashboardView({
               <div className="w-8 h-8 rounded-xl bg-rose-500/20 flex items-center justify-center text-rose-400 border border-rose-500/30 animate-pulse">
                 <ShieldAlert className="w-5 h-5" />
               </div>
-              <span className="text-3xl font-extrabold text-rose-300 tabular-nums">11</span>
+              <span className="text-3xl font-extrabold text-rose-300 tabular-nums">{totalAlertCount}</span>
             </div>
             <div className="mt-2 text-[11px] font-medium flex items-center gap-2">
-              <span className="text-rose-400 font-bold">Critical 3</span>
+              <span className="text-rose-400 font-bold">Critical {criticalAlertCount}</span>
               <span className="text-slate-600">|</span>
-              <span className="text-amber-400 font-bold">Warning 8</span>
+              <span className="text-amber-400 font-bold">Warning {warningAlertCount}</span>
             </div>
           </div>
           <div className="h-10 mt-3 -mx-4 -mb-4">
@@ -280,7 +281,7 @@ export default function DashboardView({
               Alert Summary
             </h3>
             <span className="text-xs text-slate-300 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/10 font-medium">
-              Total 11
+              Total {totalAlertCount}
             </span>
           </div>
 
@@ -304,7 +305,7 @@ export default function DashboardView({
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute flex flex-col items-center justify-center text-center">
-                <span className="text-2xl font-extrabold text-white tabular-nums leading-none">11</span>
+                <span className="text-2xl font-extrabold text-white tabular-nums leading-none">{totalAlertCount}</span>
                 <span className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wider">Alerts</span>
               </div>
             </div>
@@ -313,17 +314,17 @@ export default function DashboardView({
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
                 <span className="text-slate-400">Critical:</span>
-                <span className="font-bold text-white ml-auto">3 (27%)</span>
+                <span className="font-bold text-white ml-auto">{criticalAlertCount} ({alertPercent(criticalAlertCount)}%)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
                 <span className="text-slate-400">Warning:</span>
-                <span className="font-bold text-white ml-auto">8 (73%)</span>
+                <span className="font-bold text-white ml-auto">{warningAlertCount} ({alertPercent(warningAlertCount)}%)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                 <span className="text-slate-400">Info:</span>
-                <span className="font-bold text-white ml-auto">0 (0%)</span>
+                <span className="font-bold text-white ml-auto">{infoAlertCount} ({alertPercent(infoAlertCount)}%)</span>
               </div>
             </div>
           </div>

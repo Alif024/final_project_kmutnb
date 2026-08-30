@@ -6,21 +6,11 @@ import {
   Server,
   Layers,
   Cpu,
-  HardDrive,
   RefreshCw,
   Search,
-  Filter,
   ZoomIn,
   ZoomOut,
   Maximize2,
-  AlertTriangle,
-  Activity,
-  CheckCircle2,
-  XCircle,
-  FileText,
-  Clock,
-  ExternalLink,
-  ChevronRight,
   ShieldAlert,
   Database,
   Radio,
@@ -41,7 +31,8 @@ import {
   TopologyNode,
   TopologyEdge,
   SyslogEntry,
-  Alert
+  Alert,
+  HealthStatus
 } from '@/types/ai-noc';
 
 interface InfrastructureViewProps {
@@ -53,6 +44,31 @@ interface InfrastructureViewProps {
   recentAlerts: Alert[];
   initialSubTab?: string;
   onNavigateTab?: (tab: string, subtab?: string) => void;
+}
+
+// Shared status -> color mapping so a badge's color always matches the status text it shows
+function statusClasses(status: HealthStatus) {
+  switch (status) {
+    case 'critical':
+      return { icon: 'bg-rose-500/20 border-rose-500/30 text-rose-400', badge: 'bg-rose-500/20 text-rose-300 border-rose-500/30' };
+    case 'warning':
+      return { icon: 'bg-amber-500/20 border-amber-500/30 text-amber-400', badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30' };
+    case 'healthy':
+      return { icon: 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
+    default:
+      return { icon: 'bg-slate-500/20 border-slate-500/30 text-slate-400', badge: 'bg-slate-500/20 text-slate-300 border-slate-500/30' };
+  }
+}
+
+function formatUptime(totalSeconds: number): string {
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  return `${days}d ${hours}h ${minutes}m`;
+}
+
+function usageColor(pct: number) {
+  return pct >= 80 ? 'text-rose-300 border-rose-500' : pct >= 60 ? 'text-amber-300 border-amber-500' : 'text-emerald-300 border-emerald-400';
 }
 
 export default function InfrastructureView({
@@ -71,7 +87,7 @@ export default function InfrastructureView({
   const [selectedNodeId, setSelectedNodeId] = useState<string>('node-fw');
   const [selectedHypervisorId, setSelectedHypervisorId] = useState<string>('hyp-01');
   const [nodeDetailTab, setNodeDetailTab] = useState<'overview' | 'interfaces' | 'performance' | 'logs' | 'alerts' | 'vm-info'>('overview');
-  const [hypDetailTab, setHypDetailTab] = useState<'overview' | 'performance' | 'vms' | 'datastores' | 'networks' | 'alerts' | 'logs'>('overview');
+  const [hypDetailTab, setHypDetailTab] = useState<'overview' | 'performance' | 'vms' | 'datastores' | 'alerts' | 'logs'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
 
@@ -86,6 +102,18 @@ export default function InfrastructureView({
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) || nodes[1];
   const selectedHyp = hypervisors.find((h) => h.id === selectedHypervisorId) || hypervisors[0];
+
+  // A topology node that represents a VM can be cross-referenced to its real
+  // VirtualMachine record (and from there, its host) by matching IP address.
+  const matchedVm = vms.find((v) => v.ipAddress === selectedNode.ipAddress);
+  const matchedVmHost = matchedVm ? hypervisors.find((h) => h.id === matchedVm.hypervisorId) : undefined;
+  const nodeAlerts = recentAlerts.filter(
+    (a) => (matchedVm && a.entityId === matchedVm.id) || a.entityName === selectedNode.label
+  );
+
+  const hypVms = vms.filter((v) => v.hypervisorId === selectedHyp.id);
+  const hypAlerts = recentAlerts.filter((a) => a.entityId === selectedHyp.id || a.entityName === selectedHyp.name);
+  const hypLogs = syslogs.filter((s) => s.sourceId === selectedHyp.id);
 
   return (
     <div className="space-y-6 pb-6 animate-in fade-in duration-300">
@@ -373,13 +401,13 @@ export default function InfrastructureView({
           <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 space-y-4 shadow-lg">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 font-bold">
-                  <ShieldAlert className="w-5 h-5 text-rose-400" />
+                <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold ${statusClasses(selectedNode.status).icon}`}>
+                  <ShieldAlert className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-bold text-base text-white">{selectedNode.label}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold uppercase">
+                    <span className={`text-xs px-2 py-0.5 rounded-full border font-bold uppercase ${statusClasses(selectedNode.status).badge}`}>
                       {selectedNode.status}
                     </span>
                   </div>
@@ -412,11 +440,11 @@ export default function InfrastructureView({
                     Device Information
                   </h4>
                   <div className="space-y-1.5">
-                    <div className="flex justify-between"><span className="text-slate-400">Type:</span> <span className="font-semibold text-white">Virtual Firewall</span></div>
-                    <div className="flex justify-between"><span className="text-slate-400">IP Address:</span> <span className="font-mono text-white">10.0.0.1</span></div>
-                    <div className="flex justify-between"><span className="text-slate-400">Vendor / Model:</span> <span className="font-semibold text-blue-400">pfSense 2.7.2</span></div>
-                    <div className="flex justify-between"><span className="text-slate-400">Uptime:</span> <span className="text-white">7d 14h 23m</span></div>
-                    <div className="flex justify-between"><span className="text-slate-400">Location Host:</span> <span className="text-white">Proxmox-Node-01</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Type:</span> <span className="font-semibold text-white capitalize">{matchedVm ? `Virtual Machine (${matchedVm.role})` : selectedNode.nodeType}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">IP Address:</span> <span className="font-mono text-white">{selectedNode.ipAddress}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Vendor / Model:</span> <span className="font-semibold text-blue-400">{matchedVm?.vendorModel ?? '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Uptime:</span> <span className="text-white">{matchedVm ? formatUptime(matchedVm.uptimeSeconds) : '—'}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-400">Location Host:</span> <span className="text-white">{matchedVmHost?.name ?? '—'}</span></div>
                   </div>
                 </div>
 
@@ -425,26 +453,30 @@ export default function InfrastructureView({
                   <h4 className="font-bold text-slate-300 text-xs border-b border-white/10 pb-1.5 uppercase">
                     Resource Utilization
                   </h4>
-                  <div className="grid grid-cols-3 gap-2 text-center py-1">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block mb-1">CPU</span>
-                      <div className="w-12 h-12 rounded-full border-4 border-rose-500 flex items-center justify-center font-bold text-rose-300 mx-auto">
-                        78%
+                  {matchedVm ? (
+                    <div className="grid grid-cols-3 gap-2 text-center py-1">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-1">CPU</span>
+                        <div className={`w-12 h-12 rounded-full border-4 flex items-center justify-center font-bold mx-auto ${usageColor(matchedVm.cpuUsage)}`}>
+                          {matchedVm.cpuUsage}%
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-1">Memory</span>
+                        <div className={`w-12 h-12 rounded-full border-4 flex items-center justify-center font-bold mx-auto ${usageColor(matchedVm.memoryUsage)}`}>
+                          {matchedVm.memoryUsage}%
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-1">Storage</span>
+                        <div className={`w-12 h-12 rounded-full border-4 flex items-center justify-center font-bold mx-auto ${usageColor(matchedVm.storageUsage)}`}>
+                          {matchedVm.storageUsage}%
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block mb-1">Memory</span>
-                      <div className="w-12 h-12 rounded-full border-4 border-purple-500 flex items-center justify-center font-bold text-purple-300 mx-auto">
-                        65%
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block mb-1">Storage</span>
-                      <div className="w-12 h-12 rounded-full border-4 border-emerald-400 flex items-center justify-center font-bold text-emerald-300 mx-auto">
-                        41%
-                      </div>
-                    </div>
-                  </div>
+                  ) : (
+                    <p className="text-slate-500 py-3">อุปกรณ์นี้ไม่มีข้อมูลเมตริกระดับ VM ในระบบ</p>
+                  )}
                 </div>
 
                 {/* 3. Status Summary */}
@@ -455,19 +487,76 @@ export default function InfrastructureView({
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400">Overall Status:</span>
-                      <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold uppercase border border-rose-500/30">Critical</span>
+                      <span className={`px-2 py-0.5 rounded-full font-bold uppercase border ${statusClasses(selectedNode.status).badge}`}>
+                        {selectedNode.status}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400">Active Alerts:</span>
-                      <span className="font-bold text-rose-400">2 Alerts</span>
+                      <span className={`font-bold ${nodeAlerts.length > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        {nodeAlerts.length} Alerts
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400">Last Seen:</span>
-                      <span className="text-emerald-400 font-medium">1 นาทีที่แล้ว</span>
+                      <span className="text-emerald-400 font-medium">{matchedVm?.lastSeen ?? '—'}</span>
                     </div>
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Performance Tab */}
+            {nodeDetailTab === 'performance' && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3 text-xs">
+                <h4 className="font-bold text-white">Performance Trend (ตัวอย่างข้อมูลย้อนหลัง 1 ชั่วโมง)</h4>
+                <div className="h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={perfData}>
+                      <XAxis dataKey="t" stroke="#64748B" fontSize={10} />
+                      <YAxis stroke="#64748B" fontSize={10} />
+                      <Tooltip contentStyle={{ backgroundColor: '#020617', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '11px', color: '#fff' }} />
+                      <Line type="monotone" dataKey="cpu" name="CPU %" stroke="#3B82F6" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="mem" name="Memory %" stroke="#A855F7" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Alerts Tab */}
+            {nodeDetailTab === 'alerts' && (
+              <div className="space-y-2 text-xs">
+                {nodeAlerts.length === 0 ? (
+                  <p className="text-slate-500 py-4 text-center">ไม่มี Alert ที่เกี่ยวข้องกับอุปกรณ์นี้</p>
+                ) : (
+                  nodeAlerts.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between bg-black/20 border border-white/10 rounded-xl p-3">
+                      <div>
+                        <p className="font-semibold text-white">{a.title}</p>
+                        <p className="text-slate-400 text-[11px]">{a.lastSeen}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize border ${statusClasses(a.severity === 'critical' ? 'critical' : a.severity === 'warning' ? 'warning' : 'unknown').badge}`}>
+                        {a.severity}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* VM Info Tab */}
+            {nodeDetailTab === 'vm-info' && (
+              matchedVm ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="flex justify-between bg-black/20 border border-white/10 rounded-xl p-3"><span className="text-slate-400">Role:</span><span className="text-white font-semibold capitalize">{matchedVm.role}</span></div>
+                  <div className="flex justify-between bg-black/20 border border-white/10 rounded-xl p-3"><span className="text-slate-400">Health:</span><span className="text-white font-semibold capitalize">{matchedVm.health}</span></div>
+                  <div className="flex justify-between bg-black/20 border border-white/10 rounded-xl p-3"><span className="text-slate-400">I/O Wait:</span><span className="text-white font-semibold">{matchedVm.ioWaitPercent}%</span></div>
+                  <div className="flex justify-between bg-black/20 border border-white/10 rounded-xl p-3"><span className="text-slate-400">Hypervisor Host:</span><span className="text-white font-semibold">{matchedVmHost?.name ?? '—'}</span></div>
+                </div>
+              ) : (
+                <p className="text-slate-500 text-xs py-4 text-center">โหนดนี้ไม่ใช่ Virtual Machine จึงไม่มีข้อมูล VM Info</p>
+              )
             )}
 
             {/* Logs Tab (Unified Syslog Viewer Aligned to NTP Time!) */}
@@ -692,13 +781,7 @@ export default function InfrastructureView({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-lg text-white">{selectedHyp.name}</h3>
-                  <span
-                    className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                      selectedHyp.status === 'warning'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    }`}
-                  >
+                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase border ${statusClasses(selectedHyp.status).badge}`}>
                     {selectedHyp.status}
                   </span>
                 </div>
@@ -723,58 +806,133 @@ export default function InfrastructureView({
               </div>
             </div>
 
-            {/* Overview / Performance Tab Content */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-              {/* Special Virtualization Metrics Cards */}
-              <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-1">
-                <span className="text-slate-400 text-[11px] font-medium block">CPU Ready Time</span>
-                <span className={`text-xl font-bold tabular-nums ${selectedHyp.cpuReadyTimePercent > 4 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                  {selectedHyp.cpuReadyTimePercent}%
-                </span>
-                <p className="text-[10px] text-slate-500">Threshold &lt; 5.0% (เวลารอคิว CPU)</p>
-              </div>
+            {/* Overview Tab: Specific Virtualization Metrics Cards */}
+            {hypDetailTab === 'overview' && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-1">
+                  <span className="text-slate-400 text-[11px] font-medium block">CPU Ready Time</span>
+                  <span className={`text-xl font-bold tabular-nums ${selectedHyp.cpuReadyTimePercent > 4 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {selectedHyp.cpuReadyTimePercent}%
+                  </span>
+                  <p className="text-[10px] text-slate-500">Threshold &lt; 5.0% (เวลารอคิว CPU)</p>
+                </div>
 
-              <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-1">
-                <span className="text-slate-400 text-[11px] font-medium block">Memory Ballooning</span>
-                <span className={`text-xl font-bold tabular-nums ${selectedHyp.memoryBallooningMb > 500 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                  {selectedHyp.memoryBallooningMb} MB
-                </span>
-                <p className="text-[10px] text-slate-500">Reclaimed Memory from Guest</p>
-              </div>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-1">
+                  <span className="text-slate-400 text-[11px] font-medium block">Memory Ballooning</span>
+                  <span className={`text-xl font-bold tabular-nums ${selectedHyp.memoryBallooningMb > 500 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {selectedHyp.memoryBallooningMb} MB
+                  </span>
+                  <p className="text-[10px] text-slate-500">Reclaimed Memory from Guest</p>
+                </div>
 
-              <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-1">
-                <span className="text-slate-400 text-[11px] font-medium block">Storage Latency</span>
-                <span className={`text-xl font-bold tabular-nums ${selectedHyp.storageLatencyMs > 10 ? 'text-rose-400 font-extrabold' : 'text-emerald-400'}`}>
-                  {selectedHyp.storageLatencyMs} ms
-                </span>
-                <p className="text-[10px] text-slate-500">Threshold &lt; 10 ms (Datastore I/O)</p>
-              </div>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-1">
+                  <span className="text-slate-400 text-[11px] font-medium block">Storage Latency</span>
+                  <span className={`text-xl font-bold tabular-nums ${selectedHyp.storageLatencyMs > 10 ? 'text-rose-400 font-extrabold' : 'text-emerald-400'}`}>
+                    {selectedHyp.storageLatencyMs} ms
+                  </span>
+                  <p className="text-[10px] text-slate-500">Threshold &lt; 10 ms (Datastore I/O)</p>
+                </div>
 
-              <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-1">
-                <span className="text-slate-400 text-[11px] font-medium block">vSwitch Dropped Packets</span>
-                <span className={`text-xl font-bold tabular-nums ${selectedHyp.vswitchDroppedPackets > 50 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                  {selectedHyp.vswitchDroppedPackets} pkts
-                </span>
-                <p className="text-[10px] text-slate-500">Virtual Switch Congestion</p>
+                <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-1">
+                  <span className="text-slate-400 text-[11px] font-medium block">vSwitch Dropped Packets</span>
+                  <span className={`text-xl font-bold tabular-nums ${selectedHyp.vswitchDroppedPackets > 50 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {selectedHyp.vswitchDroppedPackets} pkts
+                  </span>
+                  <p className="text-[10px] text-slate-500">Virtual Switch Congestion</p>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Performance Line Chart over 1 Hour */}
-            <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
-              <h4 className="font-bold text-xs text-white">Performance Metrics Trend (1 Hour)</h4>
-              <div className="h-44">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={perfData}>
-                    <XAxis dataKey="t" stroke="#64748B" fontSize={10} />
-                    <YAxis stroke="#64748B" fontSize={10} />
-                    <Tooltip contentStyle={{ backgroundColor: '#020617', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '11px', color: '#fff' }} />
-                    <Line type="monotone" dataKey="cpu" name="CPU Usage %" stroke="#3B82F6" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="mem" name="Memory Usage %" stroke="#A855F7" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="latency" name="Latency (ms)" stroke="#EF4444" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
+            {/* Performance Tab: Line Chart over 1 Hour */}
+            {hypDetailTab === 'performance' && (
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
+                <h4 className="font-bold text-xs text-white">Performance Metrics Trend (1 Hour)</h4>
+                <div className="h-44">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={perfData}>
+                      <XAxis dataKey="t" stroke="#64748B" fontSize={10} />
+                      <YAxis stroke="#64748B" fontSize={10} />
+                      <Tooltip contentStyle={{ backgroundColor: '#020617', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '11px', color: '#fff' }} />
+                      <Line type="monotone" dataKey="cpu" name="CPU Usage %" stroke="#3B82F6" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="mem" name="Memory Usage %" stroke="#A855F7" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="latency" name="Latency (ms)" stroke="#EF4444" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* VMs Tab: VMs hosted on this hypervisor */}
+            {hypDetailTab === 'vms' && (
+              <div className="space-y-2 text-xs">
+                {hypVms.length === 0 ? (
+                  <p className="text-slate-500 py-4 text-center">ไม่มี VM บน Host นี้</p>
+                ) : (
+                  hypVms.map((v) => (
+                    <div key={v.id} className="flex items-center justify-between bg-black/20 border border-white/10 rounded-xl p-3">
+                      <div>
+                        <p className="font-bold text-white">{v.name}</p>
+                        <p className="text-slate-400 text-[11px] font-mono">{v.ipAddress} · {v.role}</p>
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px]">
+                        <span className="text-blue-400">CPU {v.cpuUsage}%</span>
+                        <span className="text-purple-400">Mem {v.memoryUsage}%</span>
+                        <span className={`px-2 py-0.5 rounded-full font-bold uppercase border ${statusClasses(v.health).badge}`}>{v.status}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Datastores Tab: this host's own storage capacity (mock data models one datastore per host) */}
+            {hypDetailTab === 'datastores' && (
+              <div className="bg-black/20 border border-white/10 rounded-xl p-4 text-xs space-y-2">
+                <h4 className="font-bold text-white">Datastore หลักของ {selectedHyp.name}</h4>
+                <div className="flex justify-between"><span className="text-slate-400">Capacity:</span><span className="text-white font-mono">{selectedHyp.usedStorageTb} / {selectedHyp.totalStorageTb} TB</span></div>
+                <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                  <div className="bg-emerald-400 h-full rounded-full" style={{ width: `${(selectedHyp.usedStorageTb / selectedHyp.totalStorageTb) * 100}%` }}></div>
+                </div>
+                <div className="flex justify-between"><span className="text-slate-400">Latency:</span><span className={selectedHyp.storageLatencyMs > 10 ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>{selectedHyp.storageLatencyMs} ms</span></div>
+              </div>
+            )}
+
+            {/* Alerts Tab */}
+            {hypDetailTab === 'alerts' && (
+              <div className="space-y-2 text-xs">
+                {hypAlerts.length === 0 ? (
+                  <p className="text-slate-500 py-4 text-center">ไม่มี Alert ที่เกี่ยวข้องกับ Host นี้</p>
+                ) : (
+                  hypAlerts.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between bg-black/20 border border-white/10 rounded-xl p-3">
+                      <div>
+                        <p className="font-semibold text-white">{a.title}</p>
+                        <p className="text-slate-400 text-[11px]">{a.lastSeen}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize border ${statusClasses(a.severity === 'critical' ? 'critical' : a.severity === 'warning' ? 'warning' : 'unknown').badge}`}>
+                        {a.severity}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Logs Tab */}
+            {hypDetailTab === 'logs' && (
+              <div className="bg-slate-950/80 border border-white/10 rounded-xl p-3 font-mono space-y-2 text-xs max-h-48 overflow-y-auto">
+                {hypLogs.length === 0 ? (
+                  <p className="text-slate-500 text-center py-4 font-sans">ไม่มี Syslog จาก Host นี้</p>
+                ) : (
+                  hypLogs.map((log) => (
+                    <div key={log.id} className="text-slate-400 flex items-start gap-3 border-b border-white/5 pb-1.5">
+                      <span className="text-blue-400 shrink-0 font-bold">{log.timestamp}</span>
+                      <span className={`flex-1 ${log.severityLevel <= 2 ? 'text-rose-400 font-medium' : 'text-slate-200'}`}>{log.message}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

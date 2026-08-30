@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, AlertTriangle, Terminal, CheckCircle2, X } from 'lucide-react';
 import { ApprovalRequest } from '@/types/ai-noc';
 
@@ -10,6 +10,9 @@ interface CommandPreviewModalProps {
   onConfirmApprove: (id: string, commandText: string) => void;
 }
 
+// Rendered with key={request?.id} by the parent, so React mounts a fresh
+// instance (fresh isExecuting/executionSuccess state) per request instead of
+// reusing one across different approval requests.
 export default function CommandPreviewModal({
   request,
   onClose,
@@ -17,19 +20,28 @@ export default function CommandPreviewModal({
 }: CommandPreviewModalProps) {
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionSuccess, setExecutionSuccess] = useState(false);
+  const pendingTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Cancel any in-flight timers if the modal unmounts mid-execution.
+  useEffect(() => {
+    const timeouts = pendingTimeouts.current;
+    return () => timeouts.forEach(clearTimeout);
+  }, []);
 
   if (!request) return null;
 
   const handleConfirm = () => {
     setIsExecuting(true);
-    setTimeout(() => {
+    const t1 = setTimeout(() => {
       setIsExecuting(false);
       setExecutionSuccess(true);
-      setTimeout(() => {
+      const t2 = setTimeout(() => {
         onConfirmApprove(request.id, request.commandPreview);
         onClose();
       }, 1000);
+      pendingTimeouts.current.push(t2);
     }, 1500);
+    pendingTimeouts.current.push(t1);
   };
 
   return (
@@ -46,7 +58,11 @@ export default function CommandPreviewModal({
               <p className="text-xs text-slate-400">Human-in-the-Loop Command Execution Preview</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10">
+          <button
+            onClick={onClose}
+            disabled={isExecuting}
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>

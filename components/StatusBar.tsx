@@ -27,21 +27,21 @@ export default function StatusBar({
       <div className="flex items-center gap-6">
         {/* Telemetry Data Collector */}
         <div className="flex items-center gap-2">
-          <Activity className="w-3.5 h-3.5 text-emerald-400" />
+          <Activity className={`w-3.5 h-3.5 ${isCollectorActive ? 'text-emerald-400' : 'text-slate-500'}`} />
           <span>Data Collection :</span>
-          <span className="flex items-center gap-1 font-semibold text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-            Active
+          <span className={`flex items-center gap-1 font-semibold ${isCollectorActive ? 'text-emerald-400' : 'text-slate-500'}`}>
+            <span className={`w-2 h-2 rounded-full ${isCollectorActive ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`}></span>
+            {isCollectorActive ? 'Active' : 'Stopped'}
           </span>
         </div>
 
         {/* AI Engine Status */}
         <div className="flex items-center gap-2 hidden sm:flex">
-          <Cpu className="w-3.5 h-3.5 text-purple-400" />
+          <Cpu className={`w-3.5 h-3.5 ${isAiRunning ? 'text-purple-400' : 'text-slate-500'}`} />
           <span>AI Engine :</span>
-          <span className="flex items-center gap-1 font-semibold text-purple-400">
-            <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
-            Running (Gemini 3.6 Flash)
+          <span className={`flex items-center gap-1 font-semibold ${isAiRunning ? 'text-purple-400' : 'text-slate-500'}`}>
+            <span className={`w-2 h-2 rounded-full ${isAiRunning ? 'bg-purple-400 animate-pulse' : 'bg-slate-500'}`}></span>
+            {isAiRunning ? 'Running (Gemini 3.6 Flash)' : 'Stopped'}
           </span>
         </div>
 

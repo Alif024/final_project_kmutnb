@@ -4,21 +4,13 @@ import React, { useState } from 'react';
 import {
   ShieldCheck,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   Sliders,
   Filter,
   ArrowUpDown,
   Sparkles,
-  ChevronRight,
-  Clock,
-  ExternalLink,
   Ban,
   Terminal,
-  Layers,
-  Cpu,
-  RefreshCw,
-  Info
 } from 'lucide-react';
 import { Recommendation, ApprovalRequest, UserRole } from '@/types/ai-noc';
 
@@ -49,6 +41,11 @@ export default function ActionCenterView({
   const [approvalFilter, setApprovalFilter] = useState<'pending' | 'executed' | 'rejected'>('pending');
 
   const filteredApprovals = initialApprovals.filter((appr) => appr.status === approvalFilter);
+  const filteredRecs =
+    recFilter === 'all' ? initialRecs : initialRecs.filter((rec) => rec.status === recFilter);
+
+  const recCountByPriority = (priority: Recommendation['priority']) =>
+    initialRecs.filter((rec) => rec.priority === priority).length;
 
   return (
     <div className="space-y-6 pb-6 animate-in fade-in duration-300">
@@ -104,31 +101,31 @@ export default function ActionCenterView({
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 cursor-pointer hover:border-white/20 transition-colors">
               <span className="text-xs text-slate-300 block font-medium">ทั้งหมด</span>
-              <span className="text-2xl font-extrabold text-white tabular-nums">12</span>
+              <span className="text-2xl font-extrabold text-white tabular-nums">{initialRecs.length}</span>
               <span className="text-[10px] text-slate-400 block mt-0.5">รายการข้อเสนอแนะ</span>
             </div>
 
             <div className="bg-white/5 backdrop-blur-md border border-red-500/30 rounded-2xl p-4 cursor-pointer hover:border-red-500 transition-colors">
               <span className="text-xs text-red-400 block font-bold">Critical</span>
-              <span className="text-2xl font-extrabold text-red-400 tabular-nums">3</span>
+              <span className="text-2xl font-extrabold text-red-400 tabular-nums">{recCountByPriority('critical')}</span>
               <span className="text-[10px] text-slate-400 block mt-0.5">ความสำคัญสูงสุด</span>
             </div>
 
             <div className="bg-white/5 backdrop-blur-md border border-amber-500/30 rounded-2xl p-4 cursor-pointer hover:border-amber-500 transition-colors">
               <span className="text-xs text-amber-400 block font-bold">High</span>
-              <span className="text-2xl font-extrabold text-amber-400 tabular-nums">5</span>
+              <span className="text-2xl font-extrabold text-amber-400 tabular-nums">{recCountByPriority('high')}</span>
               <span className="text-[10px] text-slate-400 block mt-0.5">ความสำคัญสูง</span>
             </div>
 
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 cursor-pointer hover:border-white/20 transition-colors">
               <span className="text-xs text-blue-400 block font-bold">Medium</span>
-              <span className="text-2xl font-extrabold text-blue-400 tabular-nums">3</span>
+              <span className="text-2xl font-extrabold text-blue-400 tabular-nums">{recCountByPriority('medium')}</span>
               <span className="text-[10px] text-slate-400 block mt-0.5">ความสำคัญปานกลาง</span>
             </div>
 
             <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 cursor-pointer hover:border-white/20 transition-colors">
               <span className="text-xs text-emerald-400 block font-bold">Low</span>
-              <span className="text-2xl font-extrabold text-emerald-400 tabular-nums">1</span>
+              <span className="text-2xl font-extrabold text-emerald-400 tabular-nums">{recCountByPriority('low')}</span>
               <span className="text-[10px] text-slate-400 block mt-0.5">คำแนะนำทั่วไป</span>
             </div>
           </div>
@@ -182,7 +179,14 @@ export default function ActionCenterView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {initialRecs.map((rec) => (
+                  {filteredRecs.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-slate-500">
+                        ไม่พบรายการข้อเสนอแนะในหมวดนี้
+                      </td>
+                    </tr>
+                  ) : (
+                  filteredRecs.map((rec) => (
                     <tr
                       key={rec.id}
                       onClick={() => {
@@ -255,17 +259,17 @@ export default function ActionCenterView({
 
                       <td className="py-3 text-right font-mono text-slate-400">{rec.createdAt}</td>
                     </tr>
-                  ))}
+                  ))
+                  )}
                 </tbody>
               </table>
             </div>
 
             {/* Pagination footer */}
             <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/10">
-              <span>Showing 1 to 6 of 12 results</span>
+              <span>Showing {filteredRecs.length} of {initialRecs.length} results</span>
               <div className="flex items-center gap-1">
                 <button className="px-2.5 py-1 bg-black/20 border border-white/10 rounded text-white font-bold">1</button>
-                <button className="px-2.5 py-1 bg-black/20 border border-white/10 rounded hover:text-white">2</button>
               </div>
             </div>
           </div>

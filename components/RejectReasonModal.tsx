@@ -10,6 +10,9 @@ interface RejectReasonModalProps {
   onConfirmReject: (id: string, reason: string) => void;
 }
 
+// Rendered with key={request?.id} by the parent, so React mounts a fresh
+// instance (empty reason/selectedQuick) per request instead of reusing one
+// across different approval requests.
 export default function RejectReasonModal({
   request,
   onClose,
