@@ -4,6 +4,7 @@ import React from 'react';
 import { RefreshCw, Activity, Cpu, Server, CheckCircle2 } from 'lucide-react';
 
 interface StatusBarProps {
+  collapsed?: boolean;
   lastUpdate?: string;
   onRefresh?: () => void;
   isCollectorActive?: boolean;
@@ -11,13 +12,18 @@ interface StatusBarProps {
 }
 
 export default function StatusBar({
+  collapsed = false,
   lastUpdate = '24/05/2569 15:42:18',
   onRefresh,
   isCollectorActive = true,
   isAiRunning = true,
 }: StatusBarProps) {
   return (
-    <footer className="h-[36px] bg-[#020617]/70 backdrop-blur-xl border-t border-white/10 px-4 flex items-center justify-between text-xs text-slate-400 sticky bottom-0 z-30 select-none">
+    <footer
+      className={`h-[36px] bg-[#020617]/70 backdrop-blur-xl border-t border-white/10 px-4 flex items-center justify-between text-xs text-slate-400 fixed bottom-0 right-0 z-30 select-none transition-all duration-300 ${
+        collapsed ? "left-[72px]" : "left-[240px]"
+      }`}
+    >
       <div className="flex items-center gap-6">
         {/* Telemetry Data Collector */}
         <div className="flex items-center gap-2">

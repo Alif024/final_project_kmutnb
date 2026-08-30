@@ -63,7 +63,11 @@ export default function TopBar({
   };
 
   return (
-    <header className="h-[56px] bg-[#020617]/60 backdrop-blur-xl border-b border-white/10 px-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+    <header
+      className={`h-[56px] bg-[#020617]/60 backdrop-blur-xl border-b border-white/10 px-4 flex items-center justify-between fixed top-0 right-0 z-30 shadow-sm transition-all duration-300 ${
+        collapsed ? "left-[72px]" : "left-[240px]"
+      }`}
+    >
       {/* Left: Sidebar Toggle & Page Info */}
       <div className="flex items-center gap-3">
         <button

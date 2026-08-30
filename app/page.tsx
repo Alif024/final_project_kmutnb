@@ -125,7 +125,7 @@ export default function Page() {
         <div className="absolute top-[25%] right-[15%] w-[35%] h-[35%] bg-indigo-600/15 rounded-full blur-[120px]"></div>
       </div>
 
-      <div className="flex flex-1 min-h-[calc(100vh-36px)] relative z-10">
+      <div className="flex flex-1 min-h-screen relative z-10">
         {/* Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -138,7 +138,11 @@ export default function Page() {
         />
 
         {/* Main Content Column */}
-        <div className="flex-1 flex flex-col min-w-0 bg-transparent">
+        <div
+          className={`flex-1 flex flex-col min-w-0 bg-transparent pt-14 pb-9 transition-all duration-300 ${
+            collapsed ? "ml-[72px]" : "ml-[240px]"
+          }`}
+        >
           {/* TopBar */}
           <TopBar
             collapsed={collapsed}
@@ -225,16 +229,17 @@ export default function Page() {
               />
             )}
           </main>
+
+          {/* Fixed Bottom Status Bar (spans the main content column only) */}
+          <StatusBar
+            collapsed={collapsed}
+            lastUpdate="24/05/2569 15:42:18"
+            onRefresh={() => {}}
+            isCollectorActive={true}
+            isAiRunning={true}
+          />
         </div>
       </div>
-
-      {/* Sticky Bottom Status Bar */}
-      <StatusBar
-        lastUpdate="24/05/2569 15:42:18"
-        onRefresh={() => {}}
-        isCollectorActive={true}
-        isAiRunning={true}
-      />
 
       {/* Human-in-the-Loop Command Execution Preview Modal */}
       <CommandPreviewModal

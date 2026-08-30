@@ -111,7 +111,9 @@ export default function Sidebar({
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               title={collapsed ? `${item.label} - ${item.subtitle}` : undefined}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-left group relative ${
+              className={`w-full flex items-center py-2.5 rounded-xl transition-all duration-200 text-left group relative ${
+                collapsed ? 'justify-center px-0' : 'gap-3 px-3'
+              } ${
                 isActive
                   ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30 shadow-lg shadow-blue-500/10'
                   : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
