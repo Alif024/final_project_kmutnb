@@ -13,7 +13,8 @@ import {
   UserCheck,
   LogOut,
   ShieldAlert,
-  Server
+  Server,
+  Menu
 } from 'lucide-react';
 import { UserRole } from '@/types/ai-noc';
 
@@ -85,19 +86,31 @@ export default function Sidebar({
         collapsed ? 'w-[72px]' : 'w-[240px]'
       }`}
     >
-      {/* Brand Logo Header */}
-      <div className="h-[60px] px-4 flex items-center justify-between border-b border-white/10">
-        <div className="flex items-center gap-3 overflow-hidden cursor-pointer" onClick={() => setActiveTab('dashboard')}>
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
-            <Brain className="w-6 h-6 text-white" />
-          </div>
-          {!collapsed && (
+      {/* Brand Logo Header + Sidebar Toggle */}
+      <div
+        className={`h-[60px] flex items-center border-b border-white/10 ${
+          collapsed ? 'justify-center px-0' : 'justify-between px-4'
+        }`}
+      >
+        {!collapsed && (
+          <div className="flex items-center gap-3 overflow-hidden cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+              <Brain className="w-6 h-6 text-white" />
+            </div>
             <div className="flex flex-col overflow-hidden">
               <span className="font-bold text-lg text-white leading-none tracking-tight">AI-NOC</span>
               <span className="text-[10px] text-slate-400 truncate mt-1">v2.4.0 • Operation Center</span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          title={collapsed ? 'ขยายเมนู (Expand Sidebar)' : 'ย่อเมนู (Collapse Sidebar)'}
+          className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors border border-transparent hover:border-white/10 shrink-0"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Navigation Links */}

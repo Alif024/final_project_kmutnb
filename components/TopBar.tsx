@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Menu, Bell, Maximize2, Minimize2, Calendar, Clock, RefreshCw } from 'lucide-react';
+import { Bell, Maximize2, Minimize2, Calendar, Clock, RefreshCw } from 'lucide-react';
 
 interface TopBarProps {
   collapsed: boolean;
-  setCollapsed: (collapsed: boolean) => void;
   activeAlertCount?: number;
   onRefresh?: () => void;
   title?: string;
@@ -14,7 +13,6 @@ interface TopBarProps {
 
 export default function TopBar({
   collapsed,
-  setCollapsed,
   activeAlertCount = 5,
   onRefresh,
   title,
@@ -68,18 +66,10 @@ export default function TopBar({
         collapsed ? "left-[72px]" : "left-[240px]"
       }`}
     >
-      {/* Left: Sidebar Toggle & Page Info */}
+      {/* Left: Page Info */}
       <div className="flex items-center gap-3">
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors border border-transparent hover:border-white/10"
-          title="Toggle Sidebar"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-
         {(title || subtitle) && (
-          <div className="hidden md:flex flex-col ml-1">
+          <div className="hidden md:flex flex-col">
             {title && <h1 className="text-sm font-semibold text-white leading-none tracking-tight">{title}</h1>}
             {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
           </div>

@@ -146,7 +146,6 @@ export default function Page() {
           {/* TopBar */}
           <TopBar
             collapsed={collapsed}
-            setCollapsed={setCollapsed}
             activeAlertCount={MOCK_ALERTS.length}
             onRefresh={() => {}}
             title={
