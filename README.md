@@ -11,7 +11,7 @@
 
 > **สถานะ: Prototype / Demo (UI-complete, Mock-driven)**
 > ส่วนติดต่อผู้ใช้ครบทั้ง 6 โมดูลและใช้งานโต้ตอบได้จริงในเบราว์เซอร์
-> ข้อมูลทั้งหมดมาจากชุดข้อมูลจำลอง (`lib/mock-data.ts`) ยกเว้น **AI Chat Assistant** ที่เรียก Gemini API จริงผ่าน API Route
+> ข้อมูลทั้งหมดมาจากไฟล์ชุดข้อมูลจำลองไฟล์เดียวคือ `lib/mock-data.json` ยกเว้น **AI Chat Assistant** ที่เรียก Gemini API จริงผ่าน API Route
 
 **ผลการตรวจสอบล่าสุด (30 สิงหาคม 2568):** ระบบ Build ผ่านสมบูรณ์
 
@@ -107,7 +107,8 @@ final_project_kmutnb/
 │   ├── RejectReasonModal.tsx    # ฟอร์มระบุเหตุผลการปฏิเสธ
 │   └── views/                   # 6 View หลัก (ดูตารางฟีเจอร์ด้านล่าง)
 ├── lib/
-│   ├── mock-data.ts             # ชุดข้อมูลจำลองทั้งหมดของระบบ
+│   ├── mock-data.json           # ชุดข้อมูลจำลองทั้งหมดของระบบ (แหล่งข้อมูลเดียว)
+│   ├── mock-data.ts             # ผูก TypeScript types ให้ JSON แล้ว re-export
 │   └── utils.ts                 # `cn()` — clsx + tailwind-merge
 ├── types/ai-noc.ts              # TypeScript Interface ของโดเมนทั้งหมด
 ├── hooks/use-mobile.ts          # Media Query Hook
