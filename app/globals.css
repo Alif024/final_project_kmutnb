@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: `dark:` utilities apply only under a `.dark` ancestor
+   (instead of the OS `prefers-color-scheme`), so the ThemeToggle button can
+   switch themes independently of the system setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
     --bg-app: #020617;
@@ -28,10 +33,15 @@
   }
 
   body {
-    background-color: #020617;
-    color: var(--text-primary);
+    background-color: #f8fafc;
+    color: #0f172a;
     font-family: var(--font-sans), 'Inter', 'IBM Plex Sans Thai', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif;
     overflow-x: hidden;
+  }
+
+  .dark body {
+    background-color: #020617;
+    color: var(--text-primary);
   }
 }
 
@@ -101,19 +111,29 @@
   box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
 }
 
-/* Custom Scrollbar for dark theme */
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(2, 6, 23, 0.5);
+  background: rgba(15, 23, 42, 0.05);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(15, 23, 42, 0.2);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: rgba(2, 6, 23, 0.5);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
 

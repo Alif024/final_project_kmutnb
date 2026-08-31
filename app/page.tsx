@@ -123,12 +123,12 @@ export default function Page() {
   const pendingApprovalCount = approvals.filter((a) => a.status === 'pending').length;
 
   return (
-    <div className="min-h-screen bg-[#020617] text-[#F8FAFC] font-sans flex flex-col selection:bg-blue-600 selection:text-white relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-[#F8FAFC] font-sans flex flex-col selection:bg-blue-600 selection:text-white relative overflow-x-hidden">
       {/* Frosted Glass Ambient Glow Background Lights */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-blue-600/20 rounded-full blur-[130px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/10 rounded-full blur-[160px]"></div>
-        <div className="absolute top-[25%] right-[15%] w-[35%] h-[35%] bg-indigo-600/15 rounded-full blur-[120px]"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-blue-400/10 dark:bg-blue-600/20 rounded-full blur-[130px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-400/10 dark:bg-emerald-600/10 rounded-full blur-[160px]"></div>
+        <div className="absolute top-[25%] right-[15%] w-[35%] h-[35%] bg-indigo-400/10 dark:bg-indigo-600/15 rounded-full blur-[120px]"></div>
       </div>
 
       <div className="flex flex-1 min-h-screen relative z-10">

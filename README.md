@@ -46,7 +46,7 @@
 |---|---|
 | Framework | Next.js 15.5 (App Router, React Server Components + Client Components) |
 | UI | React 19.2, TypeScript 5.9 (`strict: true`) |
-| Styling | Tailwind CSS v4.1 (`@tailwindcss/postcss`), ธีม Dark + Frosted Glass |
+| Styling | Tailwind CSS v4.1 (`@tailwindcss/postcss`), Frosted Glass, รองรับ Dark/Light Mode (สลับได้ที่ปุ่มบน TopBar, จำค่าไว้ใน `localStorage`) |
 | ไอคอน / กราฟ | lucide-react, Recharts 3.10 |
 | Animation | motion (ตั้ง `transpilePackages`) |
 | AI | `@google/genai` v2 — โมเดล `gemini-3.6-flash` |
@@ -105,7 +105,8 @@ final_project_kmutnb/
 │   └── page.tsx                 # หน้าเดียวของแอป — จัดการ State และสลับ View
 ├── components/
 │   ├── Sidebar.tsx              # เมนูหลัก 6 โมดูล + Role Switcher
-│   ├── TopBar.tsx               # ชื่อหน้า, นาฬิกาไทย (พ.ศ.), Fullscreen
+│   ├── TopBar.tsx               # ชื่อหน้า, นาฬิกาไทย (พ.ศ.), Fullscreen, Theme Toggle
+│   ├── ThemeToggle.tsx          # ปุ่มสลับ Dark/Light Mode (ผูกกับ class `dark` บน <html>)
 │   ├── StatusBar.tsx            # แถบสถานะ Collector / AI Engine / Syslog
 │   ├── CommandPreviewModal.tsx  # ตัวอย่างคำสั่งก่อนอนุมัติ (Human-in-the-Loop)
 │   ├── RejectReasonModal.tsx    # ฟอร์มระบุเหตุผลการปฏิเสธ
