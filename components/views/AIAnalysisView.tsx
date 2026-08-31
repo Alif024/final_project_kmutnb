@@ -312,7 +312,7 @@ export default function AIAnalysisView({
           </div>
 
           {/* AI Recommendation Summary linking to Action Center */}
-          <div className="bg-gradient-to-r from-purple-950/40 to-blue-950/40 border border-purple-500/30 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg backdrop-blur-md">
+          <div className="bg-gradient-to-r from-white to-purple-100 dark:from-purple-950/40 dark:to-blue-950/40 border border-purple-500/30 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg backdrop-blur-md">
             <div className="space-y-1">
               <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />

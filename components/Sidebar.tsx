@@ -155,7 +155,7 @@ export default function Sidebar({
                   </div>
                   <span
                     className={`text-[11px] block truncate mt-0.5 ${
-                      isActive ? 'text-blue-300/80' : 'text-slate-500 group-hover:text-slate-400'
+                      isActive ? 'text-blue-600 dark:text-blue-300/80' : 'text-slate-500 group-hover:text-slate-400'
                     }`}
                   >
                     {item.subtitle}

@@ -113,7 +113,7 @@ export default function CommandPreviewModal({
               <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
               การยืนยันนี้ถือเป็นคำอนุมัติขั้นสุดท้ายจากวิศวกรประจำศูนย์ NOC
             </div>
-            <p className="text-[11px] text-amber-200/80">
+            <p className="text-[11px] text-amber-700/80 dark:text-amber-200/80">
               เมื่อกดปุ่มยืนยัน AI Agent จะทำการยิง API / SSH คำสั่งไปยังอุปกรณ์เป้าหมายทันที
             </p>
           </div>
