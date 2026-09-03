@@ -128,6 +128,8 @@ export interface LogQuery {
   sources: string[];
   /** Stream ที่เลือก — ว่าง = ทุก Stream */
   streams: LogStreamId[];
+  /** ช่วงเวลาบนกราฟที่คลิกเลือกไว้ เก็บเป็นป้ายเวลาเริ่มช่วง เช่น "13:15" — ว่าง = ทุกช่วง */
+  buckets: string[];
   range: LogTimeRange;
   /** จำกัดเฉพาะ Log ที่ผูกกับ Incident นี้ */
   incidentId?: string;
@@ -141,9 +143,11 @@ export interface LogFacet {
 }
 
 export interface LogHistogramBucket {
-  label: string;                // "13:10"
+  label: string;                // "13:15" = เวลาเริ่มของช่วง
   count: number;
   errorCount: number;           // severityLevel <= 3
+  /** ผู้ใช้คลิกเลือกช่วงนี้ไว้หรือไม่ */
+  selected: boolean;
 }
 
 export interface LogSearchResult {

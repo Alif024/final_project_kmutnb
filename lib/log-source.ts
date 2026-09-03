@@ -72,13 +72,35 @@ export const DEFAULT_LOG_QUERY: LogQuery = {
   severities: [],
   sources: [],
   streams: [],
+  buckets: [],
   range: 'all',
 };
+
+/** ความกว้างของหนึ่งช่วงเวลาบนกราฟการกระจาย (นาที) */
+export const BUCKET_MINUTES = 15;
 
 /** แปลง "HH:mm:ss" เป็นจำนวนวินาทีนับจากเที่ยงคืน */
 function toSeconds(time: string): number {
   const [h = 0, m = 0, s = 0] = time.split(':').map(Number);
   return h * 3600 + m * 60 + s;
+}
+
+/** แปลงวินาทีเป็นป้ายเวลา "HH:mm" */
+function toLabel(seconds: number): string {
+  const hh = String(Math.floor(seconds / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+/** ป้ายของช่วงเวลาที่ log บรรทัดนี้ตกอยู่ ใช้เป็นคีย์จับคู่กับแท่งบนกราฟ */
+export function bucketLabelOf(timestamp: string): string {
+  const size = BUCKET_MINUTES * 60;
+  return toLabel(Math.floor(toSeconds(timestamp) / size) * size);
+}
+
+/** เวลาสิ้นสุดของช่วง (ใช้ประกอบคิวรี Graylog) */
+function bucketEndLabel(label: string): string {
+  return toLabel(toSeconds(label) + BUCKET_MINUTES * 60 - 1);
 }
 
 function getStreamLabel(id?: LogStreamId): string {
@@ -133,6 +155,14 @@ export function buildGraylogQuery(query: LogQuery): string {
   if (query.incidentId) {
     clauses.push(`incident_id:"${query.incidentId}"`);
   }
+  if (query.buckets.length > 0) {
+    // หมายเหตุ: Graylog จริงต้องใส่วันที่นำหน้าเวลาด้วย เช่น "2026-05-24 13:15:00"
+    // ที่นี่ชุดข้อมูลจำลองอยู่ในวันเดียวกันทั้งหมด จึงเทียบเฉพาะเวลา
+    const ranges = [...query.buckets]
+      .sort()
+      .map((b) => `timestamp:["${b}:00" TO "${bucketEndLabel(b)}:59"]`);
+    clauses.push(ranges.length === 1 ? ranges[0] : `(${ranges.join(' OR ')})`);
+  }
 
   return clauses.length > 0 ? clauses.join(' AND ') : '*';
 }
@@ -155,11 +185,11 @@ function buildFacets(
 }
 
 /** จัดกลุ่ม Log เป็นช่วงเวลาเท่าๆ กันสำหรับกราฟแท่งด้านบนตาราง */
-function buildHistogram(entries: SyslogEntry[], bucketMinutes: number): LogHistogramBucket[] {
+function buildHistogram(entries: SyslogEntry[], selected: string[]): LogHistogramBucket[] {
   if (entries.length === 0) return [];
 
   const times = entries.map((log) => toSeconds(log.timestamp));
-  const bucketSize = bucketMinutes * 60;
+  const bucketSize = BUCKET_MINUTES * 60;
   const first = Math.floor(Math.min(...times) / bucketSize) * bucketSize;
   const last = Math.floor(Math.max(...times) / bucketSize) * bucketSize;
 
@@ -169,12 +199,12 @@ function buildHistogram(entries: SyslogEntry[], bucketMinutes: number): LogHisto
       const t = toSeconds(log.timestamp);
       return t >= start && t < start + bucketSize;
     });
-    const hh = String(Math.floor(start / 3600)).padStart(2, '0');
-    const mm = String(Math.floor((start % 3600) / 60)).padStart(2, '0');
+    const label = toLabel(start);
     buckets.push({
-      label: `${hh}:${mm}`,
+      label,
       count: inBucket.length,
       errorCount: inBucket.filter((log) => log.severityLevel <= 3).length,
+      selected: selected.includes(label),
     });
   }
 
@@ -214,28 +244,39 @@ export function searchLogs(query: LogQuery): LogSearchResult {
 
   const matchIncident = (log: SyslogEntry) =>
     !query.incidentId || log.incidentId === query.incidentId;
+  const matchBucket = (log: SyslogEntry) =>
+    query.buckets.length === 0 || query.buckets.includes(bucketLabelOf(log.timestamp));
 
   const base = all.filter((log) => matchTime(log) && matchSearch(log) && matchIncident(log));
-  const entries = base.filter((log) => matchSeverity(log) && matchSource(log) && matchStream(log));
+
+  // ยังไม่ตัดด้วยช่วงเวลาที่คลิกเลือก — กราฟต้องแสดงทุกแท่งเสมอ ไม่งั้นจะเหลือ
+  // เฉพาะแท่งที่เลือกไว้แล้วคลิกเพิ่มช่วงอื่นไม่ได้อีก (เหตุผลเดียวกับ facet count)
+  const beforeBuckets = base.filter(
+    (log) => matchSeverity(log) && matchSource(log) && matchStream(log)
+  );
+  const entries = beforeBuckets.filter(matchBucket);
+
+  // Facet ต่าง ๆ นับจากผลลัพธ์ที่ผ่านช่วงเวลาที่เลือกแล้ว
+  const scoped = base.filter(matchBucket);
 
   return {
     entries,
     totalCount: all.length,
     matchedCount: entries.length,
-    histogram: buildHistogram(entries, 15),
+    histogram: buildHistogram(beforeBuckets, query.buckets),
     sourceFacets: buildFacets(
-      base.filter((log) => matchSeverity(log) && matchStream(log)),
+      scoped.filter((log) => matchSeverity(log) && matchStream(log)),
       (log) => ({ value: log.sourceId, label: log.sourceName })
     ),
     severityFacets: buildFacets(
-      base.filter((log) => matchSource(log) && matchStream(log)),
+      scoped.filter((log) => matchSource(log) && matchStream(log)),
       (log) => ({
         value: String(log.severityLevel),
         label: SEVERITY_META[log.severityLevel]?.name ?? `Level ${log.severityLevel}`,
       })
     ),
     streamFacets: buildFacets(
-      base.filter((log) => matchSeverity(log) && matchSource(log)),
+      scoped.filter((log) => matchSeverity(log) && matchSource(log)),
       (log) => (log.stream ? { value: log.stream, label: getStreamLabel(log.stream) } : undefined)
     ),
     // ค่าจำลองให้ดูเหมือนเวลา query ของ Graylog จริง (คิดจากปริมาณข้อมูลที่สแกน)

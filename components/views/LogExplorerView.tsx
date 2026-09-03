@@ -28,6 +28,7 @@ import {
 } from 'recharts';
 import { LogQuery, LogStreamId, LogTimeRange, SyslogEntry } from '@/types/ai-noc';
 import {
+  BUCKET_MINUTES,
   DEFAULT_LOG_QUERY,
   LOG_STREAMS,
   SEVERITY_META,
@@ -169,6 +170,7 @@ export default function LogExplorerView({
     query.severities.length +
     query.sources.length +
     query.streams.length +
+    query.buckets.length +
     (query.search.trim() ? 1 : 0) +
     (query.range !== 'all' ? 1 : 0) +
     (query.incidentId ? 1 : 0);
@@ -176,6 +178,10 @@ export default function LogExplorerView({
   /** สลับค่าหนึ่งค่าในตัวกรองแบบเลือกได้หลายรายการ */
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+
+  /** คลิกแท่งบนกราฟเพื่อเปิด/ปิดการกรองเฉพาะช่วงเวลานั้น เลือกพร้อมกันได้หลายช่วง */
+  const toggleBucket = (label: string) =>
+    updateQuery((q) => ({ ...q, buckets: toggle(q.buckets, label) }));
 
   const resetQuery = () => updateQuery(DEFAULT_LOG_QUERY);
 
@@ -466,13 +472,45 @@ export default function LogExplorerView({
           {/* Histogram */}
           {result.histogram.length > 0 && (
             <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
-              <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 mb-3">
-                <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                การกระจายตามช่วงเวลา (ช่วงละ 15 นาที)
-                <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
-                  — แท่งสีแดงคือช่วงที่มี Log ระดับ Error ขึ้นไป
-                </span>
-              </h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 min-w-0">
+                  <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  การกระจายตามช่วงเวลา (ช่วงละ {BUCKET_MINUTES} นาที)
+                  <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
+                    — แท่งแดงคือช่วงที่มี Log ระดับ Error ขึ้นไป · คลิกที่แท่งเพื่อดูเฉพาะช่วงนั้น เลือกได้หลายช่วง
+                  </span>
+                </h3>
+
+                {query.buckets.length > 0 && (
+                  <button
+                    onClick={() => updateQuery((q) => ({ ...q, buckets: [] }))}
+                    title="ล้างช่วงเวลาที่เลือกไว้"
+                    className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-slate-500 dark:text-slate-400 border border-transparent hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                    ล้าง ({query.buckets.length})
+                  </button>
+                )}
+              </div>
+
+              {/* สรุปช่วงที่เลือกไว้ กดที่ชิปเพื่อเอาช่วงนั้นออกได้ */}
+              {query.buckets.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">
+                    ช่วงที่เลือก:
+                  </span>
+                  {[...query.buckets].sort().map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => toggleBucket(b)}
+                      title="เอาช่วงนี้ออก"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-semibold bg-blue-500/15 border border-blue-500/40 text-blue-600 dark:text-blue-300 hover:bg-rose-500/15 hover:border-rose-500/40 hover:text-rose-600 dark:hover:text-rose-300 transition-colors"
+                    >
+                      {b} <X className="w-2.5 h-2.5" />
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="h-32">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={result.histogram}>
@@ -498,9 +536,26 @@ export default function LogExplorerView({
                       itemStyle={{ color: '#fff' }}
                       formatter={(value) => [value as number, 'จำนวนข้อความ']}
                     />
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                    <Bar
+                      dataKey="count"
+                      radius={[4, 4, 0, 0]}
+                      cursor="pointer"
+                      // Recharts ส่ง payload ของแถวมาให้ใน data.payload (บางเวอร์ชันแนบมาที่ data ตรง ๆ)
+                      onClick={(data: unknown) => {
+                        const row = data as { label?: string; payload?: { label?: string } };
+                        const label = row?.payload?.label ?? row?.label;
+                        if (label) toggleBucket(label);
+                      }}
+                    >
                       {result.histogram.map((b, idx) => (
-                        <Cell key={idx} fill={b.errorCount > 0 ? '#EF4444' : '#3B82F6'} />
+                        <Cell
+                          key={idx}
+                          fill={b.errorCount > 0 ? '#EF4444' : '#3B82F6'}
+                          // เมื่อมีการเลือกช่วงไว้ ให้แท่งที่ไม่ได้เลือกจางลงเพื่อให้เห็นชัดว่ากรองอะไรอยู่
+                          fillOpacity={query.buckets.length === 0 || b.selected ? 1 : 0.25}
+                          stroke={b.selected ? '#1D4ED8' : undefined}
+                          strokeWidth={b.selected ? 2 : 0}
+                        />
                       ))}
                     </Bar>
                   </BarChart>
