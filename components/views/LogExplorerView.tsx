@@ -134,12 +134,15 @@ export default function LogExplorerView({
         </div>
       </div>
 
-      {/* แถวหลักของหน้า — คอลัมน์ตัวกรองอยู่ซ้ายมือ ขนาบช่องค้นหา กราฟ และตารางผลลัพธ์ */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:items-start">
-        {/* Left: Facet filters — ติดหนึบไว้ขณะเลื่อนอ่านผลลัพธ์ และเลื่อนภายในตัวเองเมื่อยาวเกินจอ */}
-        <aside className="lg:col-span-3 space-y-4 lg:sticky lg:top-16 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pr-1">
+      {/* แถวหลักของหน้า — คอลัมน์ตัวกรองอยู่ซ้ายมือ ขนาบช่องค้นหา กราฟ และตารางผลลัพธ์
+          บนจอใหญ่ล็อกความสูงของแถวไว้ (ค่าเดียวกับ layout ของ AI Chat) ทั้งสองคอลัมน์
+          จึงจบที่เส้นเดียวกันเสมอ โดยการ์ดใบล่างสุดของแต่ละฝั่ง (Sources / ตารางผลลัพธ์)
+          เป็นตัวยืดเก็บพื้นที่ที่เหลือ แล้วเลื่อนรายการอยู่ภายในตัวเอง */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[720px]">
+        {/* Left: Facet filters */}
+        <aside className="lg:col-span-3 flex flex-col gap-4 lg:h-full">
           {/* Severity */}
-          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg">
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
             <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
               <AlertOctagon className="w-4 h-4 text-rose-500" />
               Severity (RFC 5424)
@@ -179,7 +182,7 @@ export default function LogExplorerView({
           </div>
 
           {/* Stream */}
-          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg">
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
             <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
               <Layers className="w-4 h-4 text-purple-500" />
               Streams
@@ -212,13 +215,13 @@ export default function LogExplorerView({
           </div>
 
           {/* Source */}
-          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg">
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg flex flex-col lg:flex-1 lg:min-h-0">
             <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
               <Server className="w-4 h-4 text-emerald-500" />
               Sources
             </h3>
-            {/* ไม่ต้องจำกัดความสูงตรงนี้ เพราะทั้งคอลัมน์เลื่อนอยู่แล้วบนจอใหญ่ */}
-            <div className="space-y-1">
+            {/* รายการต้นทางเลื่อนอยู่ในการ์ด เพื่อให้ก้นการ์ดเสมอกับตารางผลลัพธ์ */}
+            <div className="space-y-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
               {result.sourceFacets.length === 0 && (
                 <p className="text-[11px] text-slate-500 py-2">ไม่มีข้อมูลในเงื่อนไขนี้</p>
               )}
@@ -244,9 +247,9 @@ export default function LogExplorerView({
         </aside>
 
         {/* Right: ช่องค้นหา + กราฟการกระจาย + ตารางผลลัพธ์ */}
-        <div className="lg:col-span-9 space-y-6">
+        <div className="lg:col-span-9 flex flex-col gap-6 lg:h-full">
           {/* Search Bar + Time Range */}
-          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 space-y-3 shadow-lg">
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 space-y-3 shadow-lg shrink-0">
             <div className="flex flex-col lg:flex-row lg:items-center gap-3">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-500 dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -362,7 +365,7 @@ export default function LogExplorerView({
 
           {/* Histogram */}
           {result.histogram.length > 0 && (
-            <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg">
+            <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
               <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 mb-3">
                 <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 การกระจายตามช่วงเวลา (ช่วงละ 15 นาที)
@@ -407,7 +410,7 @@ export default function LogExplorerView({
           )}
 
           {/* Result table */}
-          <div className="flex flex-col bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden">
+          <div className="flex flex-col lg:flex-1 lg:min-h-0 bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden">
             <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-white/10">
               <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2">
                 <Filter className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -431,7 +434,7 @@ export default function LogExplorerView({
                 </button>
               </div>
             ) : (
-              <div className="max-h-[640px] lg:max-h-[calc(100vh-14rem)] overflow-y-auto divide-y divide-slate-100 dark:divide-white/5">
+              <div className="max-h-[640px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto divide-y divide-slate-100 dark:divide-white/5">
                 {rows.map((log) => (
                   <LogRow
                     key={log.id}
