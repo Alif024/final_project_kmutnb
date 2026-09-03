@@ -13,14 +13,32 @@ import {
   Lock,
   Eye,
   UserCheck,
-  Clock
+  Clock,
+  Trash2,
+  Loader2,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
-import { UserRole, AuditLogEntry } from '@/types/ai-noc';
+import { UserRole, AuditLogEntry, Integration } from '@/types/ai-noc';
+import AddIntegrationModal from '@/components/AddIntegrationModal';
+import DeleteIntegrationModal from '@/components/DeleteIntegrationModal';
+import {
+  ACCENT_CLASSES,
+  DETAIL_TONE_CLASSES,
+  buildConnectionTestSteps,
+  getIntegrationMeta,
+} from '@/lib/integrations';
+import { useConnectionTest } from '@/hooks/use-connection-test';
+import ConnectionTestConsole from '@/components/ConnectionTestConsole';
 
 interface SettingsViewProps {
   userRole: UserRole;
   onRoleChange: (role: UserRole) => void;
   auditLogs: AuditLogEntry[];
+  integrations: Integration[];
+  onAddIntegration: (integration: Integration) => void;
+  onRemoveIntegration: (id: string) => void;
+  onIntegrationTested: (id: string) => void;
   initialSubTab?: string;
 }
 
@@ -28,6 +46,10 @@ export default function SettingsView({
   userRole,
   onRoleChange,
   auditLogs,
+  integrations,
+  onAddIntegration,
+  onRemoveIntegration,
+  onIntegrationTested,
   initialSubTab = 'integrations',
 }: SettingsViewProps) {
   const [subTab, setSubTab] = useState<'integrations' | 'system' | 'rbac' | 'audit'>(
@@ -51,6 +73,15 @@ export default function SettingsView({
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2500);
   };
+
+  // Add Integration Wizard state
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  // รายการที่กำลังรอยืนยันการลบ (null = ยังไม่ได้กดลบรายการใด)
+  const [integrationToDelete, setIntegrationToDelete] = useState<Integration | null>(null);
+  const connectedCount = integrations.filter((i) => i.connectionState === 'connected').length;
+  const pendingCount = integrations.length - connectedCount;
+  // Viewer เป็นสิทธิ์แบบอ่านอย่างเดียว จึงเพิ่มการเชื่อมต่อใหม่ไม่ได้
+  const canManageIntegrations = userRole !== 'viewer';
 
   return (
     <div className="space-y-6 pb-6 animate-in fade-in duration-300">
@@ -111,141 +142,68 @@ export default function SettingsView({
       {/* SUBTAB 1: INTEGRATION CONFIG */}
       {subTab === 'integrations' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between bg-white dark:bg-white/5 backdrop-blur-md p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-lg">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">การเชื่อมต่อระบบโครงสร้างพื้นฐานและซอฟต์แวร์ติดตาม</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-white/5 backdrop-blur-md p-4 rounded-2xl border border-slate-200 dark:border-white/10 shadow-lg">
+            <div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                การเชื่อมต่อระบบโครงสร้างพื้นฐานและซอฟต์แวร์ติดตาม
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                ทั้งหมด {integrations.length} รายการ · เชื่อมต่อแล้ว {connectedCount} · รอการทดสอบ {pendingCount}
+              </p>
+            </div>
+
             <button
-              onClick={() => alert('Add Integration wizard')}
-              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow flex items-center gap-1.5"
+              onClick={() => setIsWizardOpen(true)}
+              disabled={!canManageIntegrations}
+              title={
+                canManageIntegrations
+                  ? undefined
+                  : 'สิทธิ์ Viewer ดูข้อมูลได้อย่างเดียว ไม่สามารถเพิ่มการเชื่อมต่อได้'
+              }
+              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-all shadow flex items-center gap-1.5 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
             >
               <Plus className="w-4 h-4" /> เพิ่มการเชื่อมต่อ (Add Integration)
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* 1. VMware vCenter */}
-            <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-5 space-y-4 shadow-lg hover:border-slate-400 dark:hover:border-white/20 transition-all">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold border border-blue-500/30">
-                    vC
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-white">VMware vCenter Server</h4>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">10.0.0.100</span>
-                  </div>
-                </div>
-                <span className="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase">
-                  Connected
-                </span>
-              </div>
-
-              <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
-                <div className="flex justify-between"><span>API Status:</span> <span className="text-emerald-600 dark:text-emerald-400 font-semibold">200 OK</span></div>
-                <div className="flex justify-between"><span>Last Sync:</span> <span className="font-mono text-slate-900 dark:text-white">2 นาทีที่แล้ว</span></div>
-                <div className="flex justify-between"><span>Managed Hosts:</span> <span className="text-slate-900 dark:text-white font-bold">4 ESXi Hosts</span></div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-200 dark:border-white/10 flex items-center justify-end gap-2">
-                <button className="px-3 py-1.5 bg-slate-100 dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 transition-all">
-                  Test Connection
-                </button>
-                <button className="px-3 py-1.5 bg-blue-400/10 dark:bg-blue-600/20 hover:bg-blue-600/30 text-blue-600 dark:text-blue-300 rounded-lg text-xs font-semibold border border-blue-500/30 transition-all">
-                  Sync Now
-                </button>
-              </div>
+          {integrations.length === 0 ? (
+            <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-dashed border-slate-300 dark:border-white/15 rounded-2xl p-10 text-center space-y-2">
+              <Server className="w-8 h-8 mx-auto text-slate-400 dark:text-slate-500" />
+              <h4 className="font-bold text-sm text-slate-900 dark:text-white">ยังไม่มีการเชื่อมต่อในระบบ</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                AI-NOC จะไม่ได้รับข้อมูลจากภายนอกจนกว่าจะเพิ่มการเชื่อมต่ออย่างน้อย 1 รายการ
+              </p>
             </div>
-
-            {/* 2. Proxmox VE Cluster */}
-            <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-5 space-y-4 shadow-lg hover:border-slate-400 dark:hover:border-white/20 transition-all">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center text-orange-400 font-bold border border-orange-500/30">
-                    PVE
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-white">Proxmox VE Cluster</h4>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">10.0.0.120</span>
-                  </div>
-                </div>
-                <span className="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase">
-                  Connected
-                </span>
-              </div>
-
-              <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
-                <div className="flex justify-between"><span>API Status:</span> <span className="text-emerald-600 dark:text-emerald-400 font-semibold">200 OK</span></div>
-                <div className="flex justify-between"><span>Last Sync:</span> <span className="font-mono text-slate-900 dark:text-white">1 นาทีที่แล้ว</span></div>
-                <div className="flex justify-between"><span>Managed Nodes:</span> <span className="text-slate-900 dark:text-white font-bold">2 PVE Nodes</span></div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-200 dark:border-white/10 flex items-center justify-end gap-2">
-                <button className="px-3 py-1.5 bg-slate-100 dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 transition-all">
-                  Test Connection
-                </button>
-                <button className="px-3 py-1.5 bg-blue-400/10 dark:bg-blue-600/20 hover:bg-blue-600/30 text-blue-600 dark:text-blue-300 rounded-lg text-xs font-semibold border border-blue-500/30 transition-all">
-                  Sync Now
-                </button>
-              </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+              {integrations.map((integration) => (
+                <IntegrationCard
+                  key={integration.id}
+                  integration={integration}
+                  canManage={canManageIntegrations}
+                  onRequestDelete={() => setIntegrationToDelete(integration)}
+                  onTestPassed={() => onIntegrationTested(integration.id)}
+                />
+              ))}
             </div>
+          )}
 
-            {/* 3. Unified Syslog & Monitoring Server */}
-            <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-5 space-y-4 shadow-lg hover:border-slate-400 dark:hover:border-white/20 transition-all">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold border border-purple-500/30">
-                    LOG
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-white">Unified Syslog & Metric Server</h4>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">10.0.0.200</span>
-                  </div>
-                </div>
-                <span className="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase">
-                  NTP Synced
-                </span>
-              </div>
+          {/* Mount เฉพาะตอนเปิด เพื่อให้วิซาร์ดเริ่มที่ขั้นตอนที่ 1 ด้วยฟอร์มว่างทุกครั้ง */}
+          {isWizardOpen && (
+            <AddIntegrationModal
+              existingIntegrations={integrations}
+              onClose={() => setIsWizardOpen(false)}
+              onAdd={onAddIntegration}
+            />
+          )}
 
-              <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
-                <div className="flex justify-between"><span>Service:</span> <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Syslogd + Prometheus</span></div>
-                <div className="flex justify-between"><span>Ingestion Rate:</span> <span className="font-mono text-slate-900 dark:text-white">1,240 msg/sec</span></div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-200 dark:border-white/10 flex items-center justify-end gap-2">
-                <button className="px-3 py-1.5 bg-slate-100 dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 transition-all">
-                  Test Connection
-                </button>
-              </div>
-            </div>
-
-            {/* 4. LINE / Webhook Alerts */}
-            <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-5 space-y-4 shadow-lg hover:border-slate-400 dark:hover:border-white/20 transition-all">
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold border border-emerald-500/30">
-                    NOTI
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-white">LINE Notify & Webhook Gateway</h4>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">Group: NOC Critical Alerts</span>
-                  </div>
-                </div>
-                <span className="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold uppercase">
-                  Active
-                </span>
-              </div>
-
-              <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
-                <div className="flex justify-between"><span>Target:</span> <span className="text-slate-900 dark:text-white font-semibold">https://notify-api.line.me</span></div>
-                <div className="flex justify-between"><span>Alert Level:</span> <span className="text-amber-600 dark:text-amber-400 font-bold">Critical & High Only</span></div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-200 dark:border-white/10 flex items-center justify-end gap-2">
-                <button className="px-3 py-1.5 bg-slate-100 dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 transition-all">
-                  Send Test Alert
-                </button>
-              </div>
-            </div>
-          </div>
+          {integrationToDelete && (
+            <DeleteIntegrationModal
+              integration={integrationToDelete}
+              onClose={() => setIntegrationToDelete(null)}
+              onConfirmDelete={onRemoveIntegration}
+            />
+          )}
         </div>
       )}
 
@@ -434,6 +392,169 @@ export default function SettingsView({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * การ์ดแสดงสถานะการเชื่อมต่อ 1 รายการ — เรนเดอร์จากข้อมูลใน `integrations`
+ * ทั้งรายการตั้งต้นและรายการที่เพิ่มผ่าน Add Integration Wizard
+ */
+function IntegrationCard({
+  integration,
+  canManage,
+  onRequestDelete,
+  onTestPassed,
+}: {
+  integration: Integration;
+  canManage: boolean;
+  onRequestDelete: () => void;
+  onTestPassed: () => void;
+}) {
+  const meta = getIntegrationMeta(integration.type);
+  const { state: testState, logs: testLogs, runTest } = useConnectionTest();
+  const [isResultCollapsed, setIsResultCollapsed] = useState(false);
+
+  const handleTest = () => {
+    // ทดสอบใหม่ทั้งที ให้กางกล่องผลลัพธ์ให้เห็นเสมอ
+    setIsResultCollapsed(false);
+    runTest(
+      buildConnectionTestSteps({
+        type: integration.type,
+        target: integration.target,
+        port: integration.port,
+        username: integration.username,
+        protocol: integration.protocol,
+      }),
+      onTestPassed
+    );
+  };
+
+  const statusBadgeClass =
+    integration.connectionState === 'connected'
+      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+      : integration.connectionState === 'pending'
+      ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30'
+      : 'bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30';
+
+  return (
+    <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-5 space-y-4 shadow-lg hover:border-slate-400 dark:hover:border-white/20 transition-all">
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3 gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center font-bold text-xs border ${ACCENT_CLASSES[meta.accent].icon}`}
+          >
+            {meta.badge}
+          </div>
+          <div className="min-w-0">
+            <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">{integration.name}</h4>
+            <span
+              className={`text-xs text-slate-500 dark:text-slate-400 block truncate ${
+                meta.targetIsUrl ? '' : 'font-mono'
+              }`}
+            >
+              {integration.target}
+              {integration.port ? `:${integration.port}` : ''}
+            </span>
+          </div>
+        </div>
+        <span
+          className={`px-2.5 py-0.5 rounded border text-xs font-bold uppercase whitespace-nowrap ${statusBadgeClass}`}
+        >
+          {integration.statusLabel}
+        </span>
+      </div>
+
+      <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
+        {integration.details.map((detail, idx) => (
+          <div key={idx} className="flex justify-between gap-3">
+            <span>{detail.label}</span>
+            <span className={`text-right break-all ${DETAIL_TONE_CLASSES[detail.tone ?? 'default']}`}>
+              {detail.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* กล่องผลการทดสอบ — แสดงหลังกดปุ่มทดสอบครั้งแรกเท่านั้น เพื่อไม่ให้การ์ดยาวเกินจำเป็น */}
+      {testState !== 'idle' && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+              ผลการทดสอบการเชื่อมต่อ (จำลอง):
+            </span>
+            {/* ย่อ/ขยายกล่องผลลัพธ์ — log ยังอยู่ครบ กลับมากางดูได้โดยไม่ต้องทดสอบใหม่ */}
+            <button
+              onClick={() => setIsResultCollapsed((prev) => !prev)}
+              aria-expanded={!isResultCollapsed}
+              aria-label={
+                isResultCollapsed ? 'แสดงผลการทดสอบการเชื่อมต่อ' : 'ซ่อนผลการทดสอบการเชื่อมต่อ'
+              }
+              className="px-2 py-1 rounded-lg text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1"
+            >
+              {isResultCollapsed ? (
+                <>
+                  แสดงผลลัพธ์ <ChevronDown className="w-3.5 h-3.5" />
+                </>
+              ) : (
+                <>
+                  ซ่อนผลลัพธ์ <ChevronUp className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
+          </div>
+
+          {!isResultCollapsed && (
+            <ConnectionTestConsole
+              state={testState}
+              logs={testLogs}
+              idleMessage=""
+              successMessage={
+                meta.type === 'webhook-notify'
+                  ? 'ส่งการแจ้งเตือนทดสอบสำเร็จ'
+                  : 'การเชื่อมต่อสำเร็จ — ระบบพร้อมรับข้อมูล'
+              }
+            />
+          )}
+        </div>
+      )}
+
+      <div className="pt-2 border-t border-slate-200 dark:border-white/10 flex items-center justify-between gap-2">
+        <button
+          onClick={onRequestDelete}
+          disabled={!canManage}
+          title={
+            canManage
+              ? 'ลบการเชื่อมต่อนี้ออกจากระบบ'
+              : 'สิทธิ์ Viewer ดูข้อมูลได้อย่างเดียว ไม่สามารถลบการเชื่อมต่อได้'
+          }
+          aria-label={`ลบการเชื่อมต่อ ${integration.name}`}
+          className="px-3 py-1.5 bg-red-400/10 dark:bg-red-600/20 hover:bg-red-600/30 text-red-600 dark:text-red-300 rounded-lg text-xs font-semibold border border-red-500/30 transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-400/10 dark:disabled:hover:bg-red-600/20"
+        >
+          <Trash2 className="w-3.5 h-3.5" /> ลบ
+        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleTest}
+            disabled={testState === 'testing'}
+            className="px-3 py-1.5 bg-slate-100 dark:bg-black/20 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg text-xs font-medium border border-slate-200 dark:border-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+          >
+            {testState === 'testing' ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" /> กำลังทดสอบ...
+              </>
+            ) : (
+              meta.testLabel
+            )}
+          </button>
+          {meta.supportsSync && (
+            <button className="px-3 py-1.5 bg-blue-400/10 dark:bg-blue-600/20 hover:bg-blue-600/30 text-blue-600 dark:text-blue-300 rounded-lg text-xs font-semibold border border-blue-500/30 transition-all">
+              Sync Now
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

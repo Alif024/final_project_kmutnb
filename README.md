@@ -169,6 +169,11 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 
 ### 6. Settings & Administration
 - **Integrations:** สถานะการเชื่อมต่อ vCenter, Proxmox VE, Syslog/Prometheus, LINE Notify *(UI Mock)*
+  พร้อม **Add Integration Wizard** 3 ขั้นตอน (เลือกประเภท → กรอกรายละเอียดพร้อมตรวจสอบความถูกต้อง →
+  ทดสอบการเชื่อมต่อและยืนยัน) การ์ดที่เพิ่มใหม่จะแสดงต่อท้ายรายการทันที และคงอยู่เมื่อสลับแท็บ
+  พร้อมปุ่ม **ลบการเชื่อมต่อ** ที่มี Modal ยืนยันก่อนลบ (สิทธิ์ Viewer เพิ่มหรือลบไม่ได้)
+  และปุ่ม **Test Connection / Send Test Alert** ที่แสดง log ผลการทดสอบ (จำลอง) ในการ์ด
+  หากการ์ดอยู่สถานะ "รอการทดสอบ" แล้วทดสอบผ่าน สถานะจะเปลี่ยนเป็น Connected ให้อัตโนมัติ
 - **System Config:** เลือกโมเดล AI และตั้งค่า Threshold (CPU Ready, Storage Latency, Packet Loss)
 - **RBAC:** สลับบทบาท Admin / NOC Engineer / Viewer เพื่อสาธิตการควบคุมสิทธิ์
 - **Audit Log:** ตารางบันทึกการตัดสินใจทั้งหมด รวมคำสั่งที่ถูกรันและเหตุผลการปฏิเสธ
@@ -185,7 +190,10 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 3. **AI Diagnosis ยังไม่เรียกโมเดล** — ผลการวินิจฉัยอ่านจาก `MOCK_DIAGNOSIS_01` แบบตายตัว
 4. **บริบทของ AI Chat ยังฝังแบบ Hard-coded ใน System Prompt** — ยังไม่มีการส่งข้อมูล Telemetry
    สดจาก Client ไปกับทุกคำถาม และค่า `citedEntities` ที่ตอบกลับก็เป็นค่าคงที่
-5. **ปุ่มที่ยังเป็น Stub** — Export PDF/Excel และ Add Integration ยังเรียกแค่ `alert()`
+5. **ปุ่มที่ยังเป็น Stub** — Export PDF/Excel ยังเรียกแค่ `alert()` ส่วนปุ่ม Sync Now บนการ์ด
+   Integration ยังไม่ทำงาน และการทดสอบการเชื่อมต่อ (ทั้งปุ่ม Test Connection / Send Test Alert
+   บนการ์ด และขั้นตอนที่ 3 ของ Add Integration Wizard) เป็นการจำลองผลลัพธ์ — ยังไม่ยิงไปยัง
+   vCenter/Proxmox/Syslog/Webhook จริง จึงขึ้นผลสำเร็จเสมอ
    (ปุ่ม Refresh บน TopBar/StatusBar/Dashboard ทำงานจริงแล้ว คืออัปเดตเวลา "Last Update"
    เป็นเวลาปัจจุบัน แต่ยังเป็น Mock Refresh เพราะไม่มี Collector จริงให้ดึงข้อมูลใหม่)
 6. **การ Build ต้องใช้อินเทอร์เน็ต** เพราะโหลดฟอนต์ผ่าน `next/font/google`

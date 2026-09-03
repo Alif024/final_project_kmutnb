@@ -19,7 +19,8 @@ import {
   AuditLog,
   ChatSession,
   ChatMessage,
-  SyslogEntry
+  SyslogEntry,
+  Integration
 } from '@/types/ai-noc';
 import mockDataJson from './mock-data.json';
 
@@ -37,6 +38,7 @@ export interface MockData {
   chatSessions: ChatSession[];
   chatMessages: ChatMessage[];
   syslogs: SyslogEntry[];
+  integrations: Integration[];
 }
 
 // JSON ให้ชนิดเป็น string กว้างๆ จึง cast กลับเป็น union types ที่ประกาศไว้ใน types/ai-noc
@@ -57,6 +59,7 @@ export const initialAuditLogs: AuditLog[] = data.auditLogs;
 export const initialChatSessions: ChatSession[] = data.chatSessions;
 export const initialChatMessages: ChatMessage[] = data.chatMessages;
 export const sampleSyslogs: SyslogEntry[] = data.syslogs;
+export const initialIntegrations: Integration[] = data.integrations;
 
 // Alias Exports matching app imports
 export const MOCK_HYPERVISORS = initialHypervisors;
@@ -72,3 +75,4 @@ export const MOCK_AUDIT_LOGS = initialAuditLogs;
 export const MOCK_CHAT_SESSIONS = initialChatSessions;
 export const MOCK_CHAT_MESSAGES = initialChatMessages;
 export const MOCK_SYSLOGS = sampleSyslogs;
+export const MOCK_INTEGRATIONS = initialIntegrations;

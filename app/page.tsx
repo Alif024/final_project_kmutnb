@@ -30,8 +30,10 @@ import {
   MOCK_CHAT_SESSIONS,
   MOCK_CHAT_MESSAGES,
   MOCK_AUDIT_LOGS,
+  MOCK_INTEGRATIONS,
 } from '@/lib/mock-data';
-import { UserRole, ApprovalRequest, AuditLogEntry, Recommendation } from '@/types/ai-noc';
+import { UserRole, ApprovalRequest, AuditLogEntry, Recommendation, Integration } from '@/types/ai-noc';
+import { getIntegrationMeta } from '@/lib/integrations';
 
 export default function Page() {
   const [collapsed, setCollapsed] = useState(false);
@@ -43,6 +45,8 @@ export default function Page() {
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(MOCK_APPROVALS);
   const [recommendations, setRecommendations] = useState<Recommendation[]>(MOCK_RECOMMENDATIONS);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(MOCK_AUDIT_LOGS);
+  // เก็บไว้ที่นี่แทนภายใน SettingsView เพราะ View ถูก unmount ทุกครั้งที่สลับแท็บ
+  const [integrations, setIntegrations] = useState<Integration[]>(MOCK_INTEGRATIONS);
 
   // Modals state
   const [approveModalReq, setApproveModalReq] = useState<ApprovalRequest | null>(null);
@@ -118,6 +122,34 @@ export default function Page() {
       };
       return [newLog, ...prev];
     });
+  };
+
+  // เพิ่มรายการเชื่อมต่อใหม่จาก Add Integration Wizard (ต่อท้ายรายการเดิม)
+  const handleAddIntegration = (integration: Integration) => {
+    setIntegrations((prev) => [...prev, integration]);
+  };
+
+  // ลบรายการเชื่อมต่อออกจากระบบ (ยืนยันผ่าน DeleteIntegrationModal มาแล้ว)
+  const handleRemoveIntegration = (id: string) => {
+    setIntegrations((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  // ทดสอบการเชื่อมต่อผ่าน (จำลอง) — อัปเดตสถานะการ์ดให้เป็น Connected
+  const handleIntegrationTested = (id: string) => {
+    setIntegrations((prev) =>
+      prev.map((i) =>
+        i.id === id
+          ? {
+              ...i,
+              connectionState: 'connected',
+              statusLabel: getIntegrationMeta(i.type).connectedLabel,
+              details: i.details.map((d) =>
+                d.label === 'API Status:' ? { ...d, value: '200 OK', tone: 'positive' as const } : d
+              ),
+            }
+          : i
+      )
+    );
   };
 
   const pendingApprovalCount = approvals.filter((a) => a.status === 'pending').length;
@@ -231,6 +263,10 @@ export default function Page() {
                 userRole={userRole}
                 onRoleChange={setUserRole}
                 auditLogs={auditLogs}
+                integrations={integrations}
+                onAddIntegration={handleAddIntegration}
+                onRemoveIntegration={handleRemoveIntegration}
+                onIntegrationTested={handleIntegrationTested}
                 initialSubTab={activeSubTab}
               />
             )}
