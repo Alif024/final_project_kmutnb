@@ -175,12 +175,13 @@ export default function LogExplorerView({
           TopBar/StatusBar ที่เป็น fixed
 
           lg:grid-rows-1 บังคับให้แถวเดียวนี้ยืดเต็มความสูงของ grid (ไม่งั้นแถวจะสูง
-          เท่าเนื้อหาแล้วเหลือที่ว่างด้านล่าง) ทั้งสองคอลัมน์จึงจบที่เส้นเดียวกัน
-          โดยการ์ดใบล่างสุดของแต่ละฝั่ง (Sources / ตารางผลลัพธ์) เป็นตัวยืด
-          แล้วเลื่อนรายการอยู่ภายในตัวเอง */}
+          เท่าเนื้อหาแล้วเหลือที่ว่างด้านล่าง) ทั้งสองคอลัมน์จึงสูงเท่ากันและ
+          "เลื่อนแยกกัน" — ซ้ายเลื่อนทั้งคอลัมน์ ขวาตรึงช่องค้นหากับกราฟไว้
+          แล้วเลื่อนเฉพาะตารางผลลัพธ์ */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:grid-rows-1 lg:flex-1 lg:min-h-[320px]">
-        {/* Left: Facet filters */}
-        <aside className="lg:col-span-3 flex flex-col gap-4 lg:h-full">
+        {/* Left: Facet filters — เลื่อนเป็นก้อนเดียวแยกจากคอลัมน์ขวา
+            การ์ดทั้งสามใบสูงตามเนื้อหา แล้วให้ทั้งคอลัมน์เป็นพื้นที่เลื่อนของตัวเอง */}
+        <aside className="lg:col-span-3 flex flex-col gap-4 lg:h-full lg:overflow-y-auto lg:pr-1 lg:pb-1">
           {/* Severity */}
           <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
             <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
@@ -255,13 +256,12 @@ export default function LogExplorerView({
           </div>
 
           {/* Source */}
-          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg flex flex-col lg:flex-1 lg:min-h-0">
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
             <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
               <Server className="w-4 h-4 text-emerald-500" />
               Sources
             </h3>
-            {/* รายการต้นทางเลื่อนอยู่ในการ์ด เพื่อให้ก้นการ์ดเสมอกับตารางผลลัพธ์ */}
-            <div className="space-y-1 pb-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+            <div className="space-y-1">
               {result.sourceFacets.length === 0 && (
                 <p className="text-[11px] text-slate-500 py-2">ไม่มีข้อมูลในเงื่อนไขนี้</p>
               )}
