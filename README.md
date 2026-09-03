@@ -177,6 +177,8 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
   (แท่งแดง = ช่วงที่มี Log ระดับ Error ขึ้นไป)
 - **Graylog Query Echo** — แปลงเงื่อนไขที่เลือกเป็นสตริงคิวรีตามไวยากรณ์ Graylog พร้อมปุ่มคัดลอก
   ไปวางใน Graylog Web Interface ได้ทันที
+- **แบ่งหน้าครั้งละ 20 ข้อความ** พร้อมปุ่มก่อนหน้า/ถัดไป และตัวเลขช่วงที่กำลังแสดง
+  (เปลี่ยนตัวกรองหรือลำดับการเรียงจะย้อนกลับไปหน้าแรกให้อัตโนมัติ)
 - **กางดูรายละเอียดรายข้อความ** — metadata (source, source_ip, facility, level) และ Parsed Fields
   ที่ Extractor แยกไว้ พร้อมปุ่มลัดกรองเฉพาะ Source นั้น และปุ่มข้ามไปดูการวิเคราะห์ของ Incident
 

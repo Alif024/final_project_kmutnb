@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   ScrollText,
   Search,
   Filter,
   X,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Server,
   Layers,
@@ -67,6 +68,9 @@ function toneOf(level: number): string {
   return SEVERITY_META[level]?.tone ?? 'info';
 }
 
+/** จำนวนข้อความสูงสุดที่แสดงต่อหนึ่งหน้าของตารางผลลัพธ์ */
+const PAGE_SIZE = 20;
+
 export default function LogExplorerView({
   incidentId,
   initialQuery,
@@ -84,6 +88,37 @@ export default function LogExplorerView({
     [result.entries, sortNewestFirst]
   );
 
+  // ---- การแบ่งหน้าของตารางผลลัพธ์ ----
+  const [page, setPage] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageRows = useMemo(
+    () => rows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE),
+    [rows, page]
+  );
+
+  /** เลื่อนตารางกลับขึ้นบนสุดและยุบแถวที่กางอยู่ เมื่อชุดผลลัพธ์ที่เห็นเปลี่ยนไป */
+  const resetListView = () => {
+    setExpandedId(null);
+    listRef.current?.scrollTo({ top: 0 });
+  };
+
+  /**
+   * เปลี่ยนเงื่อนไขค้นหา — ต้องย้อนกลับไปหน้าแรกเสมอ ไม่งั้นผู้ใช้ที่ค้างอยู่หน้า 3
+   * แล้วกรองจนเหลือผลลัพธ์ไม่ถึง 3 หน้า จะเจอตารางว่าง
+   */
+  const updateQuery = (next: LogQuery | ((q: LogQuery) => LogQuery)) => {
+    setQuery(next);
+    setPage(0);
+    resetListView();
+  };
+
+  const goToPage = (next: number) => {
+    setPage(Math.min(Math.max(next, 0), totalPages - 1));
+    resetListView();
+  };
+
   const activeFilterCount =
     query.severities.length +
     query.sources.length +
@@ -96,10 +131,7 @@ export default function LogExplorerView({
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
-  const resetQuery = () => {
-    setQuery(DEFAULT_LOG_QUERY);
-    setExpandedId(null);
-  };
+  const resetQuery = () => updateQuery(DEFAULT_LOG_QUERY);
 
   const copyQuery = async () => {
     try {
@@ -159,7 +191,7 @@ export default function LogExplorerView({
                 return (
                   <button
                     key={f.value}
-                    onClick={() => setQuery((q) => ({ ...q, severities: toggle(q.severities, level) }))}
+                    onClick={() => updateQuery((q) => ({ ...q, severities: toggle(q.severities, level) }))}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] border transition-colors ${
                       active
                         ? 'bg-blue-500/15 border-blue-500/40 text-slate-900 dark:text-white font-semibold'
@@ -197,7 +229,7 @@ export default function LogExplorerView({
                   <button
                     key={s.id}
                     onClick={() =>
-                      setQuery((q) => ({ ...q, streams: toggle<LogStreamId>(q.streams, s.id) }))
+                      updateQuery((q) => ({ ...q, streams: toggle<LogStreamId>(q.streams, s.id) }))
                     }
                     title={s.description}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] border transition-colors ${
@@ -232,7 +264,7 @@ export default function LogExplorerView({
                 return (
                   <button
                     key={f.value}
-                    onClick={() => setQuery((q) => ({ ...q, sources: toggle(q.sources, f.value) }))}
+                    onClick={() => updateQuery((q) => ({ ...q, sources: toggle(q.sources, f.value) }))}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] border transition-colors ${
                       active
                         ? 'bg-emerald-500/15 border-emerald-500/40 text-slate-900 dark:text-white font-semibold'
@@ -258,13 +290,13 @@ export default function LogExplorerView({
                 <input
                   type="text"
                   value={query.search}
-                  onChange={(e) => setQuery((q) => ({ ...q, search: e.target.value }))}
+                  onChange={(e) => updateQuery((q) => ({ ...q, search: e.target.value }))}
                   placeholder="ค้นหาใน message, source, facility หรือ parsed field เช่น latency, postgres, 10.0.1.20"
                   className="w-full bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-9 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                 />
                 {query.search && (
                   <button
-                    onClick={() => setQuery((q) => ({ ...q, search: '' }))}
+                    onClick={() => updateQuery((q) => ({ ...q, search: '' }))}
                     title="ล้างคำค้น"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   >
@@ -279,7 +311,7 @@ export default function LogExplorerView({
                 {TIME_RANGES.map((r) => (
                   <button
                     key={r.id}
-                    onClick={() => setQuery((q) => ({ ...q, range: r.id as LogTimeRange }))}
+                    onClick={() => updateQuery((q) => ({ ...q, range: r.id as LogTimeRange }))}
                     className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
                       query.range === r.id
                         ? 'bg-blue-600 text-white shadow'
@@ -297,7 +329,7 @@ export default function LogExplorerView({
               <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">ตัวกรองด่วน:</span>
 
               <button
-                onClick={() => setQuery((q) => ({ ...q, severities: q.severities.length === 4 ? [] : [0, 1, 2, 3] }))}
+                onClick={() => updateQuery((q) => ({ ...q, severities: q.severities.length === 4 ? [] : [0, 1, 2, 3] }))}
                 className={`px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${
                   query.severities.length === 4
                     ? 'bg-rose-500/20 border-rose-500/40 text-rose-600 dark:text-rose-300 font-semibold'
@@ -309,7 +341,7 @@ export default function LogExplorerView({
 
               <button
                 onClick={() =>
-                  setQuery((q) => ({ ...q, incidentId: q.incidentId ? undefined : incidentId }))
+                  updateQuery((q) => ({ ...q, incidentId: q.incidentId ? undefined : incidentId }))
                 }
                 className={`px-2.5 py-1 rounded-lg text-[11px] border transition-colors ${
                   query.incidentId
@@ -321,7 +353,11 @@ export default function LogExplorerView({
               </button>
 
               <button
-                onClick={() => setSortNewestFirst((v) => !v)}
+                onClick={() => {
+                  setSortNewestFirst((v) => !v);
+                  setPage(0);
+                  resetListView();
+                }}
                 className="px-2.5 py-1 rounded-lg text-[11px] border bg-slate-100 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 เรียง: {sortNewestFirst ? 'ใหม่ → เก่า' : 'เก่า → ใหม่'}
@@ -436,19 +472,55 @@ export default function LogExplorerView({
                 </button>
               </div>
             ) : (
-              <div className="max-h-[640px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto pb-2 divide-y divide-slate-100 dark:divide-white/5">
-                {rows.map((log) => (
+              <div
+                ref={listRef}
+                className="max-h-[640px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto pb-2 divide-y divide-slate-100 dark:divide-white/5"
+              >
+                {pageRows.map((log) => (
                   <LogRow
                     key={log.id}
                     log={log}
                     expanded={expandedId === log.id}
                     onToggle={() => setExpandedId((id) => (id === log.id ? null : log.id))}
                     onFilterSource={() =>
-                      setQuery((q) => ({ ...q, sources: toggle(q.sources, log.sourceId) }))
+                      updateQuery((q) => ({ ...q, sources: toggle(q.sources, log.sourceId) }))
                     }
                     onOpenDiagnosis={() => onNavigateTab('ai-analysis', 'diagnosis')}
                   />
                 ))}
+              </div>
+            )}
+
+            {/* แถบแบ่งหน้า — แสดงครั้งละไม่เกิน PAGE_SIZE ข้อความ */}
+            {rows.length > 0 && (
+              <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-t border-slate-200 dark:border-white/10">
+                <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                  แสดง {(page * PAGE_SIZE + 1).toLocaleString()}–
+                  {(page * PAGE_SIZE + pageRows.length).toLocaleString()} จาก{' '}
+                  {rows.length.toLocaleString()} ข้อความ
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => goToPage(page - 1)}
+                    disabled={page === 0}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-black/20 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-600"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" /> ก่อนหน้า
+                  </button>
+
+                  <span className="text-[11px] font-mono text-slate-600 dark:text-slate-300 tabular-nums">
+                    หน้า {page + 1} / {totalPages}
+                  </span>
+
+                  <button
+                    onClick={() => goToPage(page + 1)}
+                    disabled={page >= totalPages - 1}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-blue-500/30 bg-blue-600/15 text-blue-600 dark:text-blue-300 hover:bg-blue-600/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600/15"
+                  >
+                    ถัดไป <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             )}
           </div>
