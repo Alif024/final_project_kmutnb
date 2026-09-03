@@ -138,7 +138,7 @@ export default function InfrastructureView({
             onClick={() => setSubTab('topology')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
               subTab === 'topology'
-                ? 'bg-blue-600/80 text-slate-900 dark:text-white shadow-lg shadow-blue-500/20 border border-blue-400/30'
+                ? 'bg-blue-600/80 text-white shadow-lg shadow-blue-500/20 border border-blue-400/30'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
             }`}
           >
@@ -149,7 +149,7 @@ export default function InfrastructureView({
             onClick={() => setSubTab('monitoring')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
               subTab === 'monitoring'
-                ? 'bg-blue-600/80 text-slate-900 dark:text-white shadow-lg shadow-blue-500/20 border border-blue-400/30'
+                ? 'bg-blue-600/80 text-white shadow-lg shadow-blue-500/20 border border-blue-400/30'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
             }`}
           >
@@ -427,7 +427,7 @@ export default function InfrastructureView({
                     key={t}
                     onClick={() => setNodeDetailTab(t)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize whitespace-nowrap transition-colors ${
-                      nodeDetailTab === t ? 'bg-blue-600/80 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      nodeDetailTab === t ? 'bg-blue-600/80 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     {t === 'vm-info' ? 'VM Info' : t}
@@ -813,7 +813,7 @@ export default function InfrastructureView({
                     key={t}
                     onClick={() => setHypDetailTab(t)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
-                      hypDetailTab === t ? 'bg-blue-600/80 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      hypDetailTab === t ? 'bg-blue-600/80 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     {t}
