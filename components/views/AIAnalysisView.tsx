@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Brain,
   Sparkles,
@@ -15,14 +15,18 @@ import {
   Plus,
   MessageSquare,
   Activity,
-  Info
+  Info,
+  ScrollText,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import {
   ResponsiveContainer,
   LineChart,
   Line,
 } from 'recharts';
-import { Diagnosis, Incident, ChatSession, ChatMessage } from '@/types/ai-noc';
+import { Diagnosis, Incident, ChatSession, ChatMessage, SyslogEntry } from '@/types/ai-noc';
+import { SEVERITY_META, getIncidentLogs, getLogsByIds } from '@/lib/log-source';
 
 interface AIAnalysisViewProps {
   diagnosis: Diagnosis;
@@ -48,6 +52,11 @@ export default function AIAnalysisView({
   const [inputQuery, setInputQuery] = useState('');
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState('chat-01');
+  /** ขั้นของ Root Cause Chain ที่กางดู Log หลักฐานอยู่ (null = ไม่กางขั้นไหนเลย) */
+  const [openLogStep, setOpenLogStep] = useState<number | null>(null);
+
+  // Log ทั้งหมดที่ถูกผูกไว้กับ Incident นี้ ใช้ในการ์ด Log Evidence ด้านล่าง
+  const incidentLogs = useMemo(() => getIncidentLogs(incident.id), [incident.id]);
 
   // Only show messages that belong to the currently selected chat session
   const visibleMessages = messages.filter((m) => m.sessionId === activeSessionId);
@@ -106,6 +115,7 @@ export default function AIAnalysisView({
   const suggestedPrompts = [
     'แสดง Host ที่มี Storage Latency สูง',
     'แสดง VM ที่ได้รับผลกระทบ',
+    'สรุป Log ระดับ Error ช่วงที่เกิดเหตุ',
     'จะแก้ไขปัญหานี้อย่างไร?'
   ];
 
@@ -266,6 +276,34 @@ export default function AIAnalysisView({
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 dark:text-slate-300">{step.description}</p>
+
+                    {/* Log หลักฐานที่รองรับขั้นนี้ (ดึงจาก Graylog ผ่าน lib/log-source) */}
+                    {step.logRefs && step.logRefs.length > 0 && (
+                      <div className="pt-1">
+                        <button
+                          onClick={() =>
+                            setOpenLogStep((cur) => (cur === step.order ? null : step.order))
+                          }
+                          className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-500 transition-colors"
+                        >
+                          {openLogStep === step.order ? (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          )}
+                          <ScrollText className="w-3.5 h-3.5" />
+                          หลักฐานจาก Log ({step.logRefs.length} รายการ)
+                        </button>
+
+                        {openLogStep === step.order && (
+                          <div className="mt-2 bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-white/10 rounded-lg p-2.5 space-y-1.5">
+                            {getLogsByIds(step.logRefs).map((log) => (
+                              <LogEvidenceLine key={log.id} log={log} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -309,6 +347,42 @@ export default function AIAnalysisView({
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Log Evidence (หลักฐานฝั่ง Log จาก Graylog) */}
+          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-5 space-y-4 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-white/10 pb-3">
+              <div>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                  <ScrollText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  Log Evidence (หลักฐานฝั่ง Log จาก Graylog)
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  {incidentLogs.length} ข้อความจาก{' '}
+                  {new Set(incidentLogs.map((l) => l.sourceId)).size} ต้นทาง ที่ AI ใช้ยืนยันลำดับการลุกลาม
+                  (อ้างอิงเวลา NTP เดียวกับ Metric)
+                </p>
+              </div>
+
+              <button
+                onClick={() => onNavigateTab('logs', 'incident')}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-lg transition-all flex items-center gap-2 shrink-0"
+              >
+                เปิดใน Log Explorer <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {incidentLogs.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-4">
+                ยังไม่มี Log ที่ผูกกับ Incident นี้
+              </p>
+            ) : (
+              <div className="bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-white/10 rounded-xl p-3 space-y-1.5 max-h-72 overflow-y-auto">
+                {incidentLogs.map((log) => (
+                  <LogEvidenceLine key={log.id} log={log} showFields />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* AI Recommendation Summary linking to Action Center */}
@@ -508,6 +582,65 @@ export default function AIAnalysisView({
               </div>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** สีของระดับความรุนแรง ใช้ร่วมกันทุกจุดที่แสดง Log ในหน้านี้ */
+const LOG_TONE_CLASSES: Record<string, string> = {
+  critical: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30',
+  error: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30',
+  warning: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
+  notice: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
+  info: 'bg-slate-500/15 text-slate-600 dark:text-slate-300 border-slate-500/30',
+  debug: 'bg-slate-500/10 text-slate-500 dark:text-slate-400 border-slate-500/20',
+};
+
+/**
+ * Log หนึ่งบรรทัดในรูปแบบที่ใช้เป็น "หลักฐาน" — เวลา NTP, ระดับ, ต้นทาง และข้อความ
+ * ใช้ทั้งใน Root Cause Chain (แบบย่อ) และการ์ด Log Evidence (แสดง Parsed Fields ด้วย)
+ */
+function LogEvidenceLine({ log, showFields = false }: { log: SyslogEntry; showFields?: boolean }) {
+  const meta = SEVERITY_META[log.severityLevel];
+  const fields = Object.entries(log.parsedFields ?? {});
+
+  return (
+    <div className="border-b border-slate-200 dark:border-white/5 last:border-0 pb-1.5 last:pb-0 space-y-1">
+      <div className="flex items-start gap-2 font-mono text-[11px]">
+        <span className="text-blue-600 dark:text-blue-400 font-bold shrink-0">{log.timestamp}</span>
+        <span
+          className={`px-1.5 py-0.5 rounded border text-[9px] font-bold shrink-0 w-14 text-center ${
+            LOG_TONE_CLASSES[meta?.tone ?? 'info']
+          }`}
+        >
+          {meta?.label ?? log.severityLevel}
+        </span>
+        <span className="text-amber-600 dark:text-amber-400 shrink-0 truncate max-w-[7.5rem]">
+          {log.sourceName}
+        </span>
+        <span
+          className={`flex-1 break-words ${
+            log.severityLevel <= 3
+              ? 'text-slate-800 dark:text-slate-100'
+              : 'text-slate-600 dark:text-slate-300'
+          }`}
+        >
+          {log.message}
+        </span>
+      </div>
+
+      {showFields && fields.length > 0 && (
+        <div className="flex flex-wrap gap-1 pl-[6.5rem]">
+          {fields.map(([k, v]) => (
+            <span
+              key={k}
+              className="font-mono text-[9px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-300 rounded px-1.5 py-0.5"
+            >
+              {k} = {v}
+            </span>
+          ))}
         </div>
       )}
     </div>

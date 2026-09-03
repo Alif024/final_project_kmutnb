@@ -1,9 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import { formatLogsForPrompt, getCriticalLogsForContext } from "@/lib/log-source";
 
 export async function POST(req: NextRequest) {
   try {
     const { message } = await req.json();
+
+    // Log ระดับ Error ขึ้นไปจาก Graylog ใช้เป็นบริบทให้โมเดลอ้างอิงหลักฐานได้จริง
+    const criticalLogs = getCriticalLogsForContext(20);
+    const logContext = formatLogsForPrompt(criticalLogs);
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -17,7 +22,10 @@ export async function POST(req: NextRequest) {
 **การวิเคราะห์ระบบเครือข่ายปัจจุบัน (AI-NOC Context):**
 - ตรวจพบ **1 Critical Incident**: INC-2569-0524-0001 (Storage latency บน ESXi Host-01 = 38.6 ms)
 - อุปกรณ์ที่ได้รับผลกระทบหลัก: ESXi-Host-01, Firewall-VM, ERP-VM
-- คำแนะนำ: แนะนำให้ดำเนินการ Live Migration (vMotion) ERP-VM ไปยัง ESXi-Host-02 เพื่อลดผลกระทบ`,
+- คำแนะนำ: แนะนำให้ดำเนินการ Live Migration (vMotion) ERP-VM ไปยัง ESXi-Host-02 เพื่อลดผลกระทบ
+
+**หลักฐานจาก Syslog บน Graylog (5 บรรทัดแรกจาก ${criticalLogs.length} บรรทัดที่ระดับ Error ขึ้นไป):**
+${formatLogsForPrompt(criticalLogs.slice(0, 5))}`,
         citedEntities: ['ESXi-Host-01', 'Firewall-VM', 'ERP-VM']
       });
     }
@@ -45,11 +53,16 @@ export async function POST(req: NextRequest) {
 - Incident ล่าสุด: INC-2569-0524-0001 "Users cannot access ERP System" (Root Cause: Storage latency on ESXi Host-01, Confidence 96%)
 - Affected VMs: Firewall-VM (10.0.0.1, CPU 92%, I/O Wait 28.4%), ERP-VM (10.0.1.20, Mem 88%, I/O Wait 45.2%)
 
+Syslog ระดับ Error ขึ้นไปที่เก็บรวมศูนย์ไว้บน Graylog (เรียงตามเวลา NTP จริง):
+${logContext}
+
 หลักการตอบ:
 1. ตอบเป็นภาษาไทยอย่างสุภาพ มีโครงสร้างชัดเจน
 2. ระบุสาเหตุ (Root Cause) พร้อมตัวเลขจริงและ threshold ในวงเล็บเสมอ
 3. ให้คำแนะนำเป็นรายการข้อสั้นๆ พร้อมเครื่องหมาย ✅
-4. หากผู้ใช้ถามเรื่องศัพท์เทคนิค เช่น CPU Ready Time, Memory Ballooning, Storage Latency ให้อธิบายอย่างเห็นภาพ`;
+4. หากผู้ใช้ถามเรื่องศัพท์เทคนิค เช่น CPU Ready Time, Memory Ballooning, Storage Latency ให้อธิบายอย่างเห็นภาพ
+5. เมื่ออ้างถึงเหตุการณ์ใด ให้ยกบรรทัด Syslog ที่เกี่ยวข้องมาประกอบ พร้อมระบุเวลาและชื่อ Host/VM ต้นทาง
+   และห้ามแต่งบรรทัด Log ที่ไม่มีอยู่ในบริบทข้างต้น`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.6-flash",

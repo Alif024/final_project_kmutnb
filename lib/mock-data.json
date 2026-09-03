@@ -595,7 +595,13 @@
         "entityName": "ESXi Host-01",
         "timestamp": "13:10",
         "severity": "critical",
-        "description": "พบค่า Latency สูงผิดปกติที่ Datastore: datastore1"
+        "description": "พบค่า Latency สูงผิดปกติที่ Datastore: datastore1",
+        "logRefs": [
+          "sys-06",
+          "sys-07",
+          "sys-08",
+          "sys-09"
+        ]
       },
       {
         "order": 2,
@@ -603,7 +609,15 @@
         "entityName": "Firewall-VM, ERP-VM",
         "timestamp": "13:12",
         "severity": "warning",
-        "description": "VM มีค่า I/O Wait สูงขึ้นอย่างต่อเนื่อง"
+        "description": "VM มีค่า I/O Wait สูงขึ้นอย่างต่อเนื่อง",
+        "logRefs": [
+          "sys-10",
+          "sys-11",
+          "sys-12",
+          "sys-13",
+          "sys-14",
+          "sys-15"
+        ]
       },
       {
         "order": 3,
@@ -611,7 +625,14 @@
         "entityName": "Firewall-VM",
         "timestamp": "13:15",
         "severity": "warning",
-        "description": "Firewall ประมวลผล Packet ช้าลง"
+        "description": "Firewall ประมวลผล Packet ช้าลง",
+        "logRefs": [
+          "sys-16",
+          "sys-17",
+          "sys-18",
+          "sys-19",
+          "sys-20"
+        ]
       },
       {
         "order": 4,
@@ -619,7 +640,14 @@
         "entityName": "ERP-VM",
         "timestamp": "13:18",
         "severity": "critical",
-        "description": "แอปพลิเคชัน ERP ไม่ตอบสนอง"
+        "description": "แอปพลิเคชัน ERP ไม่ตอบสนอง",
+        "logRefs": [
+          "sys-21",
+          "sys-22",
+          "sys-23",
+          "sys-24",
+          "sys-25"
+        ]
       },
       {
         "order": 5,
@@ -627,7 +655,13 @@
         "entityName": "Users",
         "timestamp": "13:19",
         "severity": "info",
-        "description": "ผู้ใช้งานแจ้งว่าไม่สามารถใช้งาน ERP ได้"
+        "description": "ผู้ใช้งานแจ้งว่าไม่สามารถใช้งาน ERP ได้",
+        "logRefs": [
+          "sys-26",
+          "sys-27",
+          "sys-28",
+          "sys-29"
+        ]
       }
     ],
     "evidence": [
@@ -1029,39 +1063,773 @@
   "syslogs": [
     {
       "id": "sys-01",
-      "timestamp": "13:10:21",
+      "timestamp": "13:05:02",
       "sourceId": "hyp-01",
       "sourceName": "ESXi-Host-01",
-      "facility": "storage",
-      "severityLevel": 2,
-      "message": "WARNING: Datastore datastore1 latency spiked to 38.6ms (Threshold: 10ms)"
+      "sourceIp": "10.0.0.101",
+      "facility": "vmkernel",
+      "severityLevel": 6,
+      "stream": "stream-esxi",
+      "message": "vmkernel: ScsiDeviceIO: Successfully queued I/O to naa.6000c2951f — average latency 4.2ms"
     },
     {
       "id": "sys-02",
-      "timestamp": "13:12:05",
-      "sourceId": "vm-erp",
-      "sourceName": "ERP-VM",
-      "facility": "kernel",
-      "severityLevel": 3,
-      "message": "kernel: [432001.120] task postgres:1423 blocked for more than 120 seconds due to I/O wait"
+      "timestamp": "13:06:11",
+      "sourceId": "hyp-03",
+      "sourceName": "Proxmox-Node-01",
+      "sourceIp": "10.0.0.201",
+      "facility": "pvedaemon",
+      "severityLevel": 6,
+      "stream": "stream-proxmox",
+      "message": "pvedaemon[1188]: <root@pam> successful auth for user 'root@pam'"
     },
     {
       "id": "sys-03",
-      "timestamp": "13:15:10",
-      "sourceId": "vm-fw",
-      "sourceName": "Firewall-VM",
-      "facility": "pfSense",
-      "severityLevel": 3,
-      "message": "dpinger: WAN_DHCP 10.0.0.1: Alarm latency 286ms loss 2%"
+      "timestamp": "13:07:35",
+      "sourceId": "vm-dns",
+      "sourceName": "DNS-VM",
+      "sourceIp": "10.0.1.53",
+      "facility": "named",
+      "severityLevel": 6,
+      "stream": "stream-app",
+      "message": "named[812]: zone kmutnb.local/IN: loaded serial 2569052401"
     },
     {
       "id": "sys-04",
+      "timestamp": "13:08:20",
+      "sourceId": "hyp-05",
+      "sourceName": "Proxmox-Node-03",
+      "sourceIp": "10.0.0.203",
+      "facility": "kernel",
+      "severityLevel": 4,
+      "stream": "stream-proxmox",
+      "message": "kernel: zfs: ARC size 74% of target on rpool — memory pressure rising"
+    },
+    {
+      "id": "sys-05",
+      "timestamp": "13:09:47",
+      "sourceId": "vm-ids",
+      "sourceName": "IDS-VM-01",
+      "sourceIp": "10.0.1.40",
+      "facility": "suricata",
+      "severityLevel": 5,
+      "stream": "stream-security",
+      "message": "suricata: stats: decoder.pkts 1284302 / drop 0.00% / alerts 3"
+    },
+    {
+      "id": "sys-06",
+      "timestamp": "13:10:03",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "vmkernel",
+      "severityLevel": 4,
+      "stream": "stream-esxi",
+      "message": "vmkernel: ScsiDeviceIO: Cmd(0x45a) 0x28 to dev naa.6000c2951f failed H:0x0 D:0x2 P:0x0 — retry 1/3",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-07",
+      "timestamp": "13:10:21",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "storage",
+      "severityLevel": 2,
+      "stream": "stream-esxi",
+      "message": "WARNING: Datastore datastore1 latency spiked to 38.6ms (Threshold: 10ms)",
+      "parsedFields": {
+        "datastore": "datastore1",
+        "latency_ms": "38.6",
+        "threshold_ms": "10",
+        "device": "naa.6000c2951f"
+      },
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-08",
+      "timestamp": "13:10:58",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "vmkernel",
+      "severityLevel": 3,
+      "stream": "stream-esxi",
+      "message": "vmkernel: NMP: nmp_ThrottleLogForDevice: device naa.6000c2951f performance has deteriorated — I/O latency increased from 4.2ms to 38.6ms",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-09",
+      "timestamp": "13:11:14",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "hostd",
+      "severityLevel": 4,
+      "stream": "stream-esxi",
+      "message": "Hostd: Alarm 'Datastore Device Backing' on datastore1 changed from Green to Yellow",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-10",
+      "timestamp": "13:11:40",
+      "sourceId": "vm-web1",
+      "sourceName": "Web-VM-01",
+      "sourceIp": "10.0.1.10",
+      "facility": "kernel",
+      "severityLevel": 4,
+      "stream": "stream-app",
+      "message": "kernel: sd 0:0:1:0: [sda] tag#12 abort scheduled — iowait 18.7%",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-11",
+      "timestamp": "13:12:05",
+      "sourceId": "vm-erp",
+      "sourceName": "ERP-VM",
+      "sourceIp": "10.0.1.20",
+      "facility": "kernel",
+      "severityLevel": 3,
+      "stream": "stream-app",
+      "message": "kernel: [432001.120] task postgres:1423 blocked for more than 120 seconds due to I/O wait",
+      "parsedFields": {
+        "task": "postgres",
+        "pid": "1423",
+        "blocked_seconds": "120",
+        "io_wait_pct": "45.2"
+      },
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-12",
+      "timestamp": "13:12:33",
+      "sourceId": "vm-erp",
+      "sourceName": "ERP-VM",
+      "sourceIp": "10.0.1.20",
+      "facility": "postgresql",
+      "severityLevel": 4,
+      "stream": "stream-app",
+      "message": "postgres[1423]: LOG: checkpoint complete: wrote 24188 buffers; write=182.442 s, sync=41.201 s",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-13",
+      "timestamp": "13:12:58",
+      "sourceId": "vm-fw",
+      "sourceName": "Firewall-VM",
+      "sourceIp": "10.0.0.1",
+      "facility": "kernel",
+      "severityLevel": 4,
+      "stream": "stream-network",
+      "message": "kernel: vtnet0: watchdog timeout on queue 2 — iowait 28.4%",
+      "parsedFields": {
+        "interface": "vtnet0",
+        "io_wait_pct": "28.4"
+      },
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-14",
+      "timestamp": "13:13:26",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "vmkernel",
+      "severityLevel": 3,
+      "stream": "stream-esxi",
+      "message": "vmkernel: WARNING: ScsiDeviceIO: device naa.6000c2951f queue depth throttled to 16 (was 64)",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-15",
+      "timestamp": "13:14:02",
+      "sourceId": "vm-erp",
+      "sourceName": "ERP-VM",
+      "sourceIp": "10.0.1.20",
+      "facility": "erp-app",
+      "severityLevel": 4,
+      "stream": "stream-app",
+      "message": "erp-app[2011]: WARN connection pool usage 88% (44/50) — waiting threads 6",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-16",
+      "timestamp": "13:15:10",
+      "sourceId": "vm-fw",
+      "sourceName": "Firewall-VM",
+      "sourceIp": "10.0.0.1",
+      "facility": "pfSense",
+      "severityLevel": 3,
+      "stream": "stream-network",
+      "message": "dpinger: WAN_DHCP 10.0.0.1: Alarm latency 286ms loss 2%",
+      "parsedFields": {
+        "gateway": "WAN_DHCP",
+        "latency_ms": "286",
+        "loss_pct": "2"
+      },
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-17",
+      "timestamp": "13:15:44",
+      "sourceId": "vm-fw",
+      "sourceName": "Firewall-VM",
+      "sourceIp": "10.0.0.1",
+      "facility": "pf",
+      "severityLevel": 4,
+      "stream": "stream-network",
+      "message": "pf: state table 68% full — 34012/50000 entries",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-18",
+      "timestamp": "13:16:05",
+      "sourceId": "vm-ids",
+      "sourceName": "IDS-VM-01",
+      "sourceIp": "10.0.1.40",
+      "facility": "suricata",
+      "severityLevel": 4,
+      "stream": "stream-security",
+      "message": "suricata: TCP retransmission burst 10.0.1.20 → 10.0.0.1 (312 pkts/5s)",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-19",
+      "timestamp": "13:16:31",
+      "sourceId": "vm-fw",
+      "sourceName": "Firewall-VM",
+      "sourceIp": "10.0.0.1",
+      "facility": "pfSense",
+      "severityLevel": 4,
+      "stream": "stream-network",
+      "message": "php-fpm: CPU usage 92% sustained for 180s — packet filter processing delayed",
+      "parsedFields": {
+        "cpu_pct": "92",
+        "sustained_seconds": "180"
+      },
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-20",
+      "timestamp": "13:16:52",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "vmkernel",
+      "severityLevel": 2,
+      "stream": "stream-esxi",
+      "message": "vmkernel: WARNING: ScsiDeviceIO: device naa.6000c2951f latency 41.9ms exceeds threshold — VM I/O stalling",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-21",
+      "timestamp": "13:17:20",
+      "sourceId": "vm-erp",
+      "sourceName": "ERP-VM",
+      "sourceIp": "10.0.1.20",
+      "facility": "postgresql",
+      "severityLevel": 3,
+      "stream": "stream-app",
+      "message": "postgres[1423]: FATAL: canceling statement due to statement timeout (SELECT * FROM erp_orders WHERE ...)",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-22",
+      "timestamp": "13:17:58",
+      "sourceId": "vm-erp",
+      "sourceName": "ERP-VM",
+      "sourceIp": "10.0.1.20",
+      "facility": "erp-app",
+      "severityLevel": 3,
+      "stream": "stream-app",
+      "message": "erp-app[2011]: ERROR JDBC connection timeout after 30000ms — pool exhausted (50/50)",
+      "parsedFields": {
+        "timeout_ms": "30000",
+        "pool_used": "50",
+        "pool_size": "50"
+      },
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-23",
+      "timestamp": "13:18:12",
+      "sourceId": "vm-erp",
+      "sourceName": "ERP-VM",
+      "sourceIp": "10.0.1.20",
+      "facility": "erp-app",
+      "severityLevel": 2,
+      "stream": "stream-app",
+      "message": "erp-app[2011]: CRITICAL health check failed 3/3 — HTTP 503 Service Unavailable",
+      "parsedFields": {
+        "http_status": "503",
+        "failed_checks": "3"
+      },
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-24",
+      "timestamp": "13:18:30",
+      "sourceId": "vm-web1",
+      "sourceName": "Web-VM-01",
+      "sourceIp": "10.0.1.10",
+      "facility": "nginx",
+      "severityLevel": 3,
+      "stream": "stream-app",
+      "message": "nginx: upstream timed out (110: Connection timed out) while reading response header from upstream \"erp-backend\"",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-25",
       "timestamp": "13:18:45",
       "sourceId": "vm-mon",
       "sourceName": "Monitoring-VM",
+      "sourceIp": "10.0.2.10",
       "facility": "ai-engine",
       "severityLevel": 1,
-      "message": "CRITICAL ALERT: Root cause identified for INC-2569-0524-0001 (Confidence 96%)"
+      "stream": "stream-ainoc",
+      "message": "CRITICAL ALERT: Root cause identified for INC-2569-0524-0001 (Confidence 96%)",
+      "parsedFields": {
+        "incident_id": "INC-2569-0524-0001",
+        "confidence": "96"
+      },
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-26",
+      "timestamp": "13:19:02",
+      "sourceId": "vm-mon",
+      "sourceName": "Monitoring-VM",
+      "sourceIp": "10.0.2.10",
+      "facility": "ai-engine",
+      "severityLevel": 6,
+      "stream": "stream-ainoc",
+      "message": "AI-NOC: correlated 5 events across 3 sources into incident INC-2569-0524-0001",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-27",
+      "timestamp": "13:19:15",
+      "sourceId": "vm-log",
+      "sourceName": "Log-Server-VM",
+      "sourceIp": "10.0.2.20",
+      "facility": "graylog",
+      "severityLevel": 5,
+      "stream": "stream-ainoc",
+      "message": "graylog-server: stream 'ERP Application' triggered alert condition 'error rate > 10/min' (current 42/min)",
+      "parsedFields": {
+        "stream": "ERP Application",
+        "error_rate": "42"
+      },
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-28",
+      "timestamp": "13:19:38",
+      "sourceId": "vm-web1",
+      "sourceName": "Web-VM-01",
+      "sourceIp": "10.0.1.10",
+      "facility": "nginx",
+      "severityLevel": 4,
+      "stream": "stream-app",
+      "message": "nginx: 245 client connections closed with 503 in the last 60s",
+      "parsedFields": {
+        "affected_sessions": "245"
+      },
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-29",
+      "timestamp": "13:19:55",
+      "sourceId": "vm-erp",
+      "sourceName": "ERP-VM",
+      "sourceIp": "10.0.1.20",
+      "facility": "erp-app",
+      "severityLevel": 3,
+      "stream": "stream-app",
+      "message": "erp-app[2011]: ERROR 245 active user sessions dropped — service degraded",
+      "incidentId": "INC-2569-0524-0001"
+    },
+    {
+      "id": "sys-30",
+      "timestamp": "13:20:11",
+      "sourceId": "vm-mon",
+      "sourceName": "Monitoring-VM",
+      "sourceIp": "10.0.2.10",
+      "facility": "ai-engine",
+      "severityLevel": 6,
+      "stream": "stream-ainoc",
+      "message": "AI-NOC: recommendation generated — Live Migration ERP-VM → ESXi-Host-02 (no downtime)"
+    },
+    {
+      "id": "sys-31",
+      "timestamp": "13:20:45",
+      "sourceId": "vm-fw",
+      "sourceName": "Firewall-VM",
+      "sourceIp": "10.0.0.1",
+      "facility": "pfSense",
+      "severityLevel": 4,
+      "stream": "stream-network",
+      "message": "dpinger: WAN_DHCP 10.0.0.1: Alarm latency 302ms loss 3%"
+    },
+    {
+      "id": "sys-32",
+      "timestamp": "13:21:30",
+      "sourceId": "hyp-05",
+      "sourceName": "Proxmox-Node-03",
+      "sourceIp": "10.0.0.203",
+      "facility": "kernel",
+      "severityLevel": 4,
+      "stream": "stream-proxmox",
+      "message": "kernel: zfs: ARC size 77% of target — shrink requested on rpool"
+    },
+    {
+      "id": "sys-33",
+      "timestamp": "13:22:14",
+      "sourceId": "vm-log",
+      "sourceName": "Log-Server-VM",
+      "sourceIp": "10.0.2.20",
+      "facility": "graylog",
+      "severityLevel": 6,
+      "stream": "stream-ainoc",
+      "message": "graylog-server: indexer cluster <green> — ingestion 1,240 msg/s, 0 failed batches"
+    },
+    {
+      "id": "sys-34",
+      "timestamp": "13:23:40",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "hostd",
+      "severityLevel": 4,
+      "stream": "stream-esxi",
+      "message": "Hostd: VM ERP-VM — guest heartbeat status changed to Yellow (VMware Tools responding slowly)"
+    },
+    {
+      "id": "sys-35",
+      "timestamp": "13:25:02",
+      "sourceId": "vm-ids",
+      "sourceName": "IDS-VM-01",
+      "sourceIp": "10.0.1.40",
+      "facility": "suricata",
+      "severityLevel": 4,
+      "stream": "stream-security",
+      "message": "ET SCAN Potential SSH Scan from 203.0.113.44 → 10.0.0.1 (12 attempts in 60s)",
+      "parsedFields": {
+        "src_ip": "203.0.113.44",
+        "dst_ip": "10.0.0.1",
+        "attempts": "12"
+      }
+    },
+    {
+      "id": "sys-36",
+      "timestamp": "13:26:18",
+      "sourceId": "hyp-02",
+      "sourceName": "ESXi-Host-02",
+      "sourceIp": "10.0.0.102",
+      "facility": "vmkernel",
+      "severityLevel": 6,
+      "stream": "stream-esxi",
+      "message": "vmkernel: ScsiDeviceIO: datastore2 average latency 3.8ms — nominal"
+    },
+    {
+      "id": "sys-37",
+      "timestamp": "13:28:44",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "vmkernel",
+      "severityLevel": 3,
+      "stream": "stream-esxi",
+      "message": "vmkernel: WARNING: datastore1 outstanding I/O 128 — SIOC congestion threshold reached"
+    },
+    {
+      "id": "sys-38",
+      "timestamp": "13:31:09",
+      "sourceId": "vm-db1",
+      "sourceName": "DB-VM-01",
+      "sourceIp": "10.0.1.30",
+      "facility": "mysqld",
+      "severityLevel": 5,
+      "stream": "stream-app",
+      "message": "mysqld[904]: Note: InnoDB buffer pool hit rate 99.2% — no action needed"
+    },
+    {
+      "id": "sys-39",
+      "timestamp": "13:34:52",
+      "sourceId": "hyp-04",
+      "sourceName": "Proxmox-Node-02",
+      "sourceIp": "10.0.0.202",
+      "facility": "pvestatd",
+      "severityLevel": 6,
+      "stream": "stream-proxmox",
+      "message": "pvestatd[1042]: status update finished (0.184 seconds)"
+    },
+    {
+      "id": "sys-40",
+      "timestamp": "13:38:27",
+      "sourceId": "vm-fw",
+      "sourceName": "Firewall-VM",
+      "sourceIp": "10.0.0.1",
+      "facility": "pf",
+      "severityLevel": 5,
+      "stream": "stream-network",
+      "message": "pf: block in on vtnet0: 198.51.100.7 → 10.0.0.1:22 (default deny rule)"
+    },
+    {
+      "id": "sys-41",
+      "timestamp": "13:42:03",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "storage",
+      "severityLevel": 3,
+      "stream": "stream-esxi",
+      "message": "WARNING: Datastore datastore1 latency 36.4ms — still above threshold (10ms)",
+      "parsedFields": {
+        "datastore": "datastore1",
+        "latency_ms": "36.4",
+        "threshold_ms": "10"
+      }
+    },
+    {
+      "id": "sys-42",
+      "timestamp": "13:47:31",
+      "sourceId": "vm-erp",
+      "sourceName": "ERP-VM",
+      "sourceIp": "10.0.1.20",
+      "facility": "erp-app",
+      "severityLevel": 4,
+      "stream": "stream-app",
+      "message": "erp-app[2011]: WARN retry queue depth 1,284 pending transactions"
+    },
+    {
+      "id": "sys-43",
+      "timestamp": "13:55:10",
+      "sourceId": "hyp-06",
+      "sourceName": "ESXi-Host-03",
+      "sourceIp": "10.0.0.103",
+      "facility": "vmkernel",
+      "severityLevel": 6,
+      "stream": "stream-esxi",
+      "message": "vmkernel: cpu utilisation 25% / memory 38% — host nominal"
+    },
+    {
+      "id": "sys-44",
+      "timestamp": "14:02:45",
+      "sourceId": "vm-mon",
+      "sourceName": "Monitoring-VM",
+      "sourceIp": "10.0.2.10",
+      "facility": "ai-engine",
+      "severityLevel": 5,
+      "stream": "stream-ainoc",
+      "message": "AI-NOC: incident INC-2569-0524-0001 still open — awaiting operator approval"
+    },
+    {
+      "id": "sys-45",
+      "timestamp": "14:08:19",
+      "sourceId": "hyp-05",
+      "sourceName": "Proxmox-Node-03",
+      "sourceIp": "10.0.0.203",
+      "facility": "kernel",
+      "severityLevel": 4,
+      "stream": "stream-proxmox",
+      "message": "kernel: CPU load average 4.92 (4 cores) — sustained above 1.0/core"
+    },
+    {
+      "id": "sys-46",
+      "timestamp": "14:15:38",
+      "sourceId": "vm-ids",
+      "sourceName": "IDS-VM-01",
+      "sourceIp": "10.0.1.40",
+      "facility": "suricata",
+      "severityLevel": 3,
+      "stream": "stream-security",
+      "message": "ET POLICY Suspicious inbound to mySQL port 3306 from 203.0.113.88",
+      "parsedFields": {
+        "src_ip": "203.0.113.88",
+        "dst_port": "3306"
+      }
+    },
+    {
+      "id": "sys-47",
+      "timestamp": "14:21:04",
+      "sourceId": "vm-dns",
+      "sourceName": "DNS-VM",
+      "sourceIp": "10.0.1.53",
+      "facility": "named",
+      "severityLevel": 4,
+      "stream": "stream-app",
+      "message": "named[812]: client 10.0.1.20#51204: query erp.kmutnb.local — timed out after 5000ms"
+    },
+    {
+      "id": "sys-48",
+      "timestamp": "14:29:55",
+      "sourceId": "hyp-03",
+      "sourceName": "Proxmox-Node-01",
+      "sourceIp": "10.0.0.201",
+      "facility": "pveproxy",
+      "severityLevel": 6,
+      "stream": "stream-proxmox",
+      "message": "pveproxy[1290]: worker 1290 finished — 0 errors in last cycle"
+    },
+    {
+      "id": "sys-49",
+      "timestamp": "14:33:12",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "vmkernel",
+      "severityLevel": 7,
+      "stream": "stream-esxi",
+      "message": "vmkernel: DEBUG: ScsiDeviceIO trace enabled for naa.6000c2951f by support request"
+    },
+    {
+      "id": "sys-50",
+      "timestamp": "14:40:47",
+      "sourceId": "vm-log",
+      "sourceName": "Log-Server-VM",
+      "sourceIp": "10.0.2.20",
+      "facility": "graylog",
+      "severityLevel": 4,
+      "stream": "stream-ainoc",
+      "message": "graylog-server: journal utilisation 62% — ingestion outpacing indexing briefly"
+    },
+    {
+      "id": "sys-51",
+      "timestamp": "14:48:23",
+      "sourceId": "vm-fw",
+      "sourceName": "Firewall-VM",
+      "sourceIp": "10.0.0.1",
+      "facility": "pfSense",
+      "severityLevel": 4,
+      "stream": "stream-network",
+      "message": "dpinger: WAN_DHCP 10.0.0.1: Alarm latency 271ms loss 1%"
+    },
+    {
+      "id": "sys-52",
+      "timestamp": "14:56:01",
+      "sourceId": "vm-web1",
+      "sourceName": "Web-VM-01",
+      "sourceIp": "10.0.1.10",
+      "facility": "nginx",
+      "severityLevel": 4,
+      "stream": "stream-app",
+      "message": "nginx: upstream \"erp-backend\" responded 503 for 18 of last 100 requests"
+    },
+    {
+      "id": "sys-53",
+      "timestamp": "15:03:38",
+      "sourceId": "hyp-02",
+      "sourceName": "ESXi-Host-02",
+      "sourceIp": "10.0.0.102",
+      "facility": "hostd",
+      "severityLevel": 6,
+      "stream": "stream-esxi",
+      "message": "Hostd: capacity check — 18 vCPU / 96 GB RAM free, eligible as vMotion target"
+    },
+    {
+      "id": "sys-54",
+      "timestamp": "15:11:16",
+      "sourceId": "vm-mon",
+      "sourceName": "Monitoring-VM",
+      "sourceIp": "10.0.2.10",
+      "facility": "ai-engine",
+      "severityLevel": 6,
+      "stream": "stream-ainoc",
+      "message": "AI-NOC: re-evaluated root cause confidence — 96% (unchanged)"
+    },
+    {
+      "id": "sys-55",
+      "timestamp": "15:18:52",
+      "sourceId": "hyp-01",
+      "sourceName": "ESXi-Host-01",
+      "sourceIp": "10.0.0.101",
+      "facility": "storage",
+      "severityLevel": 2,
+      "stream": "stream-esxi",
+      "message": "WARNING: Datastore datastore1 latency 38.6ms — sustained 128 minutes",
+      "parsedFields": {
+        "datastore": "datastore1",
+        "latency_ms": "38.6",
+        "duration_minutes": "128"
+      }
+    },
+    {
+      "id": "sys-56",
+      "timestamp": "15:24:30",
+      "sourceId": "vm-db1",
+      "sourceName": "DB-VM-01",
+      "sourceIp": "10.0.1.30",
+      "facility": "mysqld",
+      "severityLevel": 6,
+      "stream": "stream-app",
+      "message": "mysqld[904]: Note: automatic backup completed in 42.3s"
+    },
+    {
+      "id": "sys-57",
+      "timestamp": "15:29:07",
+      "sourceId": "hyp-05",
+      "sourceName": "Proxmox-Node-03",
+      "sourceIp": "10.0.0.203",
+      "facility": "pvestatd",
+      "severityLevel": 4,
+      "stream": "stream-proxmox",
+      "message": "pvestatd[1042]: storage local-zfs 83% used — approaching 85% warning level"
+    },
+    {
+      "id": "sys-58",
+      "timestamp": "15:33:41",
+      "sourceId": "vm-ids",
+      "sourceName": "IDS-VM-01",
+      "sourceIp": "10.0.1.40",
+      "facility": "suricata",
+      "severityLevel": 5,
+      "stream": "stream-security",
+      "message": "suricata: stats: decoder.pkts 1493028 / drop 0.01% / alerts 7"
+    },
+    {
+      "id": "sys-59",
+      "timestamp": "15:36:19",
+      "sourceId": "vm-erp",
+      "sourceName": "ERP-VM",
+      "sourceIp": "10.0.1.20",
+      "facility": "erp-app",
+      "severityLevel": 3,
+      "stream": "stream-app",
+      "message": "erp-app[2011]: ERROR health check failed — HTTP 503 (uptime degraded 2h 18m)"
+    },
+    {
+      "id": "sys-60",
+      "timestamp": "15:38:55",
+      "sourceId": "vm-log",
+      "sourceName": "Log-Server-VM",
+      "sourceIp": "10.0.2.20",
+      "facility": "graylog",
+      "severityLevel": 6,
+      "stream": "stream-ainoc",
+      "message": "graylog-server: 6 streams active — 1,240 msg/s across 9 sources"
+    },
+    {
+      "id": "sys-61",
+      "timestamp": "15:40:22",
+      "sourceId": "hyp-03",
+      "sourceName": "Proxmox-Node-01",
+      "sourceIp": "10.0.0.201",
+      "facility": "pvedaemon",
+      "severityLevel": 6,
+      "stream": "stream-proxmox",
+      "message": "pvedaemon[1188]: cluster quorum OK — 3/3 nodes online"
+    },
+    {
+      "id": "sys-62",
+      "timestamp": "15:41:48",
+      "sourceId": "vm-mon",
+      "sourceName": "Monitoring-VM",
+      "sourceIp": "10.0.2.10",
+      "facility": "ai-engine",
+      "severityLevel": 5,
+      "stream": "stream-ainoc",
+      "message": "AI-NOC: telemetry snapshot refreshed — 6 hypervisors / 8 VMs / 4 breached metrics"
     }
   ],
   "integrations": [

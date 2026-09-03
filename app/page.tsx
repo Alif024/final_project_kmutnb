@@ -10,6 +10,7 @@ import RejectReasonModal from '@/components/RejectReasonModal';
 // Views
 import DashboardView from '@/components/views/DashboardView';
 import InfrastructureView from '@/components/views/InfrastructureView';
+import LogExplorerView from '@/components/views/LogExplorerView';
 import AIAnalysisView from '@/components/views/AIAnalysisView';
 import ActionCenterView from '@/components/views/ActionCenterView';
 import ReportsView from '@/components/views/ReportsView';
@@ -155,7 +156,10 @@ export default function Page() {
   const pendingApprovalCount = approvals.filter((a) => a.status === 'pending').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-[#F8FAFC] font-sans flex flex-col selection:bg-blue-600 selection:text-white relative overflow-x-hidden">
+    // เปลือกแอปสูงเท่าจอพอดีและไม่เลื่อนเอง (h-screen + overflow-hidden)
+    // การเลื่อนทั้งหมดเกิดใน <main> หรือลึกลงไป — TopBar/StatusBar ที่เป็น fixed
+    // จึงไม่มีทางทับเนื้อหา และ View ที่อยากเต็มจอก็รับความสูงที่แน่นอนไปใช้ได้
+    <div className="h-screen bg-slate-50 dark:bg-[#020617] text-[#F8FAFC] font-sans flex flex-col selection:bg-blue-600 selection:text-white relative overflow-hidden">
       {/* Frosted Glass Ambient Glow Background Lights */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-blue-400/10 dark:bg-blue-600/20 rounded-full blur-[130px]"></div>
@@ -163,7 +167,7 @@ export default function Page() {
         <div className="absolute top-[25%] right-[15%] w-[35%] h-[35%] bg-indigo-400/10 dark:bg-indigo-600/15 rounded-full blur-[120px]"></div>
       </div>
 
-      <div className="flex flex-1 min-h-screen relative z-10">
+      <div className="flex flex-1 min-h-0 relative z-10">
         {/* Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -177,7 +181,7 @@ export default function Page() {
 
         {/* Main Content Column */}
         <div
-          className={`flex-1 flex flex-col min-w-0 bg-transparent pt-14 pb-9 transition-all duration-300 ${
+          className={`flex-1 flex flex-col min-w-0 min-h-0 bg-transparent pt-14 pb-9 transition-all duration-300 ${
             collapsed ? "ml-[72px]" : "ml-[240px]"
           }`}
         >
@@ -191,6 +195,8 @@ export default function Page() {
                 ? 'NOC Dashboard'
                 : activeTab === 'infrastructure'
                 ? 'Infrastructure View'
+                : activeTab === 'logs'
+                ? 'Log Explorer'
                 : activeTab === 'ai-analysis'
                 ? 'AI Analysis'
                 : activeTab === 'action-center'
@@ -202,8 +208,18 @@ export default function Page() {
             subtitle="AI Network Operation Center System"
           />
 
-          {/* View Container */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          {/* View Container — เป็นพื้นที่เลื่อนหลักของแอป
+              เพราะเปลือกด้านนอกสูงเท่าจอพอดี main จึงมีความสูงที่แน่นอนเสมอ
+              • View ทั่วไปที่ยาวกว่าจอ จะเลื่อนอยู่ใน main แทนการเลื่อนทั้งหน้า
+              • View ที่อยากเต็มจอ (Log Explorer) ใส่ `lg:flex-1 lg:min-h-0`
+                ที่ตัวเอง แล้วจัดการเลื่อนภายในคอลัมน์ของตัวเอง */}
+          <main
+            className={`flex-1 min-h-0 overflow-y-auto flex flex-col p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto ${
+              // Log Explorer เป็น View เต็มจอที่จัดขอบเอง — ตัด padding ล่างออก
+              // เพื่อให้ก้นคอลัมน์ชิดขอบบนของ StatusBar พอดี
+              activeTab === 'logs' ? 'lg:pb-0' : ''
+            }`}
+          >
             {activeTab === 'dashboard' && (
               <DashboardView
                 hypervisors={MOCK_HYPERVISORS}
@@ -223,6 +239,17 @@ export default function Page() {
                 syslogs={MOCK_SYSLOGS}
                 recentAlerts={MOCK_ALERTS}
                 initialSubTab={activeSubTab}
+                onNavigateTab={handleNavigateTab}
+              />
+            )}
+
+            {activeTab === 'logs' && (
+              <LogExplorerView
+                incidentId={MOCK_INCIDENT_01.id}
+                // เข้ามาจากปุ่ม "ดู Log ทั้งหมด" ในหน้า AI Analysis → กรองเฉพาะหลักฐานของ Incident นี้
+                initialQuery={
+                  activeSubTab === 'incident' ? { incidentId: MOCK_INCIDENT_01.id } : undefined
+                }
                 onNavigateTab={handleNavigateTab}
               />
             )}

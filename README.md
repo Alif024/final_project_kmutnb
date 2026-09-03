@@ -10,7 +10,7 @@
 ## สถานะปัจจุบันของแอปพลิเคชัน
 
 > **สถานะ: Prototype / Demo (UI-complete, Mock-driven)**
-> ส่วนติดต่อผู้ใช้ครบทั้ง 6 โมดูลและใช้งานโต้ตอบได้จริงในเบราว์เซอร์
+> ส่วนติดต่อผู้ใช้ครบทั้ง 7 โมดูลและใช้งานโต้ตอบได้จริงในเบราว์เซอร์
 > ข้อมูลทั้งหมดมาจากไฟล์ชุดข้อมูลจำลองไฟล์เดียวคือ `lib/mock-data.json` ยกเว้น **AI Chat Assistant** ที่เรียก Gemini API จริงผ่าน API Route
 
 **ผลการตรวจสอบล่าสุด (30 สิงหาคม 2569):** ระบบ Build ผ่านสมบูรณ์ และผ่านการตรวจ Logic Bug
@@ -21,24 +21,33 @@
 |---|---|
 | `npm install` | ✅ ผ่าน (1,002 packages) |
 | `npx tsc --noEmit` | ✅ ผ่าน ไม่มี Type Error |
-| `npm run build` | ✅ ผ่าน — 3 Route (`/` = 267 kB First Load JS, `/_not-found`, `/api/ai/chat`) |
+| `npm run build` | ✅ ผ่าน — 3 Route (`/` = 277 kB First Load JS, `/_not-found`, `/api/ai/chat`) |
 | `npm run lint` | ✅ ผ่าน ไม่มี Warning |
 | ทดสอบคลิกจริงผ่าน Headless Chrome | ✅ ยืนยัน 20 จุดที่แก้ไขทำงานถูกต้องตามที่ตั้งใจ |
 
-**อัปเดตล่าสุด (3 กันยายน 2569):** เพิ่มโมดูลจัดการ Integration บน branch
+**อัปเดต (3 กันยายน 2569):** เพิ่มโมดูลจัดการ Integration บน branch
 `feature/add-integration-wizard` — Add Integration Wizard, ลบการเชื่อมต่อพร้อม Modal ยืนยัน
 และปุ่มทดสอบการเชื่อมต่อที่แสดง log แบบจำลอง ผ่าน `npx tsc --noEmit`, `npm run lint`
 และ `npm run build` ทั้งหมด
 
+**อัปเดตล่าสุด (3 กันยายน 2569):** เพิ่มความสามารถด้าน Logging บน branch
+`feature/graylog-logging` — โมดูล **Log Explorer** สำหรับค้นหา Syslog รวมศูนย์แบบ Graylog,
+การ์ด **Log Evidence** ในหน้า AI Analysis ที่ผูก Log เข้ากับ Root Cause Chain รายขั้น
+และการป้อน Syslog ระดับ Error เข้าไปใน System Prompt ของ AI Chat
+ชุดข้อมูลจำลองขยายจาก 4 เป็น 62 ข้อความ และเพิ่ม Adapter `lib/log-source.ts`
+เป็นจุดต่อ Graylog REST API ในอนาคต ผ่าน `npx tsc --noEmit`, `npm run lint` และ `npm run build` ทั้งหมด
+
 | ด้าน | สถานะ |
 |---|---|
-| หน้าจอ/ฟีเจอร์ UI | ✅ ครบทั้ง 6 โมดูล รวม 13 หน้าย่อย |
+| หน้าจอ/ฟีเจอร์ UI | ✅ ครบทั้ง 7 โมดูล รวม 14 หน้าย่อย |
 | Human-in-the-Loop (อนุมัติ/ปฏิเสธ + Audit Log) | ✅ ทำงานจริงแบบ in-memory (แก้ปัญหา State ค้างข้ามคำขอแล้ว) |
 | ตัวกรอง/แท็บรายละเอียดใน Action Center และ Infrastructure | ✅ กรอง/สลับเนื้อหาได้จริงทุกปุ่ม (เดิมมีหลายจุดกดแล้วไม่มีผล) |
 | AI Chat Assistant | ✅ ต่อ Gemini API จริง (มี Mock Fallback เมื่อไม่ตั้งค่า API Key), แยกประวัติสนทนาตาม Session ถูกต้อง |
-| AI Diagnosis (RCA) | 🟡 แสดงผลจากชุดข้อมูลจำลอง ยังไม่เรียกโมเดลจริง |
+| AI Diagnosis (RCA) | 🟡 แสดงผลจากชุดข้อมูลจำลอง ยังไม่เรียกโมเดลจริง (มี Log Evidence ประกอบแล้ว) |
+| Log Explorer (ค้นหา Syslog รวมศูนย์) | ✅ ค้นหา/กรอง/กางดู Parsed Fields ได้จริงจากชุดข้อมูล 62 ข้อความ |
 | จัดการรายการ Integration (เพิ่ม / ลบ / ทดสอบการเชื่อมต่อ) | ✅ ทำงานจริงแบบ in-memory ผ่าน Wizard และ Modal ยืนยัน (ผลการทดสอบเป็นการจำลอง) |
 | การเก็บ Telemetry จริง (vCenter / Proxmox / SNMP / Syslog) | ❌ ยังไม่เชื่อมต่อ — ยังไม่มี Collector จริงอยู่เบื้องหลังรายการ Integration |
+| การดึง Log จาก Graylog จริง | ❌ ยังไม่เชื่อมต่อ — อ่านจากข้อมูลจำลองผ่าน Adapter `lib/log-source.ts` ที่เตรียมจุดต่อไว้แล้ว |
 | ฐานข้อมูล / การคงข้อมูลถาวร | ❌ ยังไม่มี — State หายเมื่อรีเฟรชหน้า |
 | การยืนยันตัวตน (Authentication) | ❌ ยังไม่มี — RBAC เป็น Role Switcher สำหรับสาธิต |
 | Export PDF / Excel | ❌ เป็นปุ่ม Stub (`alert()`) ยกเว้นปุ่ม Print ที่ใช้ `window.print()` ได้ |
@@ -110,7 +119,7 @@ final_project_kmutnb/
 │   ├── layout.tsx                # Root Layout (lang="th", ฟอนต์ Inter/Prompt)
 │   └── page.tsx                  # หน้าเดียวของแอป — จัดการ State และสลับ View
 ├── components/
-│   ├── Sidebar.tsx                # เมนูหลัก 6 โมดูล + Role Switcher
+│   ├── Sidebar.tsx                # เมนูหลัก 7 โมดูล + Role Switcher
 │   ├── TopBar.tsx                 # ชื่อหน้า, นาฬิกาไทย (พ.ศ.), Fullscreen, Theme Toggle
 │   ├── ThemeToggle.tsx            # ปุ่มสลับ Dark/Light Mode (ผูกกับ class `dark` บน <html>)
 │   ├── StatusBar.tsx              # แถบสถานะ Collector / AI Engine / Syslog
@@ -119,11 +128,12 @@ final_project_kmutnb/
 │   ├── AddIntegrationModal.tsx    # Add Integration Wizard 3 ขั้นตอน
 │   ├── DeleteIntegrationModal.tsx # ยืนยันก่อนลบการเชื่อมต่อ
 │   ├── ConnectionTestConsole.tsx  # กล่อง log ผลการทดสอบ (ใช้ร่วมวิซาร์ด/การ์ด)
-│   └── views/                     # 6 View หลัก (ดูตารางฟีเจอร์ด้านล่าง)
+│   └── views/                     # 7 View หลัก (ดูตารางฟีเจอร์ด้านล่าง)
 ├── lib/
 │   ├── mock-data.json           # ชุดข้อมูลจำลองทั้งหมดของระบบ (แหล่งข้อมูลเดียว)
 │   ├── mock-data.ts             # ผูก TypeScript types ให้ JSON แล้ว re-export
 │   ├── integrations.ts          # Metadata ของประเภท Integration + ตัวสร้าง log ทดสอบ
+│   ├── log-source.ts            # Log Source Adapter — ค้นหา/กรอง Syslog + จุดต่อ Graylog API
 │   └── utils.ts                 # `cn()` — clsx + tailwind-merge
 ├── types/ai-noc.ts              # TypeScript Interface ของโดเมนทั้งหมด
 ├── hooks/
@@ -158,14 +168,34 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
   1 ชั่วโมง พร้อมแผงรายละเอียด Host 6 แท็บ (Overview / Performance / VMs / Datastores / Alerts / Logs)
   ที่กรองข้อมูลจริงตาม Host ที่เลือก
 
-### 3. AI Analysis — Diagnosis & Assistant
+### 3. Log Explorer — ค้นหา Syslog รวมศูนย์ (Graylog)
+หน้าค้นหา Log จากทุก Host/VM ที่ส่งเข้า Graylog *(อ่านจากข้อมูลจำลอง 62 ข้อความ ผ่าน `lib/log-source.ts`)*
+- **ค้นหาแบบข้อความอิสระ** ครอบคลุม message, ชื่อ Source, facility, IP และ Parsed Field
+- **ตัวกรองแบบ Facet** 3 กลุ่ม (Severity ตาม RFC 5424 / Stream / Source) พร้อมจำนวนผลลัพธ์ข้างแต่ละตัวเลือก
+  โดยตัวเลขจะคำนวณจากเงื่อนไข "ด้านอื่น" ที่เลือกอยู่ เหมือนแถบ Fields ของ Graylog
+- **ช่วงเวลา** 15 นาที / 1 ชั่วโมง / 4 ชั่วโมง / ทั้งหมด และ **กราฟการกระจายช่วงละ 15 นาที**
+  (แท่งแดง = ช่วงที่มี Log ระดับ Error ขึ้นไป)
+- **คลิกที่แท่งกราฟเพื่อเจาะดูเฉพาะช่วงเวลานั้น เลือกพร้อมกันได้หลายช่วง** — แท่งที่เลือกจะถูกเน้น
+  ส่วนแท่งอื่นจางลง มีชิปสรุปช่วงที่เลือกกดเอาออกทีละช่วงได้ และปุ่มล้างช่วงทั้งหมดที่หัวการ์ด
+  (กราฟยังแสดงครบทุกแท่งเสมอแม้กำลังกรองอยู่ จึงคลิกเพิ่มช่วงอื่นต่อได้)
+- **ปุ่มล้างตัวกรองประจำการ์ด** ที่หัวการ์ด Severity / Streams / Sources ล้างเฉพาะของใบนั้น
+- **Graylog Query Echo** — แปลงเงื่อนไขที่เลือกเป็นสตริงคิวรีตามไวยากรณ์ Graylog พร้อมปุ่มคัดลอก
+  ไปวางใน Graylog Web Interface ได้ทันที
+- **แบ่งหน้าครั้งละ 20 ข้อความ** พร้อมปุ่มก่อนหน้า/ถัดไป และตัวเลขช่วงที่กำลังแสดง
+  (เปลี่ยนตัวกรองหรือลำดับการเรียงจะย้อนกลับไปหน้าแรกให้อัตโนมัติ)
+- **กางดูรายละเอียดรายข้อความ** — metadata (source, source_ip, facility, level) และ Parsed Fields
+  ที่ Extractor แยกไว้ พร้อมปุ่มลัดกรองเฉพาะ Source นั้น และปุ่มข้ามไปดูการวิเคราะห์ของ Incident
+
+### 4. AI Analysis — Diagnosis & Assistant
 - **AI Diagnosis (RCA):** แสดง Root Cause พร้อมคะแนนความเชื่อมั่น, ห่วงโซ่เหตุการณ์ (Evidence Chain)
   และหลักฐานเชิงเมตริกเทียบกับ Threshold *(ข้อมูลจำลอง)*
+- **Log Evidence:** แต่ละขั้นของ Root Cause Chain กางดู Syslog ที่รองรับขั้นนั้นได้ (ผูกผ่านฟิลด์
+  `logRefs`) และมีการ์ดรวมหลักฐานฝั่ง Log ทั้ง 24 ข้อความของ Incident พร้อมปุ่มเปิดต่อใน Log Explorer
 - **AI Chat Assistant:** สนทนากับ Gemini ผ่าน `POST /api/ai/chat` — System Prompt ภาษาไทย
-  ฝังบริบท Telemetry ของระบบไว้ พร้อมชุดคำถามแนะนำ *(เรียกโมเดลจริง)* แยกประวัติการสนทนาตาม
+  ฝังบริบท Telemetry **และ Syslog ระดับ Error ขึ้นไป 20 บรรทัดล่าสุด** ไว้ พร้อมชุดคำถามแนะนำ *(เรียกโมเดลจริง)* แยกประวัติการสนทนาตาม
   Session จริง (สลับ Session แล้วเห็นเฉพาะข้อความของ Session นั้น, "New Chat" ไม่ลบประวัติ Session อื่น)
 
-### 4. Action Center — Recommendation & Approval
+### 5. Action Center — Recommendation & Approval
 - **Recommendations:** ตารางข้อเสนอแนะจาก AI พร้อมลำดับความสำคัญ ความเชื่อมั่น และตัวกรองสถานะ
   ที่กรองข้อมูลจริง (การ์ดสรุปยอดด้านบนคำนวณจากรายการจริงเช่นกัน)
 - **Approvals (Human-in-the-Loop):** การ์ดคำขออนุมัติ 3 คอลัมน์ (บริบท / พารามิเตอร์ / ผลกระทบที่คาดการณ์),
@@ -174,12 +204,12 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 เมื่อกดอนุมัติหรือปฏิเสธ ระบบจะอัปเดตสถานะคำขอ อัปเดต Recommendation ที่เกี่ยวข้อง
 และบันทึก Audit Log ใหม่ทันที (ดูผลได้ที่ Settings → Audit Log)
 
-### 5. Reports & Analytics
+### 6. Reports & Analytics
 - **Executive Summary:** KPI ระดับผู้บริหาร (Availability, Incidents, MTTR, AI Accuracy),
   กราฟแนวโน้ม 7 วัน, การกระจายความรุนแรง และรายงานเชิงบรรยายจาก AI
 - **Incident Post-Mortem:** ไทม์ไลน์เหตุการณ์, บทเรียนที่ได้รับ และรายการงานติดตาม
 
-### 6. Settings & Administration
+### 7. Settings & Administration
 - **Integrations:** สถานะการเชื่อมต่อ vCenter, Proxmox VE, Syslog/Prometheus, LINE Notify *(UI Mock)*
   พร้อม **Add Integration Wizard** 3 ขั้นตอน (เลือกประเภท → กรอกรายละเอียดพร้อมตรวจสอบความถูกต้อง →
   ทดสอบการเชื่อมต่อและยืนยัน) การ์ดที่เพิ่มใหม่จะแสดงต่อท้ายรายการทันที และคงอยู่เมื่อสลับแท็บ
@@ -201,8 +231,9 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 1. **ข้อมูลไม่ถูกบันทึกถาวร** — State ทั้งหมดเก็บใน React `useState` การรีเฟรชหน้าจะรีเซ็ตกลับสู่ค่าเริ่มต้น
 2. **ไม่มีระบบยืนยันตัวตน** — การสลับบทบาทเป็นเพียงการสาธิต RBAC ไม่มีการบังคับสิทธิ์ฝั่ง Server
 3. **AI Diagnosis ยังไม่เรียกโมเดล** — ผลการวินิจฉัยอ่านจาก `MOCK_DIAGNOSIS_01` แบบตายตัว
-4. **บริบทของ AI Chat ยังฝังแบบ Hard-coded ใน System Prompt** — ยังไม่มีการส่งข้อมูล Telemetry
-   สดจาก Client ไปกับทุกคำถาม และค่า `citedEntities` ที่ตอบกลับก็เป็นค่าคงที่
+4. **บริบทของ AI Chat ยังฝังแบบ Hard-coded ใน System Prompt** — ค่า Hypervisor/VM ยังเขียนตายในโค้ด
+   (ส่วน Syslog ดึงผ่าน `lib/log-source.ts` แล้ว) ยังไม่มีการส่งข้อมูล Telemetry สดจาก Client
+   ไปกับทุกคำถาม และค่า `citedEntities` ที่ตอบกลับก็เป็นค่าคงที่
 5. **ปุ่มที่ยังเป็น Stub** — Export PDF/Excel ยังเรียกแค่ `alert()` ส่วนปุ่ม Sync Now บนการ์ด
    Integration ยังไม่ทำงาน และการทดสอบการเชื่อมต่อ (ทั้งปุ่ม Test Connection / Send Test Alert
    บนการ์ด และขั้นตอนที่ 3 ของ Add Integration Wizard) เป็นการจำลองผลลัพธ์ — ยังไม่ยิงไปยัง
@@ -231,6 +262,9 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 ## แผนพัฒนาต่อ (Roadmap)
 
 - [ ] เชื่อมต่อ Collector จริง — vCenter API, Proxmox VE API, SNMP และ Syslog
+- [ ] ต่อ Graylog REST API จริงใน `lib/log-source.ts` (`/api/search/universal/relative`)
+      แล้วย้ายการค้นหาไปเป็น API Route ฝั่ง Server เพื่อไม่ให้ Token หลุดไปฝั่ง Client
+- [ ] เพิ่ม Graylog เป็น Integration Type แยกในหน้า Settings (ปัจจุบันรวมอยู่ใน `syslog-metric`)
 - [ ] เพิ่มฐานข้อมูลสำหรับ Incident, Approval และ Audit Log
 - [ ] ให้ AI Diagnosis (RCA) วิเคราะห์จากข้อมูลจริงผ่าน Gemini
 - [ ] เพิ่ม Authentication และบังคับสิทธิ์ RBAC ที่ฝั่ง Server
