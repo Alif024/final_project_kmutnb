@@ -493,27 +493,18 @@ export default function LogExplorerView({
                 )}
               </div>
 
-              {/* สรุปช่วงที่เลือกไว้ กดที่ชิปเพื่อเอาช่วงนั้นออกได้ */}
-              {query.buckets.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 mb-3">
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">
-                    ช่วงที่เลือก:
-                  </span>
-                  {[...query.buckets].sort().map((b) => (
-                    <button
-                      key={b}
-                      onClick={() => toggleBucket(b)}
-                      title="เอาช่วงนี้ออก"
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-semibold bg-blue-500/15 border border-blue-500/40 text-blue-600 dark:text-blue-300 hover:bg-rose-500/15 hover:border-rose-500/40 hover:text-rose-600 dark:hover:text-rose-300 transition-colors"
-                    >
-                      {b} <X className="w-2.5 h-2.5" />
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="h-32">
+              {/* [&_*]:outline-none กันเส้นขอบโฟกัสของเบราว์เซอร์ที่ขึ้นตอนคลิกกราฟ */}
+              <div className="h-32 cursor-pointer [&_*]:outline-none">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={result.histogram}>
+                  <BarChart
+                    data={result.histogram}
+                    // รับคลิกที่ตัวกราฟแทนที่จะรับเฉพาะบนแท่ง — คลิกที่ไหนก็ได้ในคอลัมน์
+                    // ที่แถบ hover ครอบอยู่ก็เลือกช่วงนั้นได้ แม้แท่งจะเตี้ยมาก
+                    onClick={(state) => {
+                      const label = (state as { activeLabel?: string })?.activeLabel;
+                      if (label) toggleBucket(String(label));
+                    }}
+                  >
                     <XAxis
                       dataKey="label"
                       tick={{ fontSize: 10, fill: '#94a3b8' }}
@@ -536,31 +527,41 @@ export default function LogExplorerView({
                       itemStyle={{ color: '#fff' }}
                       formatter={(value) => [value as number, 'จำนวนข้อความ']}
                     />
-                    <Bar
-                      dataKey="count"
-                      radius={[4, 4, 0, 0]}
-                      cursor="pointer"
-                      // Recharts ส่ง payload ของแถวมาให้ใน data.payload (บางเวอร์ชันแนบมาที่ data ตรง ๆ)
-                      onClick={(data: unknown) => {
-                        const row = data as { label?: string; payload?: { label?: string } };
-                        const label = row?.payload?.label ?? row?.label;
-                        if (label) toggleBucket(label);
-                      }}
-                    >
+                    {/* คลิกรับที่ BarChart ด้านบนแล้ว ตรงนี้จึงไม่ผูก onClick ซ้ำ
+                        ไม่งั้นคลิกบนแท่งจะ toggle สองครั้งแล้วกลายเป็นไม่มีอะไรเกิดขึ้น */}
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                       {result.histogram.map((b, idx) => (
                         <Cell
                           key={idx}
                           fill={b.errorCount > 0 ? '#EF4444' : '#3B82F6'}
                           // เมื่อมีการเลือกช่วงไว้ ให้แท่งที่ไม่ได้เลือกจางลงเพื่อให้เห็นชัดว่ากรองอะไรอยู่
                           fillOpacity={query.buckets.length === 0 || b.selected ? 1 : 0.25}
-                          stroke={b.selected ? '#1D4ED8' : undefined}
-                          strokeWidth={b.selected ? 2 : 0}
                         />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+
+              {/* สรุปช่วงที่เลือกไว้ วางไว้ใต้กราฟ เพื่อไม่ให้แถวชิปที่โผล่มา
+                  ตอนเลือกช่วงแรกดันกราฟเลื่อนลง จนคลิกจุดเดิมซ้ำแล้วไม่โดนกราฟ */}
+              {query.buckets.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">
+                    ช่วงที่เลือก:
+                  </span>
+                  {[...query.buckets].sort().map((b) => (
+                    <button
+                      key={b}
+                      onClick={() => toggleBucket(b)}
+                      title="เอาช่วงนี้ออก"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-semibold bg-blue-500/15 border border-blue-500/40 text-blue-600 dark:text-blue-300 hover:bg-rose-500/15 hover:border-rose-500/40 hover:text-rose-600 dark:hover:text-rose-300 transition-colors"
+                    >
+                      {b} <X className="w-2.5 h-2.5" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
