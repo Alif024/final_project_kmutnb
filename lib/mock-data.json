@@ -1063,5 +1063,63 @@
       "severityLevel": 1,
       "message": "CRITICAL ALERT: Root cause identified for INC-2569-0524-0001 (Confidence 96%)"
     }
+  ],
+  "integrations": [
+    {
+      "id": "int-vcenter-01",
+      "type": "vmware-vcenter",
+      "name": "VMware vCenter Server",
+      "target": "10.0.0.100",
+      "port": "443",
+      "username": "administrator@vsphere.local",
+      "statusLabel": "Connected",
+      "connectionState": "connected",
+      "details": [
+        { "label": "API Status:", "value": "200 OK", "tone": "positive" },
+        { "label": "Last Sync:", "value": "2 นาทีที่แล้ว", "tone": "strong" },
+        { "label": "Managed Hosts:", "value": "4 ESXi Hosts", "tone": "strong" }
+      ]
+    },
+    {
+      "id": "int-proxmox-01",
+      "type": "proxmox-ve",
+      "name": "Proxmox VE Cluster",
+      "target": "10.0.0.120",
+      "port": "8006",
+      "username": "root@pam",
+      "statusLabel": "Connected",
+      "connectionState": "connected",
+      "details": [
+        { "label": "API Status:", "value": "200 OK", "tone": "positive" },
+        { "label": "Last Sync:", "value": "1 นาทีที่แล้ว", "tone": "strong" },
+        { "label": "Managed Nodes:", "value": "2 PVE Nodes", "tone": "strong" }
+      ]
+    },
+    {
+      "id": "int-syslog-01",
+      "type": "syslog-metric",
+      "name": "Unified Syslog & Metric Server",
+      "target": "10.0.0.200",
+      "port": "514",
+      "protocol": "UDP",
+      "statusLabel": "NTP Synced",
+      "connectionState": "connected",
+      "details": [
+        { "label": "Service:", "value": "Syslogd + Prometheus", "tone": "positive" },
+        { "label": "Ingestion Rate:", "value": "1,240 msg/sec", "tone": "strong" }
+      ]
+    },
+    {
+      "id": "int-webhook-01",
+      "type": "webhook-notify",
+      "name": "LINE Notify & Webhook Gateway",
+      "target": "Group: NOC Critical Alerts",
+      "statusLabel": "Active",
+      "connectionState": "connected",
+      "details": [
+        { "label": "Target:", "value": "https://notify-api.line.me", "tone": "strong" },
+        { "label": "Alert Level:", "value": "Critical & High Only", "tone": "warning" }
+      ]
+    }
   ]
 }

@@ -236,3 +236,35 @@ export interface ChatSession {
   timestamp: string;
   lastMessage: string;
 }
+
+// ---------------------------------------------------------------------------
+// Integrations (Settings → Integrations)
+// ---------------------------------------------------------------------------
+
+export type IntegrationType =
+  | 'vmware-vcenter'
+  | 'proxmox-ve'
+  | 'syslog-metric'
+  | 'webhook-notify';
+
+export type IntegrationConnectionState = 'connected' | 'pending' | 'error';
+
+export interface IntegrationDetail {
+  label: string;                // "API Status:", "Last Sync:"
+  value: string;
+  tone?: 'default' | 'positive' | 'warning' | 'strong';
+}
+
+export interface Integration {
+  id: string;
+  type: IntegrationType;
+  name: string;                 // "VMware vCenter Server"
+  target: string;               // IP, URL หรือชื่อกลุ่มปลายทาง
+  port?: string;
+  username?: string;
+  protocol?: string;         // เฉพาะ Syslog/Metric: UDP | TCP | TLS
+  statusLabel: string;          // "Connected", "NTP Synced", "Active", "รอทดสอบ"
+  connectionState: IntegrationConnectionState;
+  details: IntegrationDetail[];
+  addedAt?: string;             // เวลาที่เพิ่มผ่าน Add Integration Wizard
+}
