@@ -15,7 +15,9 @@ import {
   UserCheck,
   Clock,
   Trash2,
-  Loader2
+  Loader2,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { UserRole, AuditLogEntry, Integration } from '@/types/ai-noc';
 import AddIntegrationModal from '@/components/AddIntegrationModal';
@@ -173,7 +175,7 @@ export default function SettingsView({
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               {integrations.map((integration) => (
                 <IntegrationCard
                   key={integration.id}
@@ -411,8 +413,11 @@ function IntegrationCard({
 }) {
   const meta = getIntegrationMeta(integration.type);
   const { state: testState, logs: testLogs, runTest } = useConnectionTest();
+  const [isResultCollapsed, setIsResultCollapsed] = useState(false);
 
   const handleTest = () => {
+    // ทดสอบใหม่ทั้งที ให้กางกล่องผลลัพธ์ให้เห็นเสมอ
+    setIsResultCollapsed(false);
     runTest(
       buildConnectionTestSteps({
         type: integration.type,
@@ -474,19 +479,43 @@ function IntegrationCard({
       {/* กล่องผลการทดสอบ — แสดงหลังกดปุ่มทดสอบครั้งแรกเท่านั้น เพื่อไม่ให้การ์ดยาวเกินจำเป็น */}
       {testState !== 'idle' && (
         <div className="space-y-1.5">
-          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-            ผลการทดสอบการเชื่อมต่อ (จำลอง):
-          </span>
-          <ConnectionTestConsole
-            state={testState}
-            logs={testLogs}
-            idleMessage=""
-            successMessage={
-              meta.type === 'webhook-notify'
-                ? 'ส่งการแจ้งเตือนทดสอบสำเร็จ'
-                : 'การเชื่อมต่อสำเร็จ — ระบบพร้อมรับข้อมูล'
-            }
-          />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+              ผลการทดสอบการเชื่อมต่อ (จำลอง):
+            </span>
+            {/* ย่อ/ขยายกล่องผลลัพธ์ — log ยังอยู่ครบ กลับมากางดูได้โดยไม่ต้องทดสอบใหม่ */}
+            <button
+              onClick={() => setIsResultCollapsed((prev) => !prev)}
+              aria-expanded={!isResultCollapsed}
+              aria-label={
+                isResultCollapsed ? 'แสดงผลการทดสอบการเชื่อมต่อ' : 'ซ่อนผลการทดสอบการเชื่อมต่อ'
+              }
+              className="px-2 py-1 rounded-lg text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1"
+            >
+              {isResultCollapsed ? (
+                <>
+                  แสดงผลลัพธ์ <ChevronDown className="w-3.5 h-3.5" />
+                </>
+              ) : (
+                <>
+                  ซ่อนผลลัพธ์ <ChevronUp className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
+          </div>
+
+          {!isResultCollapsed && (
+            <ConnectionTestConsole
+              state={testState}
+              logs={testLogs}
+              idleMessage=""
+              successMessage={
+                meta.type === 'webhook-notify'
+                  ? 'ส่งการแจ้งเตือนทดสอบสำเร็จ'
+                  : 'การเชื่อมต่อสำเร็จ — ระบบพร้อมรับข้อมูล'
+              }
+            />
+          )}
         </div>
       )}
 
