@@ -21,9 +21,14 @@
 |---|---|
 | `npm install` | ✅ ผ่าน (1,002 packages) |
 | `npx tsc --noEmit` | ✅ ผ่าน ไม่มี Type Error |
-| `npm run build` | ✅ ผ่าน — 3 Route (`/` = 259 kB First Load JS, `/_not-found`, `/api/ai/chat`) |
+| `npm run build` | ✅ ผ่าน — 3 Route (`/` = 267 kB First Load JS, `/_not-found`, `/api/ai/chat`) |
 | `npm run lint` | ✅ ผ่าน ไม่มี Warning |
 | ทดสอบคลิกจริงผ่าน Headless Chrome | ✅ ยืนยัน 20 จุดที่แก้ไขทำงานถูกต้องตามที่ตั้งใจ |
+
+**อัปเดตล่าสุด (3 กันยายน 2569):** เพิ่มโมดูลจัดการ Integration บน branch
+`feature/add-integration-wizard` — Add Integration Wizard, ลบการเชื่อมต่อพร้อม Modal ยืนยัน
+และปุ่มทดสอบการเชื่อมต่อที่แสดง log แบบจำลอง ผ่าน `npx tsc --noEmit`, `npm run lint`
+และ `npm run build` ทั้งหมด
 
 | ด้าน | สถานะ |
 |---|---|
@@ -32,7 +37,8 @@
 | ตัวกรอง/แท็บรายละเอียดใน Action Center และ Infrastructure | ✅ กรอง/สลับเนื้อหาได้จริงทุกปุ่ม (เดิมมีหลายจุดกดแล้วไม่มีผล) |
 | AI Chat Assistant | ✅ ต่อ Gemini API จริง (มี Mock Fallback เมื่อไม่ตั้งค่า API Key), แยกประวัติสนทนาตาม Session ถูกต้อง |
 | AI Diagnosis (RCA) | 🟡 แสดงผลจากชุดข้อมูลจำลอง ยังไม่เรียกโมเดลจริง |
-| การเก็บ Telemetry จริง (vCenter / Proxmox / SNMP / Syslog) | ❌ ยังไม่เชื่อมต่อ (หน้า Integrations เป็น UI Mock) |
+| จัดการรายการ Integration (เพิ่ม / ลบ / ทดสอบการเชื่อมต่อ) | ✅ ทำงานจริงแบบ in-memory ผ่าน Wizard และ Modal ยืนยัน (ผลการทดสอบเป็นการจำลอง) |
+| การเก็บ Telemetry จริง (vCenter / Proxmox / SNMP / Syslog) | ❌ ยังไม่เชื่อมต่อ — ยังไม่มี Collector จริงอยู่เบื้องหลังรายการ Integration |
 | ฐานข้อมูล / การคงข้อมูลถาวร | ❌ ยังไม่มี — State หายเมื่อรีเฟรชหน้า |
 | การยืนยันตัวตน (Authentication) | ❌ ยังไม่มี — RBAC เป็น Role Switcher สำหรับสาธิต |
 | Export PDF / Excel | ❌ เป็นปุ่ม Stub (`alert()`) ยกเว้นปุ่ม Print ที่ใช้ `window.print()` ได้ |
@@ -101,22 +107,28 @@ final_project_kmutnb/
 ├── app/
 │   ├── api/ai/chat/route.ts     # API Route เดียวของระบบ — เรียก Gemini
 │   ├── globals.css              # Design Tokens + Frosted Glass Utilities
-│   ├── layout.tsx               # Root Layout (lang="th", ฟอนต์ Inter/Prompt)
-│   └── page.tsx                 # หน้าเดียวของแอป — จัดการ State และสลับ View
+│   ├── layout.tsx                # Root Layout (lang="th", ฟอนต์ Inter/Prompt)
+│   └── page.tsx                  # หน้าเดียวของแอป — จัดการ State และสลับ View
 ├── components/
-│   ├── Sidebar.tsx              # เมนูหลัก 6 โมดูล + Role Switcher
-│   ├── TopBar.tsx               # ชื่อหน้า, นาฬิกาไทย (พ.ศ.), Fullscreen, Theme Toggle
-│   ├── ThemeToggle.tsx          # ปุ่มสลับ Dark/Light Mode (ผูกกับ class `dark` บน <html>)
-│   ├── StatusBar.tsx            # แถบสถานะ Collector / AI Engine / Syslog
-│   ├── CommandPreviewModal.tsx  # ตัวอย่างคำสั่งก่อนอนุมัติ (Human-in-the-Loop)
-│   ├── RejectReasonModal.tsx    # ฟอร์มระบุเหตุผลการปฏิเสธ
-│   └── views/                   # 6 View หลัก (ดูตารางฟีเจอร์ด้านล่าง)
+│   ├── Sidebar.tsx                # เมนูหลัก 6 โมดูล + Role Switcher
+│   ├── TopBar.tsx                 # ชื่อหน้า, นาฬิกาไทย (พ.ศ.), Fullscreen, Theme Toggle
+│   ├── ThemeToggle.tsx            # ปุ่มสลับ Dark/Light Mode (ผูกกับ class `dark` บน <html>)
+│   ├── StatusBar.tsx              # แถบสถานะ Collector / AI Engine / Syslog
+│   ├── CommandPreviewModal.tsx    # ตัวอย่างคำสั่งก่อนอนุมัติ (Human-in-the-Loop)
+│   ├── RejectReasonModal.tsx      # ฟอร์มระบุเหตุผลการปฏิเสธ
+│   ├── AddIntegrationModal.tsx    # Add Integration Wizard 3 ขั้นตอน
+│   ├── DeleteIntegrationModal.tsx # ยืนยันก่อนลบการเชื่อมต่อ
+│   ├── ConnectionTestConsole.tsx  # กล่อง log ผลการทดสอบ (ใช้ร่วมวิซาร์ด/การ์ด)
+│   └── views/                     # 6 View หลัก (ดูตารางฟีเจอร์ด้านล่าง)
 ├── lib/
 │   ├── mock-data.json           # ชุดข้อมูลจำลองทั้งหมดของระบบ (แหล่งข้อมูลเดียว)
 │   ├── mock-data.ts             # ผูก TypeScript types ให้ JSON แล้ว re-export
+│   ├── integrations.ts          # Metadata ของประเภท Integration + ตัวสร้าง log ทดสอบ
 │   └── utils.ts                 # `cn()` — clsx + tailwind-merge
 ├── types/ai-noc.ts              # TypeScript Interface ของโดเมนทั้งหมด
-├── hooks/use-mobile.ts          # Media Query Hook (ยังไม่มีการเรียกใช้งานจริง)
+├── hooks/
+│   ├── use-mobile.ts            # Media Query Hook (ยังไม่มีการเรียกใช้งานจริง)
+│   └── use-connection-test.ts   # จำลองการทดสอบการเชื่อมต่อแบบไล่ log ทีละบรรทัด
 ├── metadata.json                # Manifest สำหรับ Google AI Studio
 └── bugs.txt                     # บันทึกผลตรวจสอบบั๊กทั้งแอป (รายการที่แก้แล้ว/ยังไม่แก้)
 ```
@@ -173,6 +185,7 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
   ทดสอบการเชื่อมต่อและยืนยัน) การ์ดที่เพิ่มใหม่จะแสดงต่อท้ายรายการทันที และคงอยู่เมื่อสลับแท็บ
   พร้อมปุ่ม **ลบการเชื่อมต่อ** ที่มี Modal ยืนยันก่อนลบ (สิทธิ์ Viewer เพิ่มหรือลบไม่ได้)
   และปุ่ม **Test Connection / Send Test Alert** ที่แสดง log ผลการทดสอบ (จำลอง) ในการ์ด
+  พร้อมปุ่ม "ซ่อนผลลัพธ์ ˄ / แสดงผลลัพธ์ ˅" สำหรับพับกล่อง log โดยไม่ล้างผลเดิม
   หากการ์ดอยู่สถานะ "รอการทดสอบ" แล้วทดสอบผ่าน สถานะจะเปลี่ยนเป็น Connected ให้อัตโนมัติ
 - **System Config:** เลือกโมเดล AI และตั้งค่า Threshold (CPU Ready, Storage Latency, Packet Loss)
 - **RBAC:** สลับบทบาท Admin / NOC Engineer / Viewer เพื่อสาธิตการควบคุมสิทธิ์
