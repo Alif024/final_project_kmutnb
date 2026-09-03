@@ -112,7 +112,7 @@ export default function LogExplorerView({
   };
 
   return (
-    <div className="space-y-6 pb-6 animate-in fade-in duration-300">
+    <div className="space-y-6 pb-10 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/10 pb-4">
         <div>
@@ -221,7 +221,7 @@ export default function LogExplorerView({
               Sources
             </h3>
             {/* รายการต้นทางเลื่อนอยู่ในการ์ด เพื่อให้ก้นการ์ดเสมอกับตารางผลลัพธ์ */}
-            <div className="space-y-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+            <div className="space-y-1 pb-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
               {result.sourceFacets.length === 0 && (
                 <p className="text-[11px] text-slate-500 py-2">ไม่มีข้อมูลในเงื่อนไขนี้</p>
               )}
@@ -434,7 +434,7 @@ export default function LogExplorerView({
                 </button>
               </div>
             ) : (
-              <div className="max-h-[640px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto divide-y divide-slate-100 dark:divide-white/5">
+              <div className="max-h-[640px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto pb-2 divide-y divide-slate-100 dark:divide-white/5">
                 {rows.map((log) => (
                   <LogRow
                     key={log.id}
