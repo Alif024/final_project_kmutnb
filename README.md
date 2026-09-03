@@ -21,21 +21,41 @@
 |---|---|
 | `npm install` | ✅ ผ่าน (1,002 packages) |
 | `npx tsc --noEmit` | ✅ ผ่าน ไม่มี Type Error |
-| `npm run build` | ✅ ผ่าน — 3 Route (`/` = 277 kB First Load JS, `/_not-found`, `/api/ai/chat`) |
+| `npm run build` | ✅ ผ่าน — 3 Route (`/` = 278 kB First Load JS, `/_not-found`, `/api/ai/chat`) |
 | `npm run lint` | ✅ ผ่าน ไม่มี Warning |
 | ทดสอบคลิกจริงผ่าน Headless Chrome | ✅ ยืนยัน 20 จุดที่แก้ไขทำงานถูกต้องตามที่ตั้งใจ |
+| ตรวจ Layout และการโต้ตอบด้วย Chrome จริง (รอบ Log Explorer) | ✅ วัดความสูง/การเลื่อนของทุกหน้า และทดสอบคลิกกราฟ ตัวกรอง และการแบ่งหน้าด้วยเมาส์จริง |
 
 **อัปเดต (3 กันยายน 2569):** เพิ่มโมดูลจัดการ Integration บน branch
 `feature/add-integration-wizard` — Add Integration Wizard, ลบการเชื่อมต่อพร้อม Modal ยืนยัน
 และปุ่มทดสอบการเชื่อมต่อที่แสดง log แบบจำลอง ผ่าน `npx tsc --noEmit`, `npm run lint`
 และ `npm run build` ทั้งหมด
 
-**อัปเดตล่าสุด (3 กันยายน 2569):** เพิ่มความสามารถด้าน Logging บน branch
-`feature/graylog-logging` — โมดูล **Log Explorer** สำหรับค้นหา Syslog รวมศูนย์แบบ Graylog,
-การ์ด **Log Evidence** ในหน้า AI Analysis ที่ผูก Log เข้ากับ Root Cause Chain รายขั้น
-และการป้อน Syslog ระดับ Error เข้าไปใน System Prompt ของ AI Chat
-ชุดข้อมูลจำลองขยายจาก 4 เป็น 62 ข้อความ และเพิ่ม Adapter `lib/log-source.ts`
-เป็นจุดต่อ Graylog REST API ในอนาคต ผ่าน `npx tsc --noEmit`, `npm run lint` และ `npm run build` ทั้งหมด
+**อัปเดตล่าสุด (3 กันยายน 2569):** เพิ่มความสามารถด้าน Logging — พัฒนาบน branch
+`feature/graylog-logging` และ merge เข้า `main` แล้ว (PR #2)
+
+ฝั่งฟีเจอร์
+
+- โมดูล **Log Explorer** สำหรับค้นหา Syslog รวมศูนย์แบบ Graylog — ค้นหาอิสระ, ตัวกรองแบบ Facet
+  พร้อมปุ่มล้างประจำการ์ด, คลิกแท่งกราฟเพื่อเจาะช่วงเวลา (เลือกได้หลายช่วง), Graylog Query Echo
+  และการแบ่งหน้าครั้งละ 20 ข้อความ
+- การ์ด **Log Evidence** ในหน้า AI Analysis ที่ผูก Log เข้ากับ Root Cause Chain รายขั้นผ่านฟิลด์ `logRefs`
+- ป้อน Syslog ระดับ Error เข้าไปใน System Prompt ของ AI Chat ให้ตอบโดยอ้างอิง Log จริงได้
+- ขยายชุดข้อมูลจำลองจาก 4 เป็น **62 ข้อความ** ครอบคลุมช่วง 13:05–15:41 จาก 14 ต้นทาง
+  โดย 24 ข้อความผูกกับ `INC-2569-0524-0001` และเพิ่ม Adapter `lib/log-source.ts`
+  เป็นจุดต่อ Graylog REST API ในอนาคต
+
+ฝั่งโครงสร้าง/แก้ไข
+
+- ปรับเปลือกแอปเป็น **App Shell สูงเท่าจอ** — หน้าเว็บไม่เลื่อนเอง การเลื่อนทั้งหมดเกิดใน `<main>`
+  หรือลึกลงไป ทำให้ TopBar/StatusBar ที่เป็น `fixed` ไม่ทับเนื้อหาในทุกหน้าอีก
+  (เดิมใช้ `min-h-screen` ซึ่งเป็นค่าต่ำสุด เนื้อหาจึงดันความสูงเกินจอได้ไม่จำกัด)
+- แก้แท็บ Logs ของโหนดใน Infrastructure ที่เดิมแสดง Syslog ของทุกโหนดปนกัน
+  ให้กรองตามโหนดที่เลือกจริง พร้อมปุ่มลัดไป Log Explorer
+- แก้ Tooltip ของกราฟที่ตัวหนังสือเป็นสีเข้มบนพื้นหลังเข้มจนอ่านไม่ออก
+
+ผ่าน `npx tsc --noEmit`, `npm run lint` และ `npm run build` ทั้งหมด
+และตรวจ Layout/การโต้ตอบด้วย Chrome จริงผ่าน `puppeteer-core` (ไม่ได้เพิ่มเป็น dependency ของโปรเจกต์)
 
 | ด้าน | สถานะ |
 |---|---|
@@ -44,7 +64,8 @@
 | ตัวกรอง/แท็บรายละเอียดใน Action Center และ Infrastructure | ✅ กรอง/สลับเนื้อหาได้จริงทุกปุ่ม (เดิมมีหลายจุดกดแล้วไม่มีผล) |
 | AI Chat Assistant | ✅ ต่อ Gemini API จริง (มี Mock Fallback เมื่อไม่ตั้งค่า API Key), แยกประวัติสนทนาตาม Session ถูกต้อง |
 | AI Diagnosis (RCA) | 🟡 แสดงผลจากชุดข้อมูลจำลอง ยังไม่เรียกโมเดลจริง (มี Log Evidence ประกอบแล้ว) |
-| Log Explorer (ค้นหา Syslog รวมศูนย์) | ✅ ค้นหา/กรอง/กางดู Parsed Fields ได้จริงจากชุดข้อมูล 62 ข้อความ |
+| Log Explorer (ค้นหา Syslog รวมศูนย์) | ✅ ค้นหา / กรองแบบ Facet / เจาะช่วงเวลาจากกราฟ / แบ่งหน้า / กางดู Parsed Fields ได้จริงจากชุดข้อมูล 62 ข้อความ |
+| Log Evidence ในหน้า AI Analysis | ✅ ผูก Log เข้ากับ Root Cause Chain รายขั้น และข้ามไป Log Explorer แบบกรอง Incident ไว้ให้ |
 | จัดการรายการ Integration (เพิ่ม / ลบ / ทดสอบการเชื่อมต่อ) | ✅ ทำงานจริงแบบ in-memory ผ่าน Wizard และ Modal ยืนยัน (ผลการทดสอบเป็นการจำลอง) |
 | การเก็บ Telemetry จริง (vCenter / Proxmox / SNMP / Syslog) | ❌ ยังไม่เชื่อมต่อ — ยังไม่มี Collector จริงอยู่เบื้องหลังรายการ Integration |
 | การดึง Log จาก Graylog จริง | ❌ ยังไม่เชื่อมต่อ — อ่านจากข้อมูลจำลองผ่าน Adapter `lib/log-source.ts` ที่เตรียมจุดต่อไว้แล้ว |
@@ -147,6 +168,15 @@ final_project_kmutnb/
 (แท็บที่เลือก, บทบาทผู้ใช้, รายการอนุมัติ, Audit Log) แล้วส่งลงไปให้แต่ละ View ผ่าน Props
 ยังไม่มี Router-based Navigation และไม่มี State Management Library
 
+**รูปแบบการเลื่อนหน้าจอ (App Shell)** — เปลือกนอกสุดใน `app/page.tsx` สูงเท่าจอพอดี
+(`h-screen` + `overflow-hidden`) หน้าเว็บจึงไม่เลื่อนเอง การเลื่อนทั้งหมดเกิดใน `<main>`
+ซึ่งเป็นพื้นที่เลื่อนหลัก โดยคอลัมน์เนื้อหากัน TopBar/StatusBar ที่เป็น `fixed` ไว้ด้วย
+`pt-14 pb-9` เนื้อหาจึงไม่มีทางมุดใต้สองแถบนั้น
+
+View ทั่วไปสูงตามเนื้อหาแล้วเลื่อนอยู่ใน `<main>` ตามปกติ ส่วน View ที่ต้องการเต็มจอ
+(ปัจจุบันคือ Log Explorer) ใส่ `lg:flex-1 lg:min-h-0` ที่ตัวเองเพื่อรับความสูงที่เหลือ
+แล้วจัดการเลื่อนภายในคอลัมน์ของตัวเอง — ไม่ต้องคำนวณความสูงจาก `100vh` ด้วยค่าคงที่
+
 ---
 
 ## ฟีเจอร์ตามโมดูล
@@ -167,6 +197,8 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
   CPU Ready Time, Memory Ballooning, Storage Latency, Virtual Switch Dropped Packets และกราฟย้อนหลัง
   1 ชั่วโมง พร้อมแผงรายละเอียด Host 6 แท็บ (Overview / Performance / VMs / Datastores / Alerts / Logs)
   ที่กรองข้อมูลจริงตาม Host ที่เลือก
+- แท็บ **Logs** ของทั้งฝั่งโหนดและฝั่ง Host กรอง Syslog ตามอุปกรณ์ที่เลือกจริง
+  (เดิมฝั่งโหนดแสดงของทุกโหนดปนกัน) และมีปุ่มลัดไปค้นต่อใน Log Explorer
 
 ### 3. Log Explorer — ค้นหา Syslog รวมศูนย์ (Graylog)
 หน้าค้นหา Log จากทุก Host/VM ที่ส่งเข้า Graylog *(อ่านจากข้อมูลจำลอง 62 ข้อความ ผ่าน `lib/log-source.ts`)*
@@ -185,6 +217,9 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
   (เปลี่ยนตัวกรองหรือลำดับการเรียงจะย้อนกลับไปหน้าแรกให้อัตโนมัติ)
 - **กางดูรายละเอียดรายข้อความ** — metadata (source, source_ip, facility, level) และ Parsed Fields
   ที่ Extractor แยกไว้ พร้อมปุ่มลัดกรองเฉพาะ Source นั้น และปุ่มข้ามไปดูการวิเคราะห์ของ Incident
+- **เลย์เอาต์เต็มจอสองคอลัมน์ที่เลื่อนแยกกัน** — คอลัมน์ตัวกรองด้านซ้ายและคอลัมน์
+  ช่องค้นหา/กราฟ/ตารางด้านขวา สูงเท่ากันและจบที่ขอบบนของแถบสถานะพอดี
+  เลื่อนฝั่งหนึ่งอีกฝั่งไม่ขยับ และตัวหน้าเว็บเองไม่เลื่อน
 
 ### 4. AI Analysis — Diagnosis & Assistant
 - **AI Diagnosis (RCA):** แสดง Root Cause พร้อมคะแนนความเชื่อมั่น, ห่วงโซ่เหตุการณ์ (Evidence Chain)
