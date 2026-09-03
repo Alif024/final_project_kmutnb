@@ -10,6 +10,7 @@ import RejectReasonModal from '@/components/RejectReasonModal';
 // Views
 import DashboardView from '@/components/views/DashboardView';
 import InfrastructureView from '@/components/views/InfrastructureView';
+import LogExplorerView from '@/components/views/LogExplorerView';
 import AIAnalysisView from '@/components/views/AIAnalysisView';
 import ActionCenterView from '@/components/views/ActionCenterView';
 import ReportsView from '@/components/views/ReportsView';
@@ -191,6 +192,8 @@ export default function Page() {
                 ? 'NOC Dashboard'
                 : activeTab === 'infrastructure'
                 ? 'Infrastructure View'
+                : activeTab === 'logs'
+                ? 'Log Explorer'
                 : activeTab === 'ai-analysis'
                 ? 'AI Analysis'
                 : activeTab === 'action-center'
@@ -223,6 +226,17 @@ export default function Page() {
                 syslogs={MOCK_SYSLOGS}
                 recentAlerts={MOCK_ALERTS}
                 initialSubTab={activeSubTab}
+                onNavigateTab={handleNavigateTab}
+              />
+            )}
+
+            {activeTab === 'logs' && (
+              <LogExplorerView
+                incidentId={MOCK_INCIDENT_01.id}
+                // เข้ามาจากปุ่ม "ดู Log ทั้งหมด" ในหน้า AI Analysis → กรองเฉพาะหลักฐานของ Incident นี้
+                initialQuery={
+                  activeSubTab === 'incident' ? { incidentId: MOCK_INCIDENT_01.id } : undefined
+                }
                 onNavigateTab={handleNavigateTab}
               />
             )}

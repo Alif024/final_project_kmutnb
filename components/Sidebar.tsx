@@ -7,6 +7,7 @@ import {
   Sparkles,
   ShieldCheck,
   BarChart3,
+  ScrollText,
   Settings,
   Brain,
   ChevronRight,
@@ -48,6 +49,12 @@ export default function Sidebar({
       label: 'Infrastructure',
       subtitle: 'Topology & Monitoring',
       icon: Network,
+    },
+    {
+      id: 'logs',
+      label: 'Log Explorer',
+      subtitle: 'ค้นหา Syslog รวมศูนย์',
+      icon: ScrollText,
     },
     {
       id: 'ai-analysis',

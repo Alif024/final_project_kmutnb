@@ -111,6 +111,11 @@ export default function InfrastructureView({
     (a) => (matchedVm && a.entityId === matchedVm.id) || a.entityName === selectedNode.label
   );
 
+  // Syslog ของโหนดที่เลือกอยู่ — จับคู่ผ่าน VM ที่ IP ตรงกัน หรือชื่อโหนดตรงกับ source
+  const nodeLogs = syslogs.filter(
+    (s) => (matchedVm && s.sourceId === matchedVm.id) || s.sourceName === selectedNode.label
+  );
+
   const hypVms = vms.filter((v) => v.hypervisorId === selectedHyp.id);
   const hypAlerts = recentAlerts.filter((a) => a.entityId === selectedHyp.id || a.entityName === selectedHyp.name);
   const hypLogs = syslogs.filter((s) => s.sourceId === selectedHyp.id);
@@ -573,16 +578,27 @@ export default function InfrastructureView({
                 </div>
 
                 <div className="bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-white/10 rounded-xl p-3 font-mono space-y-2 max-h-48 overflow-y-auto">
-                  {syslogs.map((log) => (
-                    <div key={log.id} className="text-slate-500 dark:text-slate-400 flex items-start gap-3 border-b border-slate-200 dark:border-white/5 pb-1.5">
-                      <span className="text-blue-600 dark:text-blue-400 shrink-0 font-bold">{log.timestamp}</span>
-                      <span className="text-amber-600 dark:text-amber-400 shrink-0 font-bold">[{log.sourceName}]</span>
-                      <span className={`flex-1 ${log.severityLevel <= 2 ? 'text-rose-600 dark:text-rose-400 font-medium' : 'text-slate-700 dark:text-slate-200'}`}>
-                        {log.message}
-                      </span>
-                    </div>
-                  ))}
+                  {nodeLogs.length === 0 ? (
+                    <p className="text-slate-500 text-center py-4 font-sans">ไม่มี Syslog จากโหนดนี้</p>
+                  ) : (
+                    nodeLogs.map((log) => (
+                      <div key={log.id} className="text-slate-500 dark:text-slate-400 flex items-start gap-3 border-b border-slate-200 dark:border-white/5 pb-1.5">
+                        <span className="text-blue-600 dark:text-blue-400 shrink-0 font-bold">{log.timestamp}</span>
+                        <span className="text-amber-600 dark:text-amber-400 shrink-0 font-bold">[{log.sourceName}]</span>
+                        <span className={`flex-1 ${log.severityLevel <= 2 ? 'text-rose-600 dark:text-rose-400 font-medium' : 'text-slate-700 dark:text-slate-200'}`}>
+                          {log.message}
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
+
+                <button
+                  onClick={() => onNavigateTab?.('logs')}
+                  className="w-full px-3 py-2 rounded-xl bg-blue-600/15 border border-blue-500/30 text-blue-600 dark:text-blue-300 text-[11px] font-semibold hover:bg-blue-600/25 transition-colors"
+                >
+                  ค้นหา Log ทั้งหมดใน Log Explorer →
+                </button>
               </div>
             )}
 

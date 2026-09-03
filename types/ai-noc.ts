@@ -92,13 +92,74 @@ export interface TopologyEdge {
 
 export interface SyslogEntry {
   id: string;
-  timestamp: string;            // NTP synced
-  sourceId: string;
+  timestamp: string;            // NTP synced (HH:mm:ss)
+  sourceId: string;             // ผูกกับ Hypervisor.id หรือ VirtualMachine.id
   sourceName: string;
-  facility: string;
-  severityLevel: number;        // 0-7
+  sourceIp?: string;
+  facility: string;             // vmkernel, hostd, kernel, pfSense, suricata, graylog ...
+  severityLevel: number;        // 0-7 ตาม RFC 5424
   message: string;
   parsedFields?: Record<string, string>;
+  stream?: LogStreamId;         // Graylog Stream ที่ข้อความนี้ถูกจัดเข้า
+  incidentId?: string;          // ผูกกับ Incident เมื่อเป็นหลักฐานของเหตุการณ์นั้น
+}
+
+// ---------------------------------------------------------------------------
+// Log Explorer (Graylog-backed) — ดู lib/log-source.ts
+// ---------------------------------------------------------------------------
+
+export type LogStreamId =
+  | 'stream-esxi'
+  | 'stream-proxmox'
+  | 'stream-network'
+  | 'stream-app'
+  | 'stream-security'
+  | 'stream-ainoc';
+
+/** ช่วงเวลาย้อนหลังนับจากเวลาอ้างอิงล่าสุดของ Telemetry */
+export type LogTimeRange = '15m' | '1h' | '4h' | 'all';
+
+export interface LogQuery {
+  /** คำค้นแบบข้อความอิสระ ค้นใน message, sourceName และ facility */
+  search: string;
+  /** ระดับความรุนแรงที่เลือก (0-7) — ว่าง = ทุกระดับ */
+  severities: number[];
+  /** sourceId ที่เลือก — ว่าง = ทุกต้นทาง */
+  sources: string[];
+  /** Stream ที่เลือก — ว่าง = ทุก Stream */
+  streams: LogStreamId[];
+  range: LogTimeRange;
+  /** จำกัดเฉพาะ Log ที่ผูกกับ Incident นี้ */
+  incidentId?: string;
+}
+
+/** ตัวเลือกพร้อมจำนวนผลลัพธ์ สำหรับแถบกรองด้านข้าง */
+export interface LogFacet {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export interface LogHistogramBucket {
+  label: string;                // "13:10"
+  count: number;
+  errorCount: number;           // severityLevel <= 3
+}
+
+export interface LogSearchResult {
+  entries: SyslogEntry[];
+  /** จำนวนทั้งหมดในคลัง (ก่อนกรอง) */
+  totalCount: number;
+  /** จำนวนที่ตรงเงื่อนไข */
+  matchedCount: number;
+  histogram: LogHistogramBucket[];
+  sourceFacets: LogFacet[];
+  severityFacets: LogFacet[];
+  streamFacets: LogFacet[];
+  /** เวลาที่ใช้ค้น (จำลอง) */
+  tookMs: number;
+  /** คิวรีรูปแบบ Graylog ที่เทียบเท่ากับเงื่อนไขนี้ */
+  graylogQuery: string;
 }
 
 export interface MetricSample {
@@ -144,6 +205,8 @@ export interface RootCauseStep {
   timestamp: string;
   severity: Severity;
   description: string;
+  /** id ของ SyslogEntry ที่เป็นหลักฐานรองรับขั้นนี้ */
+  logRefs?: string[];
 }
 
 export interface Evidence {
