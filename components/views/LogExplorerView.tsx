@@ -144,7 +144,9 @@ export default function LogExplorerView({
   };
 
   return (
-    <div className="space-y-6 pb-16 animate-in fade-in duration-300">
+    // จอ lg ขึ้นไปรับความสูงที่เหลือจาก main มาเต็ม ๆ (main เป็น flex column ให้แล้ว)
+    // จอเล็กกว่านั้นปล่อยให้สูงตามเนื้อหาและเลื่อนทั้งหน้าตามปกติ
+    <div className="flex flex-col gap-6 pb-6 lg:pb-4 lg:flex-1 lg:min-h-0 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/10 pb-4">
         <div>
@@ -167,23 +169,16 @@ export default function LogExplorerView({
       </div>
 
       {/* แถวหลักของหน้า — คอลัมน์ตัวกรองอยู่ซ้ายมือ ขนาบช่องค้นหา กราฟ และตารางผลลัพธ์
-          บนจอใหญ่กำหนดความสูงของแถวให้พอดีกับพื้นที่ที่เหลือจริง เพื่อให้ทั้งหน้าไม่ต้อง
-          เลื่อน เนื้อหาจึงไม่มีทางมุดใต้ TopBar/StatusBar ที่เป็น fixed และทั้งสองคอลัมน์
-          จบที่เส้นเดียวกัน โดยการ์ดใบล่างสุดของแต่ละฝั่ง (Sources / ตารางผลลัพธ์)
-          เป็นตัวยืดแล้วเลื่อนรายการอยู่ภายในตัวเอง
+          บนจอใหญ่แถวนี้กินความสูงที่เหลือทั้งหมดของหน้า ผ่านสาย flex ที่ต่อกันมาจาก
+          main โดยตรง (main → view root → แถวนี้) จึงไม่มีตัวเลขคงที่ให้ต้องคอยแก้ตาม
+          เวลาปรับ padding หรือขนาดหัวข้อ และทั้งหน้าไม่ต้องเลื่อน เนื้อหาจึงไม่มุดใต้
+          TopBar/StatusBar ที่เป็น fixed
 
-          ที่มาของตัวลบ — ทุกอย่างที่กินความสูงนอกเหนือจากแถวนี้:
-            TopBar (pt-14 ของคอลัมน์เนื้อหา)            56px
-            padding บนของ main (lg:p-8)                 32px
-            บล็อกหัวข้อ + เส้นคั่น                       67px
-            ช่องไฟใต้หัวข้อ (space-y-6)                  24px
-            ระยะขอบท้ายหน้า (pb-16)                     64px
-            padding ล่างของ main (lg:p-8)               32px
-            StatusBar (pb-9 ของคอลัมน์เนื้อหา)           36px
-            รวม 311px → ใช้ 21rem (336px) เผื่อไว้ 25px
-
-          หมายเหตุ: ถ้าแก้ pb ของหน้าหรือขนาดหัวข้อ ต้องแก้ตัวลบตรงนี้ตามด้วย */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[calc(100vh-21rem)] lg:min-h-[420px]">
+          lg:grid-rows-1 บังคับให้แถวเดียวนี้ยืดเต็มความสูงของ grid (ไม่งั้นแถวจะสูง
+          เท่าเนื้อหาแล้วเหลือที่ว่างด้านล่าง) ทั้งสองคอลัมน์จึงจบที่เส้นเดียวกัน
+          โดยการ์ดใบล่างสุดของแต่ละฝั่ง (Sources / ตารางผลลัพธ์) เป็นตัวยืด
+          แล้วเลื่อนรายการอยู่ภายในตัวเอง */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:grid-rows-1 lg:flex-1 lg:min-h-[320px]">
         {/* Left: Facet filters */}
         <aside className="lg:col-span-3 flex flex-col gap-4 lg:h-full">
           {/* Severity */}

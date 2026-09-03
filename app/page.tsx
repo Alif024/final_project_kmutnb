@@ -205,8 +205,12 @@ export default function Page() {
             subtitle="AI Network Operation Center System"
           />
 
-          {/* View Container */}
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          {/* View Container
+              เป็น flex column เพื่อให้ View ที่ต้องการเต็มความสูง (เช่น Log Explorer)
+              ใช้ `lg:flex-1 lg:min-h-0` รับความสูงที่เหลือจริงไปได้เลย ไม่ต้องคำนวณ
+              จาก 100vh เอง — View อื่นที่ไม่ใส่ flex-1 ยังสูงตามเนื้อหาเหมือนเดิม
+              (ห้ามใส่ min-h-0 ที่นี่ ไม่งั้น View ยาว ๆ จะล้นออกนอกจอโดยเลื่อนไม่ได้) */}
+          <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
             {activeTab === 'dashboard' && (
               <DashboardView
                 hypervisors={MOCK_HYPERVISORS}
