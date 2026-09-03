@@ -71,6 +71,42 @@ function toneOf(level: number): string {
 /** จำนวนข้อความสูงสุดที่แสดงต่อหนึ่งหน้าของตารางผลลัพธ์ */
 const PAGE_SIZE = 20;
 
+/**
+ * หัวการ์ดตัวกรอง พร้อมปุ่มล้างเฉพาะของการ์ดใบนั้น
+ * ปุ่มจะโผล่เมื่อการ์ดนั้นมีตัวเลือกที่เลือกอยู่เท่านั้น เพื่อไม่ให้หัวการ์ดรกโดยไม่จำเป็น
+ */
+function FacetCardHeader({
+  icon,
+  title,
+  activeCount,
+  onClear,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  activeCount: number;
+  onClear: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
+      <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 min-w-0">
+        {icon}
+        <span className="truncate">{title}</span>
+      </h3>
+
+      {activeCount > 0 && (
+        <button
+          onClick={onClear}
+          title={`ล้างตัวกรอง ${title}`}
+          className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-slate-500 dark:text-slate-400 border border-transparent hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition-colors"
+        >
+          <X className="w-3 h-3" />
+          ล้าง ({activeCount})
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function LogExplorerView({
   incidentId,
   initialQuery,
@@ -194,10 +230,12 @@ export default function LogExplorerView({
         <aside className="lg:col-span-3 flex flex-col gap-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 lg:pb-1">
           {/* Severity */}
           <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
-            <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
-              <AlertOctagon className="w-4 h-4 text-rose-500" />
-              Severity (RFC 5424)
-            </h3>
+            <FacetCardHeader
+              icon={<AlertOctagon className="w-4 h-4 text-rose-500 shrink-0" />}
+              title="Severity (RFC 5424)"
+              activeCount={query.severities.length}
+              onClear={() => updateQuery((q) => ({ ...q, severities: [] }))}
+            />
             <div className="space-y-1">
               {result.severityFacets.length === 0 && (
                 <p className="text-[11px] text-slate-500 py-2">ไม่มีข้อมูลในเงื่อนไขนี้</p>
@@ -234,10 +272,12 @@ export default function LogExplorerView({
 
           {/* Stream */}
           <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
-            <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
-              <Layers className="w-4 h-4 text-purple-500" />
-              Streams
-            </h3>
+            <FacetCardHeader
+              icon={<Layers className="w-4 h-4 text-purple-500 shrink-0" />}
+              title="Streams"
+              activeCount={query.streams.length}
+              onClear={() => updateQuery((q) => ({ ...q, streams: [] }))}
+            />
             <div className="space-y-1">
               {LOG_STREAMS.map((s) => {
                 const facet = result.streamFacets.find((f) => f.value === s.id);
@@ -267,10 +307,12 @@ export default function LogExplorerView({
 
           {/* Source */}
           <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
-            <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
-              <Server className="w-4 h-4 text-emerald-500" />
-              Sources
-            </h3>
+            <FacetCardHeader
+              icon={<Server className="w-4 h-4 text-emerald-500 shrink-0" />}
+              title="Sources"
+              activeCount={query.sources.length}
+              onClear={() => updateQuery((q) => ({ ...q, sources: [] }))}
+            />
             <div className="space-y-1">
               {result.sourceFacets.length === 0 && (
                 <p className="text-[11px] text-slate-500 py-2">ไม่มีข้อมูลในเงื่อนไขนี้</p>
