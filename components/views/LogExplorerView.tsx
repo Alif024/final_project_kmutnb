@@ -295,10 +295,12 @@ export default function LogExplorerView({
         </div>
       )}
 
-      {/* Facets + Results */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Facets + Results
+          บนจอใหญ่ล็อกความสูงของทั้งแถวไว้ แล้วให้แต่ละคอลัมน์เลื่อนอยู่ภายในตัวเอง
+          ตารางผลการค้นหาจึงยืดเต็มการ์ดเสมอ ไม่เหลือพื้นที่ว่างท้ายกล่อง */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[720px]">
         {/* Left: Facet filters */}
-        <div className="lg:col-span-3 space-y-4">
+        <div className="lg:col-span-3 space-y-4 lg:h-full lg:overflow-y-auto lg:pr-1">
           {/* Severity */}
           <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg">
             <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
@@ -378,7 +380,8 @@ export default function LogExplorerView({
               <Server className="w-4 h-4 text-emerald-500" />
               Sources
             </h3>
-            <div className="space-y-1 max-h-64 overflow-y-auto">
+            {/* ไม่ต้องจำกัดความสูงตรงนี้ เพราะทั้งคอลัมน์เลื่อนอยู่แล้วบนจอใหญ่ */}
+            <div className="space-y-1">
               {result.sourceFacets.length === 0 && (
                 <p className="text-[11px] text-slate-500 py-2">ไม่มีข้อมูลในเงื่อนไขนี้</p>
               )}
@@ -404,8 +407,8 @@ export default function LogExplorerView({
         </div>
 
         {/* Right: Result table */}
-        <div className="lg:col-span-9 bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-white/10">
+        <div className="lg:col-span-9 lg:h-full flex flex-col bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden">
+          <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-white/10">
             <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2">
               <Filter className="w-4 h-4 text-blue-600 dark:text-blue-400" />
               ผลการค้นหา ({rows.length.toLocaleString()} ข้อความ)
@@ -416,7 +419,7 @@ export default function LogExplorerView({
           </div>
 
           {rows.length === 0 ? (
-            <div className="py-16 flex flex-col items-center justify-center gap-2 text-slate-500">
+            <div className="flex-1 py-16 flex flex-col items-center justify-center gap-2 text-slate-500">
               <Database className="w-8 h-8" />
               <p className="text-xs">ไม่พบ Log ที่ตรงกับเงื่อนไข</p>
               <button
@@ -427,7 +430,7 @@ export default function LogExplorerView({
               </button>
             </div>
           ) : (
-            <div className="max-h-[640px] overflow-y-auto divide-y divide-slate-100 dark:divide-white/5">
+            <div className="flex-1 min-h-0 max-h-[640px] lg:max-h-none overflow-y-auto divide-y divide-slate-100 dark:divide-white/5">
               {rows.map((log) => (
                 <LogRow
                   key={log.id}
