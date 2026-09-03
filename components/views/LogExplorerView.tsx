@@ -278,6 +278,10 @@ export default function LogExplorerView({
                     fontSize: 11,
                     color: '#fff',
                   }}
+                  // Recharts ใส่ inline color ให้บรรทัดหัวเรื่องและรายการเอง
+                  // จึงต้องกำหนดสีขาวแยก ไม่งั้นจะกลายเป็นสีเข้มบนพื้นหลังเข้ม
+                  labelStyle={{ color: '#fff', fontWeight: 700 }}
+                  itemStyle={{ color: '#fff' }}
                   formatter={(value) => [value as number, 'จำนวนข้อความ']}
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
