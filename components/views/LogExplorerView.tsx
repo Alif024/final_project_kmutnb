@@ -144,7 +144,7 @@ export default function LogExplorerView({
   };
 
   return (
-    <div className="space-y-6 pb-10 animate-in fade-in duration-300">
+    <div className="space-y-6 pb-16 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/10 pb-4">
         <div>
@@ -167,12 +167,14 @@ export default function LogExplorerView({
       </div>
 
       {/* แถวหลักของหน้า — คอลัมน์ตัวกรองอยู่ซ้ายมือ ขนาบช่องค้นหา กราฟ และตารางผลลัพธ์
-          บนจอใหญ่กำหนดความสูงของแถวให้พอดีกับพื้นที่ที่เหลือจริง คือหักความสูงของ
-          TopBar (56px) + StatusBar (36px) ที่ลอยอยู่ ออกจากความสูงจอ พร้อมระยะขอบ
-          ของ main/หน้า/หัวข้อ รวมเป็น 17rem — ทั้งหน้าจึงไม่ต้องเลื่อน เนื้อหาไม่มุด
-          ใต้แถบสถานะ และทั้งสองคอลัมน์จบที่เส้นเดียวกัน โดยการ์ดใบล่างสุดของแต่ละฝั่ง
-          (Sources / ตารางผลลัพธ์) เป็นตัวยืดแล้วเลื่อนรายการอยู่ภายในตัวเอง */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[calc(100vh-17rem)] lg:min-h-[420px]">
+          บนจอใหญ่กำหนดความสูงของแถวให้พอดีกับพื้นที่ที่เหลือจริง คือหักออกจากความสูงจอ
+          ทั้ง TopBar (56px) + StatusBar (36px) ที่ลอยอยู่ padding ล่างของ main (32px)
+          ระยะขอบท้ายหน้า pb-16 (64px) และบล็อกหัวข้อพร้อมช่องไฟ (~91px) รวมเป็น 18.5rem
+          — ทั้งหน้าจึงไม่ต้องเลื่อน เนื้อหาไม่มุดใต้แถบสถานะ และทั้งสองคอลัมน์จบที่เส้น
+          เดียวกัน โดยการ์ดใบล่างสุดของแต่ละฝั่ง (Sources / ตารางผลลัพธ์) เป็นตัวยืด
+          แล้วเลื่อนรายการอยู่ภายในตัวเอง
+          หมายเหตุ: ถ้าแก้ pb ของหน้า ต้องแก้ตัวลบตรงนี้ให้เท่ากันด้วย */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[calc(100vh-18.5rem)] lg:min-h-[420px]">
         {/* Left: Facet filters */}
         <aside className="lg:col-span-3 flex flex-col gap-4 lg:h-full">
           {/* Severity */}
