@@ -156,7 +156,10 @@ export default function Page() {
   const pendingApprovalCount = approvals.filter((a) => a.status === 'pending').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-[#F8FAFC] font-sans flex flex-col selection:bg-blue-600 selection:text-white relative overflow-x-hidden">
+    // เปลือกแอปสูงเท่าจอพอดีและไม่เลื่อนเอง (h-screen + overflow-hidden)
+    // การเลื่อนทั้งหมดเกิดใน <main> หรือลึกลงไป — TopBar/StatusBar ที่เป็น fixed
+    // จึงไม่มีทางทับเนื้อหา และ View ที่อยากเต็มจอก็รับความสูงที่แน่นอนไปใช้ได้
+    <div className="h-screen bg-slate-50 dark:bg-[#020617] text-[#F8FAFC] font-sans flex flex-col selection:bg-blue-600 selection:text-white relative overflow-hidden">
       {/* Frosted Glass Ambient Glow Background Lights */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-blue-400/10 dark:bg-blue-600/20 rounded-full blur-[130px]"></div>
@@ -164,7 +167,7 @@ export default function Page() {
         <div className="absolute top-[25%] right-[15%] w-[35%] h-[35%] bg-indigo-400/10 dark:bg-indigo-600/15 rounded-full blur-[120px]"></div>
       </div>
 
-      <div className="flex flex-1 min-h-screen relative z-10">
+      <div className="flex flex-1 min-h-0 relative z-10">
         {/* Sidebar */}
         <Sidebar
           activeTab={activeTab}
@@ -178,7 +181,7 @@ export default function Page() {
 
         {/* Main Content Column */}
         <div
-          className={`flex-1 flex flex-col min-w-0 bg-transparent pt-14 pb-9 transition-all duration-300 ${
+          className={`flex-1 flex flex-col min-w-0 min-h-0 bg-transparent pt-14 pb-9 transition-all duration-300 ${
             collapsed ? "ml-[72px]" : "ml-[240px]"
           }`}
         >
@@ -205,12 +208,12 @@ export default function Page() {
             subtitle="AI Network Operation Center System"
           />
 
-          {/* View Container
-              เป็น flex column เพื่อให้ View ที่ต้องการเต็มความสูง (เช่น Log Explorer)
-              ใช้ `lg:flex-1 lg:min-h-0` รับความสูงที่เหลือจริงไปได้เลย ไม่ต้องคำนวณ
-              จาก 100vh เอง — View อื่นที่ไม่ใส่ flex-1 ยังสูงตามเนื้อหาเหมือนเดิม
-              (ห้ามใส่ min-h-0 ที่นี่ ไม่งั้น View ยาว ๆ จะล้นออกนอกจอโดยเลื่อนไม่ได้) */}
-          <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          {/* View Container — เป็นพื้นที่เลื่อนหลักของแอป
+              เพราะเปลือกด้านนอกสูงเท่าจอพอดี main จึงมีความสูงที่แน่นอนเสมอ
+              • View ทั่วไปที่ยาวกว่าจอ จะเลื่อนอยู่ใน main แทนการเลื่อนทั้งหน้า
+              • View ที่อยากเต็มจอ (Log Explorer) ใส่ `lg:flex-1 lg:min-h-0`
+                ที่ตัวเอง แล้วจัดการเลื่อนภายในคอลัมน์ของตัวเอง */}
+          <main className="flex-1 min-h-0 overflow-y-auto flex flex-col p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
             {activeTab === 'dashboard' && (
               <DashboardView
                 hypervisors={MOCK_HYPERVISORS}
