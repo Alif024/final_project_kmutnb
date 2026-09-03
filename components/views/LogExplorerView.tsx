@@ -90,7 +90,9 @@ export default function LogExplorerView({
 
   // ---- การแบ่งหน้าของตารางผลลัพธ์ ----
   const [page, setPage] = useState(0);
-  const listRef = useRef<HTMLDivElement>(null);
+  /** คอลัมน์ขวาเป็นพื้นที่เลื่อนของตัวเองบนจอ lg — ใช้เลื่อนกลับไปหาตารางเมื่อเปลี่ยนหน้า */
+  const rightColumnRef = useRef<HTMLDivElement>(null);
+  const resultsCardRef = useRef<HTMLDivElement>(null);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const pageRows = useMemo(
@@ -98,10 +100,13 @@ export default function LogExplorerView({
     [rows, page]
   );
 
-  /** เลื่อนตารางกลับขึ้นบนสุดและยุบแถวที่กางอยู่ เมื่อชุดผลลัพธ์ที่เห็นเปลี่ยนไป */
-  const resetListView = () => {
+  /**
+   * ยุบแถวที่กางอยู่ แล้วเลื่อนคอลัมน์ขวากลับขึ้นบนสุด
+   * (ใช้ตอนเปลี่ยนเงื่อนไขค้นหา ซึ่งกราฟและตัวเลขสรุปด้านบนก็เปลี่ยนตามไปด้วย)
+   */
+  const resetColumnScroll = () => {
     setExpandedId(null);
-    listRef.current?.scrollTo({ top: 0 });
+    rightColumnRef.current?.scrollTo({ top: 0 });
   };
 
   /**
@@ -111,12 +116,17 @@ export default function LogExplorerView({
   const updateQuery = (next: LogQuery | ((q: LogQuery) => LogQuery)) => {
     setQuery(next);
     setPage(0);
-    resetListView();
+    resetColumnScroll();
   };
 
+  /**
+   * เปลี่ยนหน้า — เลื่อนไปให้หัวตารางอยู่บนสุดของคอลัมน์ ไม่ใช่เลื่อนกลับไปที่ช่องค้นหา
+   * เพราะผู้ใช้กำลังอ่านผลลัพธ์อยู่ ไม่ได้กำลังแก้เงื่อนไข
+   */
   const goToPage = (next: number) => {
     setPage(Math.min(Math.max(next, 0), totalPages - 1));
-    resetListView();
+    setExpandedId(null);
+    resultsCardRef.current?.scrollIntoView({ block: 'start' });
   };
 
   const activeFilterCount =
@@ -181,7 +191,7 @@ export default function LogExplorerView({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:grid-rows-1 lg:flex-1 lg:min-h-[320px]">
         {/* Left: Facet filters — เลื่อนเป็นก้อนเดียวแยกจากคอลัมน์ขวา
             การ์ดทั้งสามใบสูงตามเนื้อหา แล้วให้ทั้งคอลัมน์เป็นพื้นที่เลื่อนของตัวเอง */}
-        <aside className="lg:col-span-3 flex flex-col gap-4 lg:h-full lg:overflow-y-auto lg:pr-1 lg:pb-1">
+        <aside className="lg:col-span-3 flex flex-col gap-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 lg:pb-1">
           {/* Severity */}
           <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
             <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-2 mb-3">
@@ -286,8 +296,12 @@ export default function LogExplorerView({
           </div>
         </aside>
 
-        {/* Right: ช่องค้นหา + กราฟการกระจาย + ตารางผลลัพธ์ */}
-        <div className="lg:col-span-9 flex flex-col gap-6 lg:h-full">
+        {/* Right: ช่องค้นหา + กราฟการกระจาย + ตารางผลลัพธ์
+            เลื่อนเป็นก้อนเดียวแยกจากคอลัมน์ซ้าย การ์ดทั้งสามใบสูงตามเนื้อหา */}
+        <div
+          ref={rightColumnRef}
+          className="lg:col-span-9 flex flex-col gap-6 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 lg:pb-1"
+        >
           {/* Search Bar + Time Range */}
           <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 space-y-3 shadow-lg shrink-0">
             <div className="flex flex-col lg:flex-row lg:items-center gap-3">
@@ -362,7 +376,7 @@ export default function LogExplorerView({
                 onClick={() => {
                   setSortNewestFirst((v) => !v);
                   setPage(0);
-                  resetListView();
+                  resetColumnScroll();
                 }}
                 className="px-2.5 py-1 rounded-lg text-[11px] border bg-slate-100 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               >
@@ -454,7 +468,10 @@ export default function LogExplorerView({
           )}
 
           {/* Result table */}
-          <div className="flex flex-col lg:flex-1 lg:min-h-0 bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden">
+          <div
+            ref={resultsCardRef}
+            className="flex flex-col shrink-0 bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl shadow-lg overflow-hidden"
+          >
             <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-white/10">
               <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2">
                 <Filter className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -478,10 +495,7 @@ export default function LogExplorerView({
                 </button>
               </div>
             ) : (
-              <div
-                ref={listRef}
-                className="max-h-[640px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto pb-2 divide-y divide-slate-100 dark:divide-white/5"
-              >
+              <div className="pb-2 divide-y divide-slate-100 dark:divide-white/5">
                 {pageRows.map((log) => (
                   <LogRow
                     key={log.id}
