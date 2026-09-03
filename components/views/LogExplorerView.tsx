@@ -156,7 +156,7 @@ export default function LogExplorerView({
   return (
     // จอ lg ขึ้นไปรับความสูงที่เหลือจาก main มาเต็ม ๆ (main เป็น flex column ให้แล้ว)
     // จอเล็กกว่านั้นปล่อยให้สูงตามเนื้อหาและเลื่อนทั้งหน้าตามปกติ
-    <div className="flex flex-col gap-6 pb-6 lg:pb-4 lg:flex-1 lg:min-h-0 animate-in fade-in duration-300">
+    <div className="flex flex-col gap-6 pb-6 lg:pb-0 lg:flex-1 lg:min-h-0 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/10 pb-4">
         <div>

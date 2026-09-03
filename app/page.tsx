@@ -213,7 +213,13 @@ export default function Page() {
               • View ทั่วไปที่ยาวกว่าจอ จะเลื่อนอยู่ใน main แทนการเลื่อนทั้งหน้า
               • View ที่อยากเต็มจอ (Log Explorer) ใส่ `lg:flex-1 lg:min-h-0`
                 ที่ตัวเอง แล้วจัดการเลื่อนภายในคอลัมน์ของตัวเอง */}
-          <main className="flex-1 min-h-0 overflow-y-auto flex flex-col p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+          <main
+            className={`flex-1 min-h-0 overflow-y-auto flex flex-col p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto ${
+              // Log Explorer เป็น View เต็มจอที่จัดขอบเอง — ตัด padding ล่างออก
+              // เพื่อให้ก้นคอลัมน์ชิดขอบบนของ StatusBar พอดี
+              activeTab === 'logs' ? 'lg:pb-0' : ''
+            }`}
+          >
             {activeTab === 'dashboard' && (
               <DashboardView
                 hypervisors={MOCK_HYPERVISORS}
