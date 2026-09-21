@@ -3,16 +3,20 @@
 import React, { useRef, useState } from 'react';
 import {
   Cable,
+  Check,
+  Copy,
   Download,
   Maximize2,
   MousePointer2,
+  Pencil,
+  Plus,
   Trash2,
   Upload,
   X,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { DiscoveredDevice, TopologyLayout } from '@/types/ai-noc';
+import { DiscoveredDevice, TopologyDiagram, TopologyLayout } from '@/types/ai-noc';
 import { DEVICE_DRAG_TYPE, deviceIcon, statusDot } from './DeviceInventoryPanel';
 
 /** ขนาดกล่องอุปกรณ์บนผัง ใช้คำนวณจุดกึ่งกลางสำหรับลากเส้นเชื่อม */
@@ -44,6 +48,14 @@ function linkColor(status: 'up' | 'down' | 'degraded'): string {
 interface TopologyBuilderProps {
   devices: DiscoveredDevice[];
   layout: TopologyLayout;
+  /** ผังทั้งหมดที่ผู้ใช้บันทึกไว้ */
+  diagrams: TopologyDiagram[];
+  activeDiagram: TopologyDiagram;
+  onSelectDiagram: (id: string) => void;
+  onCreateDiagram: () => void;
+  onDuplicateDiagram: (id: string) => void;
+  onRenameDiagram: (id: string, name: string) => void;
+  onDeleteDiagram: (id: string) => void;
   selectedDeviceId: string | null;
   onSelectDevice: (deviceId: string | null) => void;
   onAddNode: (deviceId: string, x: number, y: number) => void;
@@ -66,6 +78,13 @@ interface TopologyBuilderProps {
 export default function TopologyBuilder({
   devices,
   layout,
+  diagrams,
+  activeDiagram,
+  onSelectDiagram,
+  onCreateDiagram,
+  onDuplicateDiagram,
+  onRenameDiagram,
+  onDeleteDiagram,
   selectedDeviceId,
   onSelectDevice,
   onAddNode,
@@ -91,6 +110,10 @@ export default function TopologyBuilder({
 
   const [scale, setScale] = useState(1);
   const [connectMode, setConnectMode] = useState(false);
+  /** กำลังแก้ชื่อผังอยู่หรือไม่ — แสดงช่องกรอกแทนตัวเลือกผัง */
+  const [renameValue, setRenameValue] = useState<string | null>(null);
+  /** แสดงแถบยืนยันก่อนลบผัง เพราะลบแล้วย้อนกลับไม่ได้ */
+  const [confirmDelete, setConfirmDelete] = useState(false);
   /** อุปกรณ์ตัวแรกที่ถูกคลิกในโหมดเชื่อมต่อ (รออีกตัวเพื่อปิดเส้น) */
   const [pendingLinkFrom, setPendingLinkFrom] = useState<string | null>(null);
 
@@ -144,6 +167,128 @@ export default function TopologyBuilder({
 
   return (
     <div className="bg-white dark:bg-slate-950/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      {/* แถวเลือกและจัดการผังที่บันทึกไว้ */}
+      <div className="px-3 py-2 border-b border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-2">
+        {confirmDelete ? (
+          <>
+            <span className="text-xs text-slate-900 dark:text-white flex-1 min-w-0">
+              ลบผัง <span className="font-bold">{activeDiagram.name}</span> ถาวรหรือไม่?
+              {activeDiagram.nodes.length > 0 && (
+                <span className="text-slate-500 dark:text-slate-400">
+                  {' '}
+                  (มี {activeDiagram.nodes.length} อุปกรณ์อยู่บนผัง)
+                </span>
+              )}
+            </span>
+            <button
+              onClick={() => {
+                onDeleteDiagram(activeDiagram.id);
+                setConfirmDelete(false);
+              }}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/90 text-white hover:bg-rose-500 transition-colors"
+            >
+              ลบผัง
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+            >
+              ยกเลิก
+            </button>
+          </>
+        ) : renameValue !== null ? (
+          <>
+            <input
+              autoFocus
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  onRenameDiagram(activeDiagram.id, renameValue);
+                  setRenameValue(null);
+                }
+                if (e.key === 'Escape') setRenameValue(null);
+              }}
+              className="flex-1 min-w-0 bg-white dark:bg-slate-950/60 border border-blue-500/50 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none"
+              placeholder="ชื่อผัง"
+            />
+            <button
+              onClick={() => {
+                onRenameDiagram(activeDiagram.id, renameValue);
+                setRenameValue(null);
+              }}
+              className="p-1.5 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+              title="บันทึกชื่อ"
+            >
+              <Check className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setRenameValue(null)}
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+              title="ยกเลิก"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 shrink-0">
+              ผัง
+            </span>
+            <select
+              value={activeDiagram.id}
+              onChange={(e) => onSelectDiagram(e.target.value)}
+              className="flex-1 min-w-[160px] max-w-xs bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-blue-500/50"
+            >
+              {diagrams.map((d) => (
+                <option
+                  key={d.id}
+                  value={d.id}
+                  className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white"
+                >
+                  {d.name} ({d.nodes.length} อุปกรณ์)
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => setRenameValue(activeDiagram.name)}
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+              title="เปลี่ยนชื่อผังนี้"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => onDuplicateDiagram(activeDiagram.id)}
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+              title="ทำสำเนาผังนี้"
+            >
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+              title="ลบผังนี้"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="flex-1" />
+
+            <button
+              onClick={onCreateDiagram}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5"
+              title="สร้างผังใบใหม่"
+            >
+              <Plus className="w-3.5 h-3.5" /> ผังใหม่
+            </button>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 shrink-0">
+              บันทึกแล้ว {diagrams.length} ผัง
+            </span>
+          </>
+        )}
+      </div>
+
       {/* แถบเครื่องมือของผัง */}
       <div className="p-3 border-b border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-2">
         <button
@@ -228,9 +373,9 @@ export default function TopologyBuilder({
           onClick={onClear}
           disabled={layout.nodes.length === 0}
           className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-300 hover:bg-rose-500/20 transition-colors flex items-center gap-1.5 disabled:opacity-40"
-          title="ล้างผังทั้งหมด"
+          title="เอาอุปกรณ์และเส้นเชื่อมทั้งหมดออกจากผังนี้ (ไม่ได้ลบตัวผัง)"
         >
-          <Trash2 className="w-3.5 h-3.5" /> ล้างผัง
+          <Trash2 className="w-3.5 h-3.5" /> ล้างอุปกรณ์
         </button>
       </div>
 

@@ -1,10 +1,16 @@
 'use client';
 
 import { useCallback, useSyncExternalStore } from 'react';
-import { TopologyLayout, TopologyLayoutLink, TopologyLayoutNode } from '@/types/ai-noc';
+import {
+  TopologyDiagram,
+  TopologyLayout,
+  TopologyLayoutLink,
+  TopologyLayoutNode,
+  TopologyWorkspace,
+} from '@/types/ai-noc';
 
 /**
- * เก็บผัง Topology ที่ผู้ใช้ลากวางเอง
+ * เก็บผัง Topology ที่ผู้ใช้ลากวางเอง — บันทึกได้หลายผัง
  *
  * ระบบยังไม่มีฐานข้อมูล จึงเก็บลง `localStorage` เพื่อให้ผังที่วาดไว้ไม่หาย
  * เมื่อรีเฟรชหน้าหรือสลับแท็บ (View ถูก unmount ทุกครั้งที่เปลี่ยนแท็บ)
@@ -18,15 +24,28 @@ import { TopologyLayout, TopologyLayoutLink, TopologyLayoutNode } from '@/types/
  * แล้วค่อยสลับมาใช้ค่าจริงจาก localStorage ให้อัตโนมัติหลัง Hydrate เสร็จ
  */
 
-const STORAGE_KEY = 'ai-noc:topology-layout';
+/** คลังผังหลายใบ (รูปแบบปัจจุบัน) */
+const STORAGE_KEY = 'ai-noc:topology-workspace';
+/** ผังเดียวแบบเดิม — อ่านครั้งเดียวเพื่อย้ายข้อมูลเก่าเข้าคลังใหม่ */
+const LEGACY_STORAGE_KEY = 'ai-noc:topology-layout';
+
+const DEFAULT_DIAGRAM_NAME = 'ผังที่ 1';
+
+function newId(): string {
+  return `diagram-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
 export function createEmptyLayout(): TopologyLayout {
   return { version: 1, nodes: [], links: [], updatedAt: '' };
 }
 
+function createDiagramRecord(name: string, nodes: TopologyLayoutNode[] = [], links: TopologyLayoutLink[] = []): TopologyDiagram {
+  return { id: newId(), name, nodes, links, updatedAt: new Date().toISOString() };
+}
+
 /**
- * ตรวจรูปร่างข้อมูลก่อนนำมาใช้ — ทั้งของจาก localStorage ที่อาจค้างจากเวอร์ชันเก่า
- * และไฟล์ที่ผู้ใช้ Import เข้ามาเอง ซึ่งอาจไม่ใช่ผังของระบบนี้
+ * ตรวจรูปร่างข้อมูลของผังหนึ่งใบก่อนนำมาใช้ — ทั้งของจาก localStorage
+ * ที่อาจค้างจากเวอร์ชันเก่า และไฟล์ที่ผู้ใช้ Import เข้ามาเอง ซึ่งอาจไม่ใช่ผังของระบบนี้
  */
 export function parseLayout(raw: unknown): TopologyLayout | null {
   if (typeof raw !== 'object' || raw === null) return null;
@@ -34,8 +53,25 @@ export function parseLayout(raw: unknown): TopologyLayout | null {
   if (candidate.version !== 1) return null;
   if (!Array.isArray(candidate.nodes) || !Array.isArray(candidate.links)) return null;
 
+  const { nodes, links } = sanitizeGraph(candidate.nodes, candidate.links);
+
+  return {
+    version: 1,
+    name: typeof candidate.name === 'string' && candidate.name.trim() ? candidate.name.trim() : undefined,
+    nodes,
+    links,
+    updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : '',
+  };
+}
+
+/** คัดเฉพาะกล่องและเส้นที่ข้อมูลครบถ้วน และตัดเส้นที่ชี้ไปยังกล่องซึ่งไม่อยู่บนผังแล้ว */
+function sanitizeGraph(
+  rawNodes: unknown[],
+  rawLinks: unknown[]
+): { nodes: TopologyLayoutNode[]; links: TopologyLayoutLink[] } {
   const nodes: TopologyLayoutNode[] = [];
-  for (const n of candidate.nodes) {
+  for (const raw of rawNodes) {
+    const n = raw as Partial<TopologyLayoutNode>;
     if (
       typeof n?.deviceId === 'string' &&
       typeof n?.x === 'number' &&
@@ -49,7 +85,8 @@ export function parseLayout(raw: unknown): TopologyLayout | null {
 
   const nodeIds = new Set(nodes.map((n) => n.deviceId));
   const links: TopologyLayoutLink[] = [];
-  for (const l of candidate.links) {
+  for (const raw of rawLinks) {
+    const l = raw as Partial<TopologyLayoutLink>;
     if (
       typeof l?.id === 'string' &&
       typeof l?.source === 'string' &&
@@ -68,25 +105,53 @@ export function parseLayout(raw: unknown): TopologyLayout | null {
     }
   }
 
-  return {
-    version: 1,
-    nodes,
-    links,
-    updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : '',
-  };
+  return { nodes, links };
+}
+
+function parseWorkspace(raw: unknown): TopologyWorkspace | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const candidate = raw as Partial<TopologyWorkspace>;
+  if (candidate.version !== 2 || !Array.isArray(candidate.diagrams)) return null;
+
+  const diagrams: TopologyDiagram[] = [];
+  for (const raw of candidate.diagrams) {
+    const d = raw as Partial<TopologyDiagram>;
+    if (typeof d?.id !== 'string' || typeof d?.name !== 'string') continue;
+    if (!Array.isArray(d.nodes) || !Array.isArray(d.links)) continue;
+    const { nodes, links } = sanitizeGraph(d.nodes, d.links);
+    diagrams.push({
+      id: d.id,
+      name: d.name,
+      nodes,
+      links,
+      updatedAt: typeof d.updatedAt === 'string' ? d.updatedAt : '',
+    });
+  }
+
+  if (diagrams.length === 0) return null;
+  const activeId =
+    typeof candidate.activeId === 'string' && diagrams.some((d) => d.id === candidate.activeId)
+      ? candidate.activeId
+      : diagrams[0].id;
+
+  return { version: 2, diagrams, activeId };
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   คลังข้อมูลระดับโมดูล — มีผังเดียวทั้งแอป จึงไม่ต้องแยกตาม Component
+   คลังข้อมูลระดับโมดูล — มีคลังผังเดียวทั้งแอป จึงไม่ต้องแยกตาม Component
    ────────────────────────────────────────────────────────────────────────── */
 
 /**
  * ค่าที่ใช้ตอน Server Render และตอน Hydrate ต้องเป็นอ็อบเจกต์ตัวเดิมเสมอ
  * ไม่งั้น React จะมองว่าค่าเปลี่ยนทุกครั้งแล้ว render ไม่รู้จบ
  */
-const EMPTY_LAYOUT: TopologyLayout = createEmptyLayout();
+const EMPTY_WORKSPACE: TopologyWorkspace = {
+  version: 2,
+  diagrams: [{ id: 'diagram-initial', name: DEFAULT_DIAGRAM_NAME, nodes: [], links: [], updatedAt: '' }],
+  activeId: 'diagram-initial',
+};
 
-let cachedLayout: TopologyLayout = EMPTY_LAYOUT;
+let cachedWorkspace: TopologyWorkspace = EMPTY_WORKSPACE;
 let readFromStorage = false;
 const listeners = new Set<() => void>();
 
@@ -94,28 +159,42 @@ function emitChange(): void {
   listeners.forEach((listener) => listener());
 }
 
-function loadFromStorage(): TopologyLayout {
+/** ย้ายผังเดียวแบบเดิมเข้าคลังใหม่ เพื่อไม่ให้ผังที่ผู้ใช้วาดไว้ก่อนหน้านี้หายไป */
+function migrateLegacyLayout(): TopologyWorkspace | null {
+  try {
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!legacy) return null;
+    const parsed = parseLayout(JSON.parse(legacy));
+    if (!parsed || parsed.nodes.length === 0) return null;
+    const diagram = createDiagramRecord(parsed.name ?? DEFAULT_DIAGRAM_NAME, parsed.nodes, parsed.links);
+    return { version: 2, diagrams: [diagram], activeId: diagram.id };
+  } catch {
+    return null;
+  }
+}
+
+function loadFromStorage(): TopologyWorkspace {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return EMPTY_LAYOUT;
-    return parseLayout(JSON.parse(stored)) ?? EMPTY_LAYOUT;
+    if (stored) return parseWorkspace(JSON.parse(stored)) ?? EMPTY_WORKSPACE;
+    return migrateLegacyLayout() ?? EMPTY_WORKSPACE;
   } catch {
-    // localStorage ใช้ไม่ได้ (โหมดส่วนตัว) หรือข้อมูลเสีย — เริ่มจากผังว่าง
-    return EMPTY_LAYOUT;
+    // localStorage ใช้ไม่ได้ (โหมดส่วนตัว) หรือข้อมูลเสีย — เริ่มจากคลังว่าง
+    return EMPTY_WORKSPACE;
   }
 }
 
-function getSnapshot(): TopologyLayout {
+function getSnapshot(): TopologyWorkspace {
   // อ่านจาก localStorage ครั้งเดียวตอนถูกเรียกครั้งแรกบน Client
   if (!readFromStorage) {
-    cachedLayout = loadFromStorage();
+    cachedWorkspace = loadFromStorage();
     readFromStorage = true;
   }
-  return cachedLayout;
+  return cachedWorkspace;
 }
 
-function getServerSnapshot(): TopologyLayout {
-  return EMPTY_LAYOUT;
+function getServerSnapshot(): TopologyWorkspace {
+  return EMPTY_WORKSPACE;
 }
 
 function subscribe(listener: () => void): () => void {
@@ -124,7 +203,7 @@ function subscribe(listener: () => void): () => void {
   // ผู้ใช้อาจเปิดระบบไว้หลายแท็บ — ซิงก์ผังให้ตรงกันเมื่ออีกแท็บบันทึกทับ
   const onStorage = (e: StorageEvent) => {
     if (e.key !== STORAGE_KEY) return;
-    cachedLayout = loadFromStorage();
+    cachedWorkspace = loadFromStorage();
     emitChange();
   };
   window.addEventListener('storage', onStorage);
@@ -135,9 +214,8 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-/** เขียนผังใหม่ทั้งก้อน พร้อมบันทึกลง localStorage แล้วแจ้งผู้ที่ subscribe อยู่ */
-function writeLayout(next: TopologyLayout): void {
-  cachedLayout = next;
+function writeWorkspace(next: TopologyWorkspace): void {
+  cachedWorkspace = next;
   readFromStorage = true;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -147,46 +225,65 @@ function writeLayout(next: TopologyLayout): void {
   emitChange();
 }
 
-/** อัปเดตแบบอ้างอิงค่าเดิม พร้อมประทับเวลาแก้ไขล่าสุดให้เสมอ */
-function updateLayout(
-  updater: (prev: TopologyLayout) => Omit<TopologyLayout, 'version' | 'updatedAt'> | null
+/** แก้เฉพาะผังที่เปิดอยู่ พร้อมประทับเวลาแก้ไขล่าสุดให้เสมอ */
+function updateActiveDiagram(
+  updater: (active: TopologyDiagram) => Pick<TopologyDiagram, 'nodes' | 'links'> | null
 ): void {
-  const next = updater(getSnapshot());
+  const ws = getSnapshot();
+  const active = ws.diagrams.find((d) => d.id === ws.activeId);
+  if (!active) return;
+  const next = updater(active);
   if (!next) return;
-  writeLayout({ version: 1, ...next, updatedAt: new Date().toISOString() });
+  writeWorkspace({
+    ...ws,
+    diagrams: ws.diagrams.map((d) =>
+      d.id === active.id ? { ...d, ...next, updatedAt: new Date().toISOString() } : d
+    ),
+  });
+}
+
+/** ตั้งชื่อที่ยังไม่ถูกใช้ เช่น "ผังที่ 2", "ผังที่ 3" */
+function nextDiagramName(existing: TopologyDiagram[]): string {
+  for (let i = existing.length + 1; ; i++) {
+    const name = `ผังที่ ${i}`;
+    if (!existing.some((d) => d.name === name)) return name;
+  }
 }
 
 export function useTopologyLayout() {
-  const layout = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const workspace = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  const activeDiagram =
+    workspace.diagrams.find((d) => d.id === workspace.activeId) ?? workspace.diagrams[0];
 
   /** วางอุปกรณ์ลงผัง — อุปกรณ์เดิมที่อยู่บนผังแล้วจะไม่ถูกเพิ่มซ้ำ */
   const addNode = useCallback((deviceId: string, x: number, y: number) => {
-    updateLayout((prev) => {
-      if (prev.nodes.some((n) => n.deviceId === deviceId)) return null;
-      return { nodes: [...prev.nodes, { deviceId, x, y }], links: prev.links };
+    updateActiveDiagram((active) => {
+      if (active.nodes.some((n) => n.deviceId === deviceId)) return null;
+      return { nodes: [...active.nodes, { deviceId, x, y }], links: active.links };
     });
   }, []);
 
   const moveNode = useCallback((deviceId: string, x: number, y: number) => {
-    updateLayout((prev) => ({
-      nodes: prev.nodes.map((n) => (n.deviceId === deviceId ? { ...n, x, y } : n)),
-      links: prev.links,
+    updateActiveDiagram((active) => ({
+      nodes: active.nodes.map((n) => (n.deviceId === deviceId ? { ...n, x, y } : n)),
+      links: active.links,
     }));
   }, []);
 
   /** เอาอุปกรณ์ออกจากผัง พร้อมลบเส้นเชื่อมที่ผูกกับอุปกรณ์นั้นทั้งหมด */
   const removeNode = useCallback((deviceId: string) => {
-    updateLayout((prev) => ({
-      nodes: prev.nodes.filter((n) => n.deviceId !== deviceId),
-      links: prev.links.filter((l) => l.source !== deviceId && l.target !== deviceId),
+    updateActiveDiagram((active) => ({
+      nodes: active.nodes.filter((n) => n.deviceId !== deviceId),
+      links: active.links.filter((l) => l.source !== deviceId && l.target !== deviceId),
     }));
   }, []);
 
   /** เชื่อมอุปกรณ์สองตัว — กันเส้นซ้ำ (รวมทิศกลับกัน) และกันเชื่อมเข้าตัวเอง */
   const addLink = useCallback((source: string, target: string) => {
-    updateLayout((prev) => {
+    updateActiveDiagram((active) => {
       if (source === target) return null;
-      const duplicated = prev.links.some(
+      const duplicated = active.links.some(
         (l) =>
           (l.source === source && l.target === target) ||
           (l.source === target && l.target === source)
@@ -198,33 +295,105 @@ export function useTopologyLayout() {
         target,
         linkStatus: 'up',
       };
-      return { nodes: prev.nodes, links: [...prev.links, link] };
+      return { nodes: active.nodes, links: [...active.links, link] };
     });
   }, []);
 
   const removeLink = useCallback((linkId: string) => {
-    updateLayout((prev) => ({
-      nodes: prev.nodes,
-      links: prev.links.filter((l) => l.id !== linkId),
+    updateActiveDiagram((active) => ({
+      nodes: active.nodes,
+      links: active.links.filter((l) => l.id !== linkId),
     }));
   }, []);
 
+  /** ล้างเฉพาะเนื้อหาของผังที่เปิดอยู่ ไม่ได้ลบตัวผังทิ้ง */
   const clearLayout = useCallback(() => {
-    writeLayout(createEmptyLayout());
+    updateActiveDiagram(() => ({ nodes: [], links: [] }));
   }, []);
 
-  const replaceLayout = useCallback((next: TopologyLayout) => {
-    writeLayout({ ...next, updatedAt: new Date().toISOString() });
+  /* ── จัดการผังหลายใบ ────────────────────────────────────────────────── */
+
+  const selectDiagram = useCallback((id: string) => {
+    const ws = getSnapshot();
+    if (!ws.diagrams.some((d) => d.id === id) || ws.activeId === id) return;
+    writeWorkspace({ ...ws, activeId: id });
+  }, []);
+
+  /** สร้างผังใหม่แล้วเปิดผังนั้นทันที */
+  const createDiagram = useCallback((name?: string) => {
+    const ws = getSnapshot();
+    const diagram = createDiagramRecord(name?.trim() || nextDiagramName(ws.diagrams));
+    writeWorkspace({ ...ws, diagrams: [...ws.diagrams, diagram], activeId: diagram.id });
+  }, []);
+
+  /** ทำสำเนาผัง เพื่อลองปรับผังแบบใหม่โดยไม่แตะของเดิม */
+  const duplicateDiagram = useCallback((id: string) => {
+    const ws = getSnapshot();
+    const source = ws.diagrams.find((d) => d.id === id);
+    if (!source) return;
+    const copy = createDiagramRecord(`${source.name} (สำเนา)`, source.nodes, source.links);
+    writeWorkspace({ ...ws, diagrams: [...ws.diagrams, copy], activeId: copy.id });
+  }, []);
+
+  const renameDiagram = useCallback((id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const ws = getSnapshot();
+    writeWorkspace({
+      ...ws,
+      diagrams: ws.diagrams.map((d) => (d.id === id ? { ...d, name: trimmed } : d)),
+    });
+  }, []);
+
+  /** ลบผัง — ถ้าลบใบสุดท้ายจะสร้างผังว่างใบใหม่ให้แทน เพื่อให้มีผังเปิดอยู่เสมอ */
+  const deleteDiagram = useCallback((id: string) => {
+    const ws = getSnapshot();
+    const remaining = ws.diagrams.filter((d) => d.id !== id);
+    if (remaining.length === 0) {
+      const fresh = createDiagramRecord(DEFAULT_DIAGRAM_NAME);
+      writeWorkspace({ version: 2, diagrams: [fresh], activeId: fresh.id });
+      return;
+    }
+    writeWorkspace({
+      ...ws,
+      diagrams: remaining,
+      activeId: ws.activeId === id ? remaining[0].id : ws.activeId,
+    });
+  }, []);
+
+  /** นำผังจากไฟล์เข้ามาเป็น "ผังใบใหม่" เสมอ ไม่เขียนทับผังที่เปิดอยู่ */
+  const importDiagram = useCallback((layout: TopologyLayout) => {
+    const ws = getSnapshot();
+    const diagram = createDiagramRecord(
+      layout.name?.trim() || nextDiagramName(ws.diagrams),
+      layout.nodes,
+      layout.links
+    );
+    writeWorkspace({ ...ws, diagrams: [...ws.diagrams, diagram], activeId: diagram.id });
   }, []);
 
   return {
-    layout,
+    diagrams: workspace.diagrams,
+    activeDiagram,
+    /** เนื้อหาของผังที่เปิดอยู่ ในรูปแบบไฟล์ Export */
+    layout: {
+      version: 1 as const,
+      name: activeDiagram.name,
+      nodes: activeDiagram.nodes,
+      links: activeDiagram.links,
+      updatedAt: activeDiagram.updatedAt,
+    } satisfies TopologyLayout,
     addNode,
     moveNode,
     removeNode,
     addLink,
     removeLink,
     clearLayout,
-    replaceLayout,
+    selectDiagram,
+    createDiagram,
+    duplicateDiagram,
+    renameDiagram,
+    deleteDiagram,
+    importDiagram,
   };
 }

@@ -413,10 +413,32 @@ export interface TopologyLayoutLink {
   label?: string;
 }
 
+/** ผังหนึ่งใบ — ใช้เป็นทั้งรูปแบบไฟล์ Export และเนื้อหาของผังที่กำลังแก้ไขอยู่ */
 export interface TopologyLayout {
   /** ใช้ตรวจความเข้ากันได้ตอนอ่านจาก localStorage หรือไฟล์ที่ Import เข้ามา */
   version: 1;
+  /** ชื่อผัง — ไฟล์ที่ Export จากเวอร์ชันก่อนหน้าไม่มีฟิลด์นี้ จึงเป็นตัวเลือก */
+  name?: string;
   nodes: TopologyLayoutNode[];
   links: TopologyLayoutLink[];
   updatedAt: string;
+}
+
+/** ผังหนึ่งใบที่ถูกบันทึกไว้ในระบบ (มีชื่อและรหัสประจำผัง) */
+export interface TopologyDiagram {
+  id: string;
+  name: string;
+  nodes: TopologyLayoutNode[];
+  links: TopologyLayoutLink[];
+  updatedAt: string;
+}
+
+/**
+ * คลังผังทั้งหมดของผู้ใช้ — เก็บได้หลายผังและจำว่ากำลังเปิดผังไหนอยู่
+ * เช่น แยกผังตามอาคาร ตามวง VLAN หรือเก็บผัง "ก่อน/หลัง" การปรับปรุงระบบ
+ */
+export interface TopologyWorkspace {
+  version: 2;
+  diagrams: TopologyDiagram[];
+  activeId: string;
 }

@@ -82,8 +82,13 @@ matches devices to records falls back to matching by name.
 the diagram reflects real cabling as the operator knows it, not a guess. Discovered devices sit
 in the inventory until dragged onto the canvas.
 
-`hooks/use-topology-layout.ts` holds the layout in a module-level store exposed through
-`useSyncExternalStore`, persisted to `localStorage`. It is deliberately **not** `useState` +
+`hooks/use-topology-layout.ts` holds a **workspace of several named diagrams** (schema
+`version: 2` under `ai-noc:topology-workspace`) in a module-level store exposed through
+`useSyncExternalStore`, persisted to `localStorage`. Mutations apply to the active diagram only.
+A single-layout `version: 1` value left at the old key `ai-noc:topology-layout` is migrated into
+the workspace on first read, so keep that path when changing the schema again. There is always at
+least one diagram — deleting the last one creates a fresh empty replacement — so `activeDiagram`
+is never null. Import always adds a **new** diagram rather than overwriting the open one. It is deliberately **not** `useState` +
 `useEffect`: reading localStorage during render breaks hydration, and reading it in an effect
 trips `react-hooks/set-state-in-effect` (an error, not a warning, in this ESLint config) while
 causing a cascading render. `getServerSnapshot` returns a shared frozen empty layout — it must

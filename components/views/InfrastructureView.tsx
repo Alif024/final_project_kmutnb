@@ -146,11 +146,14 @@ export default function InfrastructureView({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ai-noc-topology-${new Date().toISOString().slice(0, 10)}.json`;
+    // ใส่ชื่อผังลงในชื่อไฟล์ เพื่อให้แยกไฟล์ของแต่ละผังออกจากกันได้
+    const safeName = topology.activeDiagram.name.replace(/[\\/:*?"<>|]/g, '-').trim();
+    a.download = `ai-noc-topology-${safeName}-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
+  /** นำผังจากไฟล์เข้ามาเป็นผังใบใหม่เสมอ เพื่อไม่ให้ทับผังที่เปิดอยู่ */
   const importLayout = async (file: File) => {
     try {
       const parsed = parseLayout(JSON.parse(await file.text()));
@@ -158,7 +161,8 @@ export default function InfrastructureView({
         setImportError('ไฟล์นี้ไม่ใช่ผัง Topology ของ AI-NOC (รูปแบบไม่ถูกต้อง)');
         return;
       }
-      topology.replaceLayout(parsed);
+      topology.importDiagram(parsed);
+      setSelectedDeviceId(null);
       setImportError(undefined);
     } catch {
       setImportError('อ่านไฟล์ไม่สำเร็จ — ต้องเป็นไฟล์ JSON ที่ Export จากระบบนี้');
@@ -263,7 +267,12 @@ export default function InfrastructureView({
           )}
 
           {/* คลังอุปกรณ์ที่ตรวจพบ (ซ้าย) + พื้นที่วาดผังที่ผู้ใช้สร้างเอง (ขวา) */}
-          <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-4 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-4">
+            {/* ครอบด้วยกล่องตำแหน่งสัมพัทธ์ แล้วให้คลังอุปกรณ์ลอยเต็มกล่อง
+                ความสูงของแถวจึงถูกกำหนดโดยพื้นที่วาดฝั่งขวาเพียงอย่างเดียว
+                ไม่ใช่โดยจำนวนอุปกรณ์ในคลัง (จอเล็กกว่า lg ยังไหลตามปกติ) */}
+            <div className="relative">
+              <div className="lg:absolute lg:inset-0 lg:flex">
             <DeviceInventoryPanel
               devices={discoveredDevices}
               sources={discoverySources}
@@ -273,10 +282,29 @@ export default function InfrastructureView({
               onRefresh={loadDevices}
               onAddDevice={addDeviceToCanvas}
             />
+              </div>
+            </div>
 
             <TopologyBuilder
               devices={discoveredDevices}
               layout={topology.layout}
+              diagrams={topology.diagrams}
+              activeDiagram={topology.activeDiagram}
+              onSelectDiagram={(id) => {
+                topology.selectDiagram(id);
+                // อุปกรณ์ที่เลือกไว้อาจไม่มีอยู่ในผังใบใหม่ จึงล้างการเลือกทิ้ง
+                setSelectedDeviceId(null);
+              }}
+              onCreateDiagram={() => {
+                topology.createDiagram();
+                setSelectedDeviceId(null);
+              }}
+              onDuplicateDiagram={topology.duplicateDiagram}
+              onRenameDiagram={topology.renameDiagram}
+              onDeleteDiagram={(id) => {
+                topology.deleteDiagram(id);
+                setSelectedDeviceId(null);
+              }}
               selectedDeviceId={selectedDeviceId}
               onSelectDevice={setSelectedDeviceId}
               onAddNode={topology.addNode}

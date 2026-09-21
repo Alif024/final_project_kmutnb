@@ -115,7 +115,7 @@ export default function DeviceInventoryPanel({
   const remaining = filtered.filter((d) => !placedIds.has(d.id)).length;
 
   return (
-    <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col shadow-lg overflow-hidden max-h-[644px]">
+    <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl flex flex-col shadow-lg overflow-hidden h-full">
       {/* หัวการ์ด */}
       <div className="p-4 border-b border-slate-200 dark:border-white/10 space-y-3">
         <div className="flex items-center justify-between gap-2">
