@@ -17,6 +17,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { DiscoveredDevice, TopologyDiagram, TopologyLayout } from '@/types/ai-noc';
+import { InterfacePeer } from '@/lib/interface-map';
 import { LinkVerification, VERDICT_COLOR, VERDICT_LABEL } from '@/lib/link-verification';
 import { DEVICE_DRAG_TYPE, deviceIcon, statusDot } from './DeviceInventoryPanel';
 
@@ -54,6 +55,8 @@ interface TopologyBuilderProps {
   activeDiagram: TopologyDiagram;
   /** ผลตรวจสอบเส้นเชื่อมเทียบกับ LLDP/CDP ค้นด้วย id ของเส้น */
   linkVerifications: Map<string, LinkVerification>;
+  /** พอร์ตของแต่ละอุปกรณ์ว่าต่อกับเครื่องไหน ใช้แสดงตอนชี้เมาส์ที่กล่อง */
+  interfacePeers: Map<string, InterfacePeer[]>;
   onSelectDiagram: (id: string) => void;
   onCreateDiagram: () => void;
   onDuplicateDiagram: (id: string) => void;
@@ -84,6 +87,7 @@ export default function TopologyBuilder({
   diagrams,
   activeDiagram,
   linkVerifications,
+  interfacePeers,
   onSelectDiagram,
   onCreateDiagram,
   onDuplicateDiagram,
@@ -120,6 +124,8 @@ export default function TopologyBuilder({
   const [confirmDelete, setConfirmDelete] = useState(false);
   /** อุปกรณ์ตัวแรกที่ถูกคลิกในโหมดเชื่อมต่อ (รออีกตัวเพื่อปิดเส้น) */
   const [pendingLinkFrom, setPendingLinkFrom] = useState<string | null>(null);
+  /** กล่องที่กำลังถูกลากอยู่ — ซ่อน tooltip ไว้ก่อนเพื่อไม่ให้บังพื้นที่วาง */
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const deviceMap = new Map(devices.map((d) => [d.id, d]));
 
@@ -479,7 +485,7 @@ export default function TopologyBuilder({
               <div
                 key={node.deviceId}
                 style={{ left: node.x, top: node.y, width: NODE_W, height: NODE_H }}
-                className={`absolute rounded-xl border-2 px-2.5 py-2 flex items-center gap-2 select-none transition-colors ${
+                className={`group absolute rounded-xl border-2 px-2.5 py-2 flex items-center gap-2 select-none transition-colors ${
                   connectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'
                 } ${
                   isPending
@@ -518,6 +524,7 @@ export default function TopologyBuilder({
                   ) {
                     return;
                   }
+                  if (!drag.moved) setDraggingId(node.deviceId);
                   drag.moved = true;
                   const p = toCanvasPoint(e.clientX, e.clientY);
                   onMoveNode(
@@ -529,6 +536,7 @@ export default function TopologyBuilder({
                 onPointerUp={(e) => {
                   const drag = dragRef.current;
                   dragRef.current = null;
+                  if (drag?.moved) setDraggingId(null);
                   if (e.currentTarget.hasPointerCapture(e.pointerId)) {
                     e.currentTarget.releasePointerCapture(e.pointerId);
                   }
@@ -553,6 +561,41 @@ export default function TopologyBuilder({
                     {device ? device.ipAddress || '—' : 'ไม่พบในผลการค้นหาล่าสุด'}
                   </p>
                 </div>
+
+                {/* รายการพอร์ตของอุปกรณ์ตัวนี้ โผล่เมื่อชี้เมาส์ที่กล่อง
+                    ตั้งใจไม่ใส่สถานะ up/down เพราะสีของเส้นบนผังบอกไว้แล้ว */}
+                {draggingId !== node.deviceId && (
+                  <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-30 w-max max-w-[280px] pointer-events-none rounded-xl border border-slate-200 dark:border-white/15 bg-white dark:bg-slate-900 shadow-xl p-2.5 space-y-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      พอร์ตที่เชื่อมต่อ
+                    </p>
+                    {(interfacePeers.get(node.deviceId) ?? []).length === 0 ? (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        ยังไม่มีข้อมูลว่าพอร์ตไหนต่อกับอะไร
+                      </p>
+                    ) : (
+                      <div className="space-y-1">
+                        {(interfacePeers.get(node.deviceId) ?? []).map((entry) => (
+                          <div key={entry.port} className="flex items-baseline gap-1.5 text-[11px]">
+                            <span className="font-mono font-bold text-slate-900 dark:text-white shrink-0">
+                              {entry.port}
+                            </span>
+                            <span className="text-slate-400 dark:text-slate-500 shrink-0">→</span>
+                            <span className="text-slate-700 dark:text-slate-200 break-all">
+                              {entry.peerName}
+                              {entry.peerPort && (
+                                <span className="font-mono text-slate-500 dark:text-slate-400">
+                                  {' '}
+                                  ({entry.peerPort})
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <button
                   // กล่องแม่จับ pointer ไว้ตอน pointerdown เพื่อใช้ลากย้ายตำแหน่ง

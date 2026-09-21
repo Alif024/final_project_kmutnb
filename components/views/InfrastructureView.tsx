@@ -38,6 +38,7 @@ import {
 import DeviceInventoryPanel from '@/components/DeviceInventoryPanel';
 import TopologyBuilder from '@/components/TopologyBuilder';
 import { parseLayout, useTopologyLayout } from '@/hooks/use-topology-layout';
+import { buildInterfacePeers } from '@/lib/interface-map';
 import { verifyLinks } from '@/lib/link-verification';
 
 interface InfrastructureViewProps {
@@ -248,6 +249,13 @@ export default function InfrastructureView({
    * ตรวจทุกเส้นบนผังที่เปิดอยู่เทียบกับ LLDP/CDP เพื่อกำหนดสีเส้นบนพื้นที่วาด
    * คำนวณที่นี่เพราะเป็นจุดเดียวที่มีครบทั้งผัง อุปกรณ์ที่ค้นพบ และข้อมูลพอร์ต
    */
+  /** พอร์ตของแต่ละอุปกรณ์ว่าต่อกับเครื่องไหน สำหรับ tooltip บนกล่องในผัง */
+  const interfacePeers = buildInterfacePeers({
+    devices: discoveredDevices,
+    neighbors: discovery?.neighbors ?? [],
+    links: topology.layout.links,
+  });
+
   const linkVerifications = verifyLinks(topology.layout.links, {
     devices: discoveredDevices,
     neighbors: discovery?.neighbors ?? [],
@@ -344,6 +352,7 @@ export default function InfrastructureView({
               diagrams={topology.diagrams}
               activeDiagram={topology.activeDiagram}
               linkVerifications={linkVerifications}
+              interfacePeers={interfacePeers}
               onSelectDiagram={(id) => {
                 topology.selectDiagram(id);
                 // อุปกรณ์ที่เลือกไว้อาจไม่มีอยู่ในผังใบใหม่ จึงล้างการเลือกทิ้ง
