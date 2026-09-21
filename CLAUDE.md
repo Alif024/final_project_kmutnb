@@ -90,6 +90,13 @@ matches devices to records falls back to matching by name.
 the diagram reflects real cabling as the operator knows it, not a guess. Discovered devices sit
 in the inventory until dragged onto the canvas.
 
+Nodes on the canvas take `setPointerCapture` on pointerdown so a drag keeps tracking outside the
+box. That capture retargets pointerup to the node, so `click` lands on the node and **never reaches
+a button inside it**. Any interactive child of a node must stop pointerdown from bubbling
+(`onPointerDown={(e) => e.stopPropagation()}`) or it will look dead — this is exactly what broke the
+node's remove button. A synthetic `element.click()` bypasses pointer events and still works, so
+browser tests must click by coordinates to catch it.
+
 `hooks/use-topology-layout.ts` holds a **workspace of several named diagrams** (schema
 `version: 2` under `ai-noc:topology-workspace`) in a module-level store exposed through
 `useSyncExternalStore`, persisted to `localStorage`. Mutations apply to the active diagram only.

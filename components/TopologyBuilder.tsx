@@ -555,6 +555,10 @@ export default function TopologyBuilder({
                 </div>
 
                 <button
+                  // กล่องแม่จับ pointer ไว้ตอน pointerdown เพื่อใช้ลากย้ายตำแหน่ง
+                  // ซึ่งทำให้ pointerup ถูกเปลี่ยนเป้าหมายไปที่กล่อง แล้ว click
+                  // ไปตกที่กล่องแทนปุ่มนี้ จึงต้องกันไม่ให้ pointerdown ลอยขึ้นไป
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
                     onRemoveNode(node.deviceId);
