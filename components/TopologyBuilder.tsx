@@ -17,6 +17,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { DiscoveredDevice, TopologyDiagram, TopologyLayout } from '@/types/ai-noc';
+import ClearTopologyModal from './ClearTopologyModal';
 import { InterfacePeer } from '@/lib/interface-map';
 import { LinkVerification, VERDICT_COLOR, VERDICT_LABEL } from '@/lib/link-verification';
 import { DEVICE_DRAG_TYPE, deviceIcon, statusDot } from './DeviceInventoryPanel';
@@ -126,6 +127,8 @@ export default function TopologyBuilder({
   const [pendingLinkFrom, setPendingLinkFrom] = useState<string | null>(null);
   /** กล่องที่กำลังถูกลากอยู่ — ซ่อน tooltip ไว้ก่อนเพื่อไม่ให้บังพื้นที่วาง */
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  /** เปิดหน้าต่างยืนยันก่อนล้างอุปกรณ์ทั้งผัง เพราะกดพลาดแล้วย้อนไม่ได้ */
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const deviceMap = new Map(devices.map((d) => [d.id, d]));
 
@@ -391,7 +394,7 @@ export default function TopologyBuilder({
         />
 
         <button
-          onClick={onClear}
+          onClick={() => setConfirmClear(true)}
           disabled={layout.nodes.length === 0}
           className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-300 hover:bg-rose-500/20 transition-colors flex items-center gap-1.5 disabled:opacity-40"
           title="เอาอุปกรณ์และเส้นเชื่อมทั้งหมดออกจากผังนี้ (ไม่ได้ลบตัวผัง)"
@@ -632,6 +635,16 @@ export default function TopologyBuilder({
           )}
         </div>
       </div>
+
+      {confirmClear && (
+        <ClearTopologyModal
+          diagramName={activeDiagram.name}
+          nodeCount={layout.nodes.length}
+          linkCount={layout.links.length}
+          onClose={() => setConfirmClear(false)}
+          onConfirm={onClear}
+        />
+      )}
 
       {/* คำอธิบายการใช้งาน */}
       <div className="px-3 py-2 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">

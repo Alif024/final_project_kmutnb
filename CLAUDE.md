@@ -90,6 +90,13 @@ matches devices to records falls back to matching by name.
 the diagram reflects real cabling as the operator knows it, not a guess. Discovered devices sit
 in the inventory until dragged onto the canvas.
 
+A modal rendered from inside the builder must be portaled to `document.body`
+(`ClearTopologyModal` does this). The builder's own container uses `backdrop-blur-xl`, and an
+element with a `backdrop-filter` becomes the containing block for `position: fixed` descendants —
+without the portal the overlay covered only the builder box (878x700 of a 1500x950 viewport) instead
+of the screen. The modals rendered from `SettingsView` sit in plain `div`s and are unaffected, so
+this only bites inside glass panels.
+
 Nodes on the canvas take `setPointerCapture` on pointerdown so a drag keeps tracking outside the
 box. That capture retargets pointerup to the node, so `click` lands on the node and **never reaches
 a button inside it**. Any interactive child of a node must stop pointerdown from bubbling
