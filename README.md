@@ -13,15 +13,15 @@
 > ส่วนติดต่อผู้ใช้ครบทั้ง 7 โมดูลและใช้งานโต้ตอบได้จริงในเบราว์เซอร์
 > ข้อมูลทั้งหมดมาจากไฟล์ชุดข้อมูลจำลองไฟล์เดียวคือ `lib/mock-data.json` ยกเว้น **AI Chat Assistant** ที่เรียก Gemini API จริงผ่าน API Route
 
-**ผลการตรวจสอบล่าสุด (30 สิงหาคม 2569):** ระบบ Build ผ่านสมบูรณ์ และผ่านการตรวจ Logic Bug
+**ผลการตรวจสอบเชิงลึก (30 สิงหาคม 2569):** ระบบ Build ผ่านสมบูรณ์ และผ่านการตรวจ Logic Bug
 เชิงลึกทั้งแอป (อ่านโค้ดทุกไฟล์ + ทดสอบคลิกจริงผ่านเบราว์เซอร์) พบ 24 จุด แก้ไขแล้ว 20 จุด —
 รายละเอียดทั้งหมดอยู่ใน [`bugs.txt`](bugs.txt)
 
 | การตรวจสอบ | ผลลัพธ์ |
 |---|---|
-| `npm install` | ✅ ผ่าน (1,002 packages) |
+| `npm install` | ✅ ผ่าน (ติดตั้งครบตาม `package-lock.json`) |
 | `npx tsc --noEmit` | ✅ ผ่าน ไม่มี Type Error |
-| `npm run build` | ✅ ผ่าน — 3 Route (`/` = 278 kB First Load JS, `/_not-found`, `/api/ai/chat`) |
+| `npm run build` | ✅ ผ่าน — 4 Route (`/` = 278 kB First Load JS, `/_not-found`, `/api/ai/chat`, `/icon.svg`) |
 | `npm run lint` | ✅ ผ่าน ไม่มี Warning |
 | ทดสอบคลิกจริงผ่าน Headless Chrome | ✅ ยืนยัน 20 จุดที่แก้ไขทำงานถูกต้องตามที่ตั้งใจ |
 | ตรวจ Layout และการโต้ตอบด้วย Chrome จริง (รอบ Log Explorer) | ✅ วัดความสูง/การเลื่อนของทุกหน้า และทดสอบคลิกกราฟ ตัวกรอง และการแบ่งหน้าด้วยเมาส์จริง |
@@ -53,9 +53,15 @@
 - แก้แท็บ Logs ของโหนดใน Infrastructure ที่เดิมแสดง Syslog ของทุกโหนดปนกัน
   ให้กรองตามโหนดที่เลือกจริง พร้อมปุ่มลัดไป Log Explorer
 - แก้ Tooltip ของกราฟที่ตัวหนังสือเป็นสีเข้มบนพื้นหลังเข้มจนอ่านไม่ออก
+- แก้แท็บที่เลือกอยู่ในหน้า Infrastructure (Topology / Monitoring และแท็บย่อยของแผงโหนดกับ Host
+  รวม 4 จุด) ที่ใช้ตัวอักษรสีเข้มบนพื้นน้ำเงินเข้มในโหมดสว่างจนอ่านยาก ให้เป็นสีขาวเหมือนหน้าอื่น
 
 ผ่าน `npx tsc --noEmit`, `npm run lint` และ `npm run build` ทั้งหมด
 และตรวจ Layout/การโต้ตอบด้วย Chrome จริงผ่าน `puppeteer-core` (ไม่ได้เพิ่มเป็น dependency ของโปรเจกต์)
+
+**ตรวจสอบซ้ำบน `main` (21 กันยายน 2569):** `npx tsc --noEmit`, `npm run lint` และ `npm run build`
+ผ่านครบทั้งสามคำสั่งโดยไม่มี Error หรือ Warning — Next.js 15.5.24 สร้างผลลัพธ์เป็น 4 Route
+โดยหน้าหลักยังอยู่ที่ 278 kB First Load JS เท่าเดิม
 
 | ด้าน | สถานะ |
 |---|---|
@@ -137,6 +143,7 @@ final_project_kmutnb/
 ├── app/
 │   ├── api/ai/chat/route.ts     # API Route เดียวของระบบ — เรียก Gemini
 │   ├── globals.css              # Design Tokens + Frosted Glass Utilities
+│   ├── icon.svg                 # ไอคอนของแอป (App Icon Convention ของ Next.js)
 │   ├── layout.tsx                # Root Layout (lang="th", ฟอนต์ Inter/Prompt)
 │   └── page.tsx                  # หน้าเดียวของแอป — จัดการ State และสลับ View
 ├── components/
