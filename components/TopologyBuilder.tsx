@@ -17,6 +17,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { DiscoveredDevice, TopologyDiagram, TopologyLayout } from '@/types/ai-noc';
+import { LinkVerification, VERDICT_COLOR, VERDICT_LABEL } from '@/lib/link-verification';
 import { DEVICE_DRAG_TYPE, deviceIcon, statusDot } from './DeviceInventoryPanel';
 
 /** ขนาดกล่องอุปกรณ์บนผัง ใช้คำนวณจุดกึ่งกลางสำหรับลากเส้นเชื่อม */
@@ -39,11 +40,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function linkColor(status: 'up' | 'down' | 'degraded'): string {
-  if (status === 'down') return '#EF4444';
-  if (status === 'degraded') return '#F59E0B';
-  return '#22C55E';
-}
+/** ผลตรวจที่ยังไม่มีข้อมูล ใช้เมื่อยังโหลดข้อมูลเพื่อนบ้านไม่เสร็จ */
+const PENDING_VERIFICATION: LinkVerification = {
+  verdict: 'unverified',
+  reason: 'กำลังตรวจสอบกับข้อมูล LLDP/CDP',
+};
 
 interface TopologyBuilderProps {
   devices: DiscoveredDevice[];
@@ -51,6 +52,8 @@ interface TopologyBuilderProps {
   /** ผังทั้งหมดที่ผู้ใช้บันทึกไว้ */
   diagrams: TopologyDiagram[];
   activeDiagram: TopologyDiagram;
+  /** ผลตรวจสอบเส้นเชื่อมเทียบกับ LLDP/CDP ค้นด้วย id ของเส้น */
+  linkVerifications: Map<string, LinkVerification>;
   onSelectDiagram: (id: string) => void;
   onCreateDiagram: () => void;
   onDuplicateDiagram: (id: string) => void;
@@ -80,6 +83,7 @@ export default function TopologyBuilder({
   layout,
   diagrams,
   activeDiagram,
+  linkVerifications,
   onSelectDiagram,
   onCreateDiagram,
   onDuplicateDiagram,
@@ -159,11 +163,15 @@ export default function TopologyBuilder({
     setPendingLinkFrom(null);
   }
 
-  /** ข้อความบอกปลายทางทั้งสองฝั่งพร้อมพอร์ต (ถ้าผู้ใช้ระบุไว้) */
+  /** ข้อความบอกปลายทางทั้งสองฝั่ง พร้อมผลตรวจสอบกับ LLDP/CDP */
   const linkTitle = (link: TopologyLayout['links'][number]) => {
     const name = (id: string) => deviceMap.get(id)?.name ?? id;
     const side = (id: string, port?: string) => (port ? `${name(id)} (${port})` : name(id));
-    return `${side(link.source, link.sourceInterface)} ←→ ${side(link.target, link.targetInterface)}`;
+    const check = linkVerifications.get(link.id) ?? PENDING_VERIFICATION;
+    return (
+      `${side(link.source, link.sourceInterface)} ←→ ${side(link.target, link.targetInterface)}` +
+      `\n[${VERDICT_LABEL[check.verdict]}] ${check.reason}`
+    );
   };
 
   const nodeCenter = (deviceId: string) => {
@@ -422,6 +430,7 @@ export default function TopologyBuilder({
               const a = nodeCenter(link.source);
               const b = nodeCenter(link.target);
               if (!a || !b) return null;
+              const check = linkVerifications.get(link.id) ?? PENDING_VERIFICATION;
               return (
                 <g key={link.id}>
                   <line
@@ -429,8 +438,11 @@ export default function TopologyBuilder({
                     y1={a.y}
                     x2={b.x}
                     y2={b.y}
-                    stroke={linkColor(link.linkStatus)}
+                    stroke={VERDICT_COLOR[check.verdict]}
                     strokeWidth={2}
+                    // เส้นประ = ยังไม่มีข้อมูลให้ตรวจ ต่างจากเทาทึบที่แปลว่าขัดแย้งจริง
+                    strokeDasharray={check.verdict === 'unverified' ? '6 5' : undefined}
+                    opacity={check.verdict === 'unverified' ? 0.7 : 1}
                   />
                   {/* เส้นโปร่งใสที่กว้างกว่า ทำหน้าที่เป็นพื้นที่คลิกเพื่อลบ */}
                   <line
@@ -579,8 +591,20 @@ export default function TopologyBuilder({
         <span>ลากกล่องเพื่อย้ายตำแหน่ง</span>
         <span>คลิกกล่องเพื่อดูรายละเอียดด้านล่าง</span>
         <span>คลิกเส้นเชื่อมเพื่อลบเส้นนั้น</span>
-        <span className="flex items-center gap-1">
-          <span className="w-4 h-0.5 bg-emerald-500 inline-block" /> Link Up
+        <span className="flex items-center gap-1" title="LLDP/CDP ยืนยันว่าปลายสายถูกต้อง">
+          <span className="w-4 h-0.5 bg-emerald-500 inline-block" /> ยืนยันแล้ว
+        </span>
+        <span className="flex items-center gap-1" title="พอร์ตที่ผูกกับเส้นนี้มีสถานะ down">
+          <span className="w-4 h-0.5 bg-rose-500 inline-block" /> พอร์ตดับ
+        </span>
+        <span className="flex items-center gap-1" title="ข้อมูล LLDP/CDP ขัดแย้งกับเส้นที่วาดไว้">
+          <span className="w-4 h-0.5 bg-slate-400 inline-block" /> ต่อผิด
+        </span>
+        <span
+          className="flex items-center gap-1"
+          title="ไม่มีข้อมูล LLDP/CDP ให้ตรวจสอบ — ไม่ได้แปลว่าต่อผิด"
+        >
+          <span className="w-4 border-t-2 border-dashed border-slate-500 inline-block" /> ยังไม่ยืนยัน
         </span>
       </div>
     </div>

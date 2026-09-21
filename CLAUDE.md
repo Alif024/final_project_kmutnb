@@ -114,6 +114,17 @@ be the same object every call or React re-renders forever. The same rule is why 
 fetch in `InfrastructureView` puts its first `setState` after an `await` and guards it with a
 `cancelled` flag (the view unmounts on every tab switch).
 
+### Link verification — `lib/link-verification.ts`
+
+Colors every drawn link by checking it against detected neighbors, in this order: a mapped port
+that is `down` wins over everything (a stale LLDP cache should not paint a dead cable green), then
+confirmation from either endpoint, then contradiction, then "no data". Four verdicts, not three:
+**verified** (green), **down** (red), **mismatch** (solid grey) and **unverified** (dashed grey).
+Keeping *unverified* separate from *mismatch* is deliberate — a device with LLDP/CDP disabled, or a
+VM with no port data, can never be confirmed, and folding those into "wrongly connected" would
+accuse correct diagrams. Every verdict carries a Thai `reason` string shown in the link tooltip, so
+a color always comes with its evidence.
+
 ### Data layer
 
 `lib/mock-data.json` is the single data file. `lib/mock-data.ts` casts it to the interfaces in

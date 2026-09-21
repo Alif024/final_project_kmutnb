@@ -1918,7 +1918,9 @@
       "lastSeen": "45 วินาทีที่แล้ว",
       "interfaces": [
         { "name": "Gi0/1", "adminStatus": "up", "operStatus": "up", "inOctets": 180000000, "outOctets": 144000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 18 },
-        { "name": "Gi0/2", "adminStatus": "up", "operStatus": "up", "inOctets": 120000000, "outOctets": 96000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 12 }
+        { "name": "Gi0/2", "adminStatus": "up", "operStatus": "up", "inOctets": 120000000, "outOctets": 96000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 12 },
+        { "name": "Gi0/3", "adminStatus": "up", "operStatus": "up", "inOctets": 80000000, "outOctets": 64000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 8 },
+        { "name": "Gi0/4", "adminStatus": "up", "operStatus": "down", "inOctets": 0, "outOctets": 0, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 0 }
       ]
     },
     {
