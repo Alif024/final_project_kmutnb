@@ -411,6 +411,13 @@ export interface TopologyLayoutLink {
   target: string;               // DiscoveredDevice.id
   linkStatus: 'up' | 'down' | 'degraded';
   label?: string;
+  /**
+   * พอร์ตที่ใช้เชื่อมของแต่ละฝั่ง เช่น "Gi0/1" — ผู้ใช้ระบุเองจากแท็บ Interfaces
+   * ระบบไม่เดาให้ เพราะการจับคู่พอร์ตต้องดูจากการเดินสายจริง
+   * (ถ้าต่อ Zabbix จริงในอนาคต อาจเติมให้อัตโนมัติจาก LLDP/CDP neighbor ได้)
+   */
+  sourceInterface?: string;
+  targetInterface?: string;
 }
 
 /** ผังหนึ่งใบ — ใช้เป็นทั้งรูปแบบไฟล์ Export และเนื้อหาของผังที่กำลังแก้ไขอยู่ */

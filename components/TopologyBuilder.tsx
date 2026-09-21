@@ -159,6 +159,13 @@ export default function TopologyBuilder({
     setPendingLinkFrom(null);
   }
 
+  /** ข้อความบอกปลายทางทั้งสองฝั่งพร้อมพอร์ต (ถ้าผู้ใช้ระบุไว้) */
+  const linkTitle = (link: TopologyLayout['links'][number]) => {
+    const name = (id: string) => deviceMap.get(id)?.name ?? id;
+    const side = (id: string, port?: string) => (port ? `${name(id)} (${port})` : name(id));
+    return `${side(link.source, link.sourceInterface)} ←→ ${side(link.target, link.targetInterface)}`;
+  };
+
   const nodeCenter = (deviceId: string) => {
     const n = layout.nodes.find((node) => node.deviceId === deviceId);
     if (!n) return null;
@@ -439,7 +446,10 @@ export default function TopologyBuilder({
                       onRemoveLink(link.id);
                     }}
                   >
-                    <title>คลิกเพื่อลบเส้นเชื่อมนี้</title>
+                    <title>
+                      {linkTitle(link)}
+                      {'\n'}คลิกเพื่อลบเส้นเชื่อมนี้
+                    </title>
                   </line>
                 </g>
               );

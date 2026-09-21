@@ -88,7 +88,14 @@ in the inventory until dragged onto the canvas.
 A single-layout `version: 1` value left at the old key `ai-noc:topology-layout` is migrated into
 the workspace on first read, so keep that path when changing the schema again. There is always at
 least one diagram — deleting the last one creates a fresh empty replacement — so `activeDiagram`
-is never null. Import always adds a **new** diagram rather than overwriting the open one. It is deliberately **not** `useState` +
+is never null. Import always adds a **new** diagram rather than overwriting the open one.
+
+A link also carries optional `sourceInterface`/`targetInterface` — which physical port each end
+uses. Nothing infers these: the operator sets them from the Interfaces tab, and the dropdown there
+only offers devices already linked on the active diagram, so a port can never claim a cable that
+was not drawn. `assignInterface()` clears the port from any other link first, because one port
+maps to exactly one cable. Port lists come from `NetworkDevice.interfaces`, which only SNMP-discovered
+devices have, so the Interfaces tab renders for those devices only. It is deliberately **not** `useState` +
 `useEffect`: reading localStorage during render breaks hydration, and reading it in an effect
 trips `react-hooks/set-state-in-effect` (an error, not a warning, in this ESLint config) while
 causing a cascading render. `getServerSnapshot` returns a shared frozen empty layout — it must

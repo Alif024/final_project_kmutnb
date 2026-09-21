@@ -201,6 +201,25 @@ export default function InfrastructureView({
       )
     : undefined;
 
+  /**
+   * เส้นเชื่อมของอุปกรณ์ที่เลือกอยู่บนผังปัจจุบัน ใช้บอกว่าพอร์ตไหนต่อกับอะไร
+   * ผู้ใช้เลือกได้เฉพาะอุปกรณ์ที่ลากเส้นเชื่อมไว้แล้ว เพราะพอร์ตควรผูกกับสายที่มีจริง
+   */
+  const deviceLinks = selectedDevice
+    ? topology.layout.links.filter(
+        (l) => l.source === selectedDevice.id || l.target === selectedDevice.id
+      )
+    : [];
+
+  /** ฝั่งตรงข้ามของเส้นเชื่อม เมื่อมองจากอุปกรณ์ที่เลือกอยู่ */
+  const peerOfLink = (link: (typeof deviceLinks)[number]) =>
+    link.source === selectedDevice?.id
+      ? { id: link.target, port: link.targetInterface, myPort: link.sourceInterface }
+      : { id: link.source, port: link.sourceInterface, myPort: link.targetInterface };
+
+  const deviceNameOf = (id: string) =>
+    discoveredDevices.find((d) => d.id === id)?.name ?? 'อุปกรณ์ที่หายไป';
+
   const nodeAlerts = selectedDevice
     ? recentAlerts.filter(
         (a) => (matchedVm && a.entityId === matchedVm.id) || a.entityName === selectedDevice.name
@@ -543,42 +562,97 @@ export default function InfrastructureView({
                     ที่ค้นพบผ่าน SNMP เท่านั้น
                   </p>
                 ) : (
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
-                        <th className="pb-2">Interface</th>
-                        <th className="pb-2">Status</th>
-                        <th className="pb-2">Utilization</th>
-                        <th className="pb-2">Packet Loss</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                      {matchedNetDevice.interfaces.map((iface) => (
-                        <tr key={iface.name}>
-                          <td className="py-2 font-mono text-slate-900 dark:text-white">{iface.name}</td>
-                          <td
-                            className={`py-2 font-bold ${
-                              iface.operStatus === 'up'
-                                ? 'text-emerald-600 dark:text-emerald-400'
-                                : 'text-rose-600 dark:text-rose-400'
-                            }`}
-                          >
-                            {iface.operStatus.toUpperCase()}
-                          </td>
-                          <td className="py-2 text-slate-900 dark:text-white">{iface.utilizationPercent}%</td>
-                          <td
-                            className={`py-2 font-bold ${
-                              iface.packetLossPercent > 0
-                                ? 'text-rose-600 dark:text-rose-400'
-                                : 'text-emerald-600 dark:text-emerald-400'
-                            }`}
-                          >
-                            {iface.packetLossPercent}%
-                          </td>
+                  <>
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
+                          <th className="pb-2">Interface</th>
+                          <th className="pb-2">Status</th>
+                          <th className="pb-2">Utilization</th>
+                          <th className="pb-2">Packet Loss</th>
+                          <th className="pb-2">เชื่อมกับ</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                        {matchedNetDevice.interfaces.map((iface) => {
+                          // เส้นเชื่อมที่ถูกผูกไว้กับพอร์ตนี้ (ถ้ามี)
+                          const link = deviceLinks.find((l) => peerOfLink(l).myPort === iface.name);
+                          const peer = link ? peerOfLink(link) : null;
+
+                          return (
+                            <tr key={iface.name}>
+                              <td className="py-2 font-mono text-slate-900 dark:text-white">{iface.name}</td>
+                              <td
+                                className={`py-2 font-bold ${
+                                  iface.operStatus === 'up'
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-rose-600 dark:text-rose-400'
+                                }`}
+                              >
+                                {iface.operStatus.toUpperCase()}
+                              </td>
+                              <td className="py-2 text-slate-900 dark:text-white">{iface.utilizationPercent}%</td>
+                              <td
+                                className={`py-2 font-bold ${
+                                  iface.packetLossPercent > 0
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : 'text-emerald-600 dark:text-emerald-400'
+                                }`}
+                              >
+                                {iface.packetLossPercent}%
+                              </td>
+                              <td className="py-2">
+                                {deviceLinks.length === 0 ? (
+                                  <span className="text-slate-500 dark:text-slate-400">—</span>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <select
+                                      value={peer?.id ?? ''}
+                                      onChange={(e) =>
+                                        topology.assignInterface(
+                                          selectedDevice.id,
+                                          iface.name,
+                                          e.target.value || null
+                                        )
+                                      }
+                                      className="bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 rounded-lg px-2 py-1 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-blue-500/50"
+                                    >
+                                      <option value="" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
+                                        — ยังไม่ระบุ —
+                                      </option>
+                                      {deviceLinks.map((l) => {
+                                        const other = peerOfLink(l);
+                                        return (
+                                          <option
+                                            key={l.id}
+                                            value={other.id}
+                                            className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white"
+                                          >
+                                            {deviceNameOf(other.id)}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                    {peer?.port && (
+                                      <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                        พอร์ต {peer.port}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-slate-200 dark:border-white/10">
+                      {deviceLinks.length === 0
+                        ? 'อุปกรณ์นี้ยังไม่ถูกลากเส้นเชื่อมกับอุปกรณ์อื่นบนผัง จึงยังระบุปลายทางของแต่ละพอร์ตไม่ได้ — ลากเส้นบนผังก่อน แล้วกลับมาเลือกที่ช่อง "เชื่อมกับ"'
+                        : 'เลือกได้เฉพาะอุปกรณ์ที่เชื่อมไว้บนผังแล้ว เพราะพอร์ตควรผูกกับสายที่เดินจริง — หนึ่งพอร์ตผูกได้หนึ่งเส้นเท่านั้น'}
+                    </p>
+                  </>
                 )}
               </div>
             )}
