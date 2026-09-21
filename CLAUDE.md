@@ -131,6 +131,13 @@ be the same object every call or React re-renders forever. The same rule is why 
 fetch in `InfrastructureView` puts its first `setState` after an `await` and guards it with a
 `cancelled` flag (the view unmounts on every tab switch).
 
+### Port-to-peer map — `lib/interface-map.ts`
+
+Builds "which port faces which device" for the canvas node tooltip, from neighbors only. It is
+deliberately separate from link verification: this answers *who is on the far end*, that one answers
+*is the drawn line trustworthy*. Ports sort with `localeCompare(..., { numeric: true })` so Gi0/2
+precedes Gi0/24.
+
 ### Link verification — `lib/link-verification.ts`
 
 Colors every drawn link by checking it against detected neighbors, in this order: a mapped port
