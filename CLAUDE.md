@@ -71,6 +71,14 @@ Each source is fetched independently and **falls back to mock data on any failur
 being down never fails the whole request. Device ids are `` `<source>:<nativeId>` `` so they stay
 stable across refreshes — the saved topology references them.
 
+The Zabbix path also returns **LLDP/CDP neighbors** (`DiscoveryResult.neighbors`): which device
+sits on the far end of each port. Real Zabbix stores these as low-level-discovery items whose key
+names depend on the template in use, so there is no fixed key — `ZABBIX_NEIGHBOR_KEYS` (default
+`lldp,cdp`) sets the prefixes, items are grouped by the index in `key[...]`, and field roles are
+matched loosely (`sysname`/`deviceid`, `portid`/`deviceport`, `manaddr`/`cacheaddress`). Since
+Zabbix 5.4 dropped `lastvalue` from `item.get`, values come from a follow-up `history.get`.
+A neighbor read that fails never fails the device list — it logs and returns `[]`.
+
 Note that vCenter and Proxmox do not return guest IPs in their list endpoints (that needs
 VMware Tools / QEMU Guest Agent and a per-VM call), so `ipAddress` is often `''`; code that
 matches devices to records falls back to matching by name.
@@ -91,11 +99,14 @@ least one diagram — deleting the last one creates a fresh empty replacement �
 is never null. Import always adds a **new** diagram rather than overwriting the open one.
 
 A link also carries optional `sourceInterface`/`targetInterface` — which physical port each end
-uses. Nothing infers these: the operator sets them from the Interfaces tab, and the dropdown there
-only offers devices already linked on the active diagram, so a port can never claim a cable that
-was not drawn. `assignInterface()` clears the port from any other link first, because one port
-maps to exactly one cable. Port lists come from `NetworkDevice.interfaces`, which only SNMP-discovered
-devices have, so the Interfaces tab renders for those devices only. It is deliberately **not** `useState` +
+uses. The Interfaces tab shows the LLDP/CDP-detected neighbor first and treats a manual assignment
+as an override, flagging the disagreement when the two differ. Detection never mutates the diagram
+on its own: `applyNeighborLink()` runs only when the operator clicks "เพิ่มเส้นเชื่อมนี้ลงผัง",
+which keeps the "no auto-generated topology" rule intact. The manual dropdown only offers devices
+already linked on the active diagram, so a port can never claim a cable that was not drawn, and
+both `assignInterface()` and `applyNeighborLink()` free the port from any other link first because
+one port maps to exactly one cable. Port lists come from `NetworkDevice.interfaces`, which only
+SNMP-discovered devices have, so the Interfaces tab renders for those devices only. It is deliberately **not** `useState` +
 `useEffect`: reading localStorage during render breaks hydration, and reading it in an effect
 trips `react-hooks/set-state-in-effect` (an error, not a warning, in this ESLint config) while
 causing a cascading render. `getServerSnapshot` returns a shared frozen empty layout — it must

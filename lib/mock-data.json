@@ -1949,5 +1949,16 @@
         { "name": "lan0", "adminStatus": "up", "operStatus": "up", "inOctets": 610000000, "outOctets": 488000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 61 }
       ]
     }
+  ],
+  "lldpNeighbors": [
+    { "localDeviceId": "net-sw-core-01", "localInterface": "Gi0/1", "protocol": "lldp", "remoteSysName": "Perimeter-Firewall-01", "remotePortId": "lan0", "remoteMgmtIp": "10.0.0.254" },
+    { "localDeviceId": "net-sw-core-01", "localInterface": "Gi0/2", "protocol": "lldp", "remoteSysName": "Access-Switch-02", "remotePortId": "Gi0/1", "remoteMgmtIp": "10.0.0.3" },
+    { "localDeviceId": "net-sw-core-01", "localInterface": "Gi0/24", "protocol": "cdp", "remoteSysName": "Edge-Router-01", "remotePortId": "Gi0/0/0", "remoteMgmtIp": "10.0.1.1" },
+    { "localDeviceId": "net-sw-core-01", "localInterface": "Te1/1", "protocol": "lldp", "remoteSysName": "ESXi-Host-01", "remotePortId": "vmnic0", "remoteMgmtIp": "10.0.0.101" },
+    { "localDeviceId": "net-sw-acc-02", "localInterface": "Gi0/1", "protocol": "lldp", "remoteSysName": "Core-Switch-01", "remotePortId": "Gi0/2", "remoteMgmtIp": "10.0.0.2" },
+    { "localDeviceId": "net-sw-acc-02", "localInterface": "Gi0/2", "protocol": "lldp", "remoteSysName": "Proxmox-Node-01", "remotePortId": "eno1", "remoteMgmtIp": "10.0.0.201" },
+    { "localDeviceId": "net-rtr-edge-01", "localInterface": "Gi0/0/0", "protocol": "cdp", "remoteSysName": "Core-Switch-01", "remotePortId": "Gi0/24", "remoteMgmtIp": "10.0.0.2" },
+    { "localDeviceId": "net-rtr-edge-01", "localInterface": "Gi0/0/1", "protocol": "cdp", "remoteSysName": "ISP-PE-Router-BKK", "remotePortId": "GigabitEthernet0/2" },
+    { "localDeviceId": "net-fw-perimeter-01", "localInterface": "lan0", "protocol": "lldp", "remoteSysName": "Core-Switch-01", "remotePortId": "Gi0/1", "remoteMgmtIp": "10.0.0.2" }
   ]
 }

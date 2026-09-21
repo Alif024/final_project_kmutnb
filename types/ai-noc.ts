@@ -387,8 +387,34 @@ export interface DiscoverySourceStatus {
   error?: string;
 }
 
+/** โปรโตคอลที่ใช้ประกาศตัวกับอุปกรณ์ข้างเคียง */
+export type NeighborProtocol = 'lldp' | 'cdp';
+
+/**
+ * เพื่อนบ้านที่อุปกรณ์ตรวจพบเองผ่าน LLDP/CDP
+ *
+ * อุปกรณ์เครือข่ายประกาศชื่อและพอร์ตของตัวเองออกไปทุกพอร์ตเป็นระยะ ฝั่งตรงข้าม
+ * จึงรู้ว่า "พอร์ตนี้ปลายสายคือใคร" โดยไม่ต้องให้คนกรอก — ระบบอ่านค่านี้ผ่าน
+ * Zabbix ซึ่ง SNMP walk ตาราง LLDP-MIB / CISCO-CDP-MIB มาเก็บไว้
+ */
+export interface DiscoveredNeighbor {
+  /** อุปกรณ์ฝั่งที่มองเห็น (DiscoveredDevice.id) */
+  localDeviceId: string;
+  /** พอร์ตของฝั่งนี้ เช่น "Gi0/1" */
+  localInterface: string;
+  protocol: NeighborProtocol;
+  /** ชื่อที่ปลายทางประกาศมา (sysName ของ LLDP หรือ deviceId ของ CDP) */
+  remoteSysName: string;
+  /** พอร์ตที่ปลายทางประกาศมา เช่น "lan0" */
+  remotePortId?: string;
+  /** IP สำหรับจัดการของปลายทาง ใช้จับคู่กับอุปกรณ์ในระบบได้แม่นกว่าชื่อ */
+  remoteMgmtIp?: string;
+}
+
 export interface DiscoveryResult {
   devices: DiscoveredDevice[];
+  /** คู่พอร์ตที่อุปกรณ์ตรวจพบเองผ่าน LLDP/CDP */
+  neighbors: DiscoveredNeighbor[];
   sources: DiscoverySourceStatus[];
   fetchedAt: string;
 }

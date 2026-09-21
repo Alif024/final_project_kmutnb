@@ -344,6 +344,71 @@ export function useTopologyLayout() {
     []
   );
 
+  /**
+   * สร้างเส้นเชื่อมจากคู่พอร์ตที่ LLDP/CDP ตรวจพบ แล้วใส่ชื่อพอร์ตให้ทั้งสองฝั่งในครั้งเดียว
+   * ผู้ใช้เป็นคนกดเอง ระบบไม่ลากเส้นให้เองจากผลการตรวจจับ
+   */
+  const applyNeighborLink = useCallback(
+    (localId: string, localInterface: string, peerId: string, peerInterface?: string) => {
+      updateActiveDiagram((active) => {
+        if (localId === peerId) return null;
+        const existing = active.links.find(
+          (l) =>
+            (l.source === localId && l.target === peerId) ||
+            (l.source === peerId && l.target === localId)
+        );
+        // หนึ่งพอร์ตผูกได้เส้นเดียว จึงปลดพอร์ตทั้งสองฝั่งออกจากเส้นอื่นก่อน
+        const cleared = active.links.map((l) => {
+          let next = l;
+          if (next.source === localId && next.sourceInterface === localInterface) {
+            next = { ...next, sourceInterface: undefined };
+          }
+          if (next.target === localId && next.targetInterface === localInterface) {
+            next = { ...next, targetInterface: undefined };
+          }
+          if (peerInterface) {
+            if (next.source === peerId && next.sourceInterface === peerInterface) {
+              next = { ...next, sourceInterface: undefined };
+            }
+            if (next.target === peerId && next.targetInterface === peerInterface) {
+              next = { ...next, targetInterface: undefined };
+            }
+          }
+          return next;
+        });
+
+        if (existing) {
+          return {
+            nodes: active.nodes,
+            links: cleared.map((l) =>
+              l.id !== existing.id
+                ? l
+                : l.source === localId
+                ? { ...l, sourceInterface: localInterface, targetInterface: peerInterface }
+                : { ...l, targetInterface: localInterface, sourceInterface: peerInterface }
+            ),
+          };
+        }
+
+        return {
+          nodes: active.nodes,
+          links: [
+            ...cleared,
+            {
+              id: `link-${localId}-${peerId}-${Date.now()}`,
+              source: localId,
+              target: peerId,
+              linkStatus: 'up' as const,
+              sourceInterface: localInterface,
+              targetInterface: peerInterface,
+            },
+          ],
+        };
+      });
+    },
+    []
+  );
+
   const removeLink = useCallback((linkId: string) => {
     updateActiveDiagram((active) => ({
       nodes: active.nodes,
@@ -434,6 +499,7 @@ export function useTopologyLayout() {
     addLink,
     removeLink,
     assignInterface,
+    applyNeighborLink,
     clearLayout,
     selectDiagram,
     createDiagram,

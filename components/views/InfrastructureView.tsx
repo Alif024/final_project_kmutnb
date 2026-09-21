@@ -32,7 +32,8 @@ import {
   SyslogEntry,
   Alert,
   HealthStatus,
-  DiscoveryResult
+  DiscoveryResult,
+  DiscoveredNeighbor
 } from '@/types/ai-noc';
 import DeviceInventoryPanel from '@/components/DeviceInventoryPanel';
 import TopologyBuilder from '@/components/TopologyBuilder';
@@ -90,6 +91,8 @@ export default function InfrastructureView({
   const [nodeDetailTab, setNodeDetailTab] = useState<'overview' | 'interfaces' | 'performance' | 'logs' | 'alerts' | 'vm-info'>('overview');
   const [hypDetailTab, setHypDetailTab] = useState<'overview' | 'performance' | 'vms' | 'datastores' | 'alerts' | 'logs'>('overview');
   const [importError, setImportError] = useState<string | undefined>(undefined);
+  /** พอร์ตที่กำลังเปิดช่องระบุปลายทางเอง (ทับค่าที่ LLDP/CDP ตรวจพบ) */
+  const [overridingIface, setOverridingIface] = useState<string | null>(null);
 
   // ผลการค้นหาอุปกรณ์จาก Zabbix / vCenter / Proxmox ผ่าน API Route ฝั่ง Server
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
@@ -219,6 +222,26 @@ export default function InfrastructureView({
 
   const deviceNameOf = (id: string) =>
     discoveredDevices.find((d) => d.id === id)?.name ?? 'อุปกรณ์ที่หายไป';
+
+  /** เพื่อนบ้าน LLDP/CDP ที่อุปกรณ์ซึ่งเลือกอยู่ประกาศไว้ */
+  const deviceNeighbors = selectedDevice
+    ? (discovery?.neighbors ?? []).filter((n) => n.localDeviceId === selectedDevice.id)
+    : [];
+
+  /**
+   * จับชื่อ/IP ที่ปลายทางประกาศมา กลับไปหาอุปกรณ์ในระบบ
+   * เทียบ IP ก่อนเพราะแม่นกว่า แล้วค่อยเทียบชื่อแบบไม่สนตัวพิมพ์
+   */
+  const matchNeighborDevice = (neighbor: DiscoveredNeighbor) => {
+    if (neighbor.remoteMgmtIp) {
+      const byIp = discoveredDevices.find((d) => d.ipAddress === neighbor.remoteMgmtIp);
+      if (byIp) return byIp;
+    }
+    const wanted = neighbor.remoteSysName.toLowerCase();
+    return discoveredDevices.find((d) => d.name.toLowerCase() === wanted);
+  };
+
+  const placedIdSet = placedIds;
 
   const nodeAlerts = selectedDevice
     ? recentAlerts.filter(
@@ -575,9 +598,20 @@ export default function InfrastructureView({
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                         {matchedNetDevice.interfaces.map((iface) => {
-                          // เส้นเชื่อมที่ถูกผูกไว้กับพอร์ตนี้ (ถ้ามี)
+                          // เส้นเชื่อมที่ถูกผูกไว้กับพอร์ตนี้ (ถ้ามี) — ค่าที่ผู้ใช้กำหนดเอง
                           const link = deviceLinks.find((l) => peerOfLink(l).myPort === iface.name);
                           const peer = link ? peerOfLink(link) : null;
+                          // ค่าที่อุปกรณ์ประกาศเองผ่าน LLDP/CDP
+                          const detected = deviceNeighbors.find((n) => n.localInterface === iface.name);
+                          const detectedDevice = detected ? matchNeighborDevice(detected) : undefined;
+                          const linkForDetected =
+                            detectedDevice && deviceLinks.some((l) => peerOfLink(l).id === detectedDevice.id);
+
+                          // ค่าที่ผู้ใช้ระบุเองจะชนะค่าที่ตรวจพบ เมื่อทั้งสองไม่ตรงกัน
+                          const usingManual = !!peer && (!detectedDevice || peer.id !== detectedDevice.id);
+                          const detectedName = detectedDevice?.name ?? detected?.remoteSysName;
+                          const shownName = usingManual && peer ? deviceNameOf(peer.id) : detectedName;
+                          const editing = overridingIface === iface.name;
 
                           return (
                             <tr key={iface.name}>
@@ -601,24 +635,109 @@ export default function InfrastructureView({
                               >
                                 {iface.packetLossPercent}%
                               </td>
-                              <td className="py-2">
-                                {deviceLinks.length === 0 ? (
-                                  <span className="text-slate-500 dark:text-slate-400">—</span>
+                              <td className="py-2 space-y-1 align-top">
+                                {shownName ? (
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-semibold text-slate-900 dark:text-white">
+                                      {shownName}
+                                    </span>
+                                    {usingManual ? (
+                                      <span
+                                        className="text-[9px] font-bold px-1.5 py-0.5 rounded border bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/30"
+                                        title="ค่าที่ผู้ดูแลระบบระบุเอง"
+                                      >
+                                        กำหนดเอง
+                                      </span>
+                                    ) : (
+                                      detected && (
+                                        <span
+                                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${
+                                            detected.protocol === 'cdp'
+                                              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30'
+                                              : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/30'
+                                          }`}
+                                          title="ตรวจพบอัตโนมัติจากที่อุปกรณ์ปลายทางประกาศตัวเอง"
+                                        >
+                                          {detected.protocol}
+                                        </span>
+                                      )
+                                    )}
+                                  </div>
                                 ) : (
-                                  <div className="flex items-center gap-2">
+                                  <span className="text-slate-500 dark:text-slate-400">—</span>
+                                )}
+
+                                {/* รายละเอียดพอร์ตปลายทาง */}
+                                {usingManual
+                                  ? peer?.port && (
+                                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                                        พอร์ต {peer.port}
+                                      </div>
+                                    )
+                                  : detected && (
+                                      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                                        {detected.remotePortId
+                                          ? `พอร์ต ${detected.remotePortId}`
+                                          : 'ไม่ทราบพอร์ตปลายทาง'}
+                                        {detected.remoteMgmtIp ? ` · ${detected.remoteMgmtIp}` : ''}
+                                      </div>
+                                    )}
+
+                                {/* เตือนเมื่อค่าที่ระบุเองไม่ตรงกับที่อุปกรณ์ประกาศ */}
+                                {usingManual && detectedName && (
+                                  <div className="text-[10px] text-amber-600 dark:text-amber-400">
+                                    {detected?.protocol.toUpperCase()} ระบุว่าเป็น {detectedName}
+                                  </div>
+                                )}
+
+                                {/* สถานะ/การกระทำของค่าที่ตรวจพบ */}
+                                {!usingManual && detected && !detectedDevice && (
+                                  <div className="text-[10px] text-amber-600 dark:text-amber-400">
+                                    ไม่อยู่ในรายการอุปกรณ์ที่ระบบค้นพบ
+                                  </div>
+                                )}
+                                {!usingManual && detectedDevice && !placedIdSet.has(detectedDevice.id) && (
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                                    ยังไม่ได้วางอุปกรณ์นี้บนผัง
+                                  </div>
+                                )}
+                                {!usingManual &&
+                                  detectedDevice &&
+                                  !linkForDetected &&
+                                  placedIdSet.has(detectedDevice.id) && (
+                                    <button
+                                      onClick={() =>
+                                        topology.applyNeighborLink(
+                                          selectedDevice.id,
+                                          iface.name,
+                                          detectedDevice.id,
+                                          detected?.remotePortId
+                                        )
+                                      }
+                                      className="text-[10px] font-semibold text-blue-600 dark:text-blue-300 hover:underline"
+                                    >
+                                      + เพิ่มเส้นเชื่อมนี้ลงผัง
+                                    </button>
+                                  )}
+
+                                {/* ระบุเอง — ซ่อนไว้เมื่อมีค่าที่ตรวจพบแล้ว เพื่อไม่ให้ตารางรก */}
+                                {deviceLinks.length > 0 &&
+                                  (editing || !detected ? (
                                     <select
+                                      autoFocus={editing}
                                       value={peer?.id ?? ''}
-                                      onChange={(e) =>
+                                      onChange={(e) => {
                                         topology.assignInterface(
                                           selectedDevice.id,
                                           iface.name,
                                           e.target.value || null
-                                        )
-                                      }
+                                        );
+                                        setOverridingIface(null);
+                                      }}
                                       className="bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 rounded-lg px-2 py-1 text-[11px] text-slate-900 dark:text-white focus:outline-none focus:border-blue-500/50"
                                     >
                                       <option value="" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
-                                        — ยังไม่ระบุ —
+                                        {detected ? '— ใช้ค่าที่ตรวจพบ —' : '— ยังไม่ระบุ —'}
                                       </option>
                                       {deviceLinks.map((l) => {
                                         const other = peerOfLink(l);
@@ -633,13 +752,14 @@ export default function InfrastructureView({
                                         );
                                       })}
                                     </select>
-                                    {peer?.port && (
-                                      <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                                        พอร์ต {peer.port}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
+                                  ) : (
+                                    <button
+                                      onClick={() => setOverridingIface(iface.name)}
+                                      className="text-[10px] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:underline"
+                                    >
+                                      ระบุเอง
+                                    </button>
+                                  ))}
                               </td>
                             </tr>
                           );
@@ -648,9 +768,11 @@ export default function InfrastructureView({
                     </table>
 
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-slate-200 dark:border-white/10">
-                      {deviceLinks.length === 0
-                        ? 'อุปกรณ์นี้ยังไม่ถูกลากเส้นเชื่อมกับอุปกรณ์อื่นบนผัง จึงยังระบุปลายทางของแต่ละพอร์ตไม่ได้ — ลากเส้นบนผังก่อน แล้วกลับมาเลือกที่ช่อง "เชื่อมกับ"'
-                        : 'เลือกได้เฉพาะอุปกรณ์ที่เชื่อมไว้บนผังแล้ว เพราะพอร์ตควรผูกกับสายที่เดินจริง — หนึ่งพอร์ตผูกได้หนึ่งเส้นเท่านั้น'}
+                      {deviceNeighbors.length > 0
+                        ? `ปลายทางที่แสดงมาจากที่อุปกรณ์ประกาศตัวเองผ่าน LLDP/CDP (พบ ${deviceNeighbors.length} พอร์ต) — ถ้าสายจริงไม่ตรงกับที่ประกาศ ระบุทับเองได้จากช่องด้านล่างของแต่ละแถว`
+                        : deviceLinks.length === 0
+                        ? 'ยังไม่พบข้อมูล LLDP/CDP ของอุปกรณ์นี้ และยังไม่ถูกลากเส้นเชื่อมบนผัง — ลากเส้นบนผังก่อน แล้วกลับมาเลือกที่ช่อง "เชื่อมกับ"'
+                        : 'ยังไม่พบข้อมูล LLDP/CDP ของอุปกรณ์นี้ จึงต้องระบุปลายทางเอง — เลือกได้เฉพาะอุปกรณ์ที่เชื่อมไว้บนผังแล้ว'}
                     </p>
                   </>
                 )}

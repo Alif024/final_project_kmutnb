@@ -20,12 +20,19 @@
 import {
   DiscoveredDevice,
   DiscoveredDeviceKind,
+  DiscoveredNeighbor,
   DiscoveryResult,
   DiscoverySourceId,
   DiscoverySourceStatus,
   HealthStatus,
+  NeighborProtocol,
 } from '@/types/ai-noc';
-import { MOCK_HYPERVISORS, MOCK_NETWORK_DEVICES, MOCK_VMS } from './mock-data';
+import {
+  MOCK_HYPERVISORS,
+  MOCK_LLDP_NEIGHBORS,
+  MOCK_NETWORK_DEVICES,
+  MOCK_VMS,
+} from './mock-data';
 
 /** เวลารอสูงสุดต่อหนึ่งคำขอไปยังระบบต้นทาง */
 const REQUEST_TIMEOUT_MS = 8000;
@@ -148,7 +155,16 @@ function zabbixStatus(host: ZabbixHost, iface?: ZabbixInterface): HealthStatus {
   }
 }
 
-async function fetchZabbixDevices(): Promise<DiscoveredDevice[]> {
+/**
+ * ผลของการค้นหาจาก Zabbix — คืนเพื่อนบ้านมาด้วย เพราะต้องใช้ hostid ชุดเดียวกัน
+ * ในการค้น Item ของ LLDP/CDP ต่อ
+ */
+interface ZabbixDiscovery {
+  devices: DiscoveredDevice[];
+  neighbors: DiscoveredNeighbor[];
+}
+
+async function fetchZabbixDevices(): Promise<ZabbixDiscovery> {
   const url = process.env.ZABBIX_URL;
   const token = process.env.ZABBIX_TOKEN;
   if (!url || !token) throw new Error('ยังไม่ได้ตั้งค่า ZABBIX_URL / ZABBIX_TOKEN');
@@ -161,7 +177,7 @@ async function fetchZabbixDevices(): Promise<DiscoveredDevice[]> {
     filter: { status: '0' },
   });
 
-  return hosts.map((host) => {
+  const devices: DiscoveredDevice[] = hosts.map((host) => {
     const iface = primaryInterface(host);
     const isSnmp = iface?.type === '2';
     const inventory = Array.isArray(host.inventory) ? undefined : host.inventory;
@@ -180,6 +196,15 @@ async function fetchZabbixDevices(): Promise<DiscoveredDevice[]> {
       lastSeen: undefined,
     };
   });
+
+  // เพื่อนบ้านอ่านไม่ได้ไม่ควรทำให้รายชื่ออุปกรณ์ทั้งชุดล้มไปด้วย
+  const hostIdToDeviceId = new Map(hosts.map((h) => [h.hostid, `zabbix:${h.hostid}`]));
+  const neighbors = await fetchZabbixNeighbors(url, token, hostIdToDeviceId).catch((e) => {
+    console.warn('อ่านเพื่อนบ้าน LLDP/CDP จาก Zabbix ไม่สำเร็จ:', errorMessage(e));
+    return [] as DiscoveredNeighbor[];
+  });
+
+  return { devices, neighbors };
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -346,8 +371,154 @@ async function fetchProxmoxDevices(): Promise<DiscoveredDevice[]> {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+   เพื่อนบ้าน LLDP / CDP — "พอร์ตนี้ปลายสายคือใคร"
+   ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * ดึงตารางเพื่อนบ้านที่อุปกรณ์ประกาศผ่าน LLDP/CDP ออกมาจาก Zabbix
+ *
+ * ค่าต้นทางจริงคือ SNMP walk ที่ Zabbix ทำไว้ให้แล้ว:
+ *   LLDP-MIB      lldpRemSysName   1.0.8802.1.1.2.1.4.1.1.9
+ *                 lldpRemPortId    1.0.8802.1.1.2.1.4.1.1.7
+ *                 lldpRemManAddr   1.0.8802.1.1.2.1.5.1.4
+ *   CISCO-CDP-MIB cdpCacheDeviceId    1.3.6.1.4.1.9.9.23.1.2.1.1.6
+ *                 cdpCacheDevicePort  1.3.6.1.4.1.9.9.23.1.2.1.1.7
+ *                 cdpCacheAddress     1.3.6.1.4.1.9.9.23.1.2.1.1.4
+ *
+ * ⚠️ Zabbix เก็บค่าพวกนี้เป็น Item ที่เกิดจาก Low-level Discovery ซึ่ง
+ *    **ชื่อคีย์ขึ้นกับ Template ที่ใช้** ไม่มีมาตรฐานกลาง โค้ดนี้จึงจับคู่แบบยืดหยุ่น
+ *    และเปิดให้ตั้งคำนำหน้าคีย์เองผ่าน ZABBIX_NEIGHBOR_KEYS (คั่นด้วยจุลภาค)
+ *    ถ้าต่อเครื่องจริงแล้วไม่พบข้อมูล ให้ดูชื่อคีย์จริงใน Zabbix แล้วตั้งค่านี้ให้ตรง
+ *
+ * Zabbix 5.4 ขึ้นไปไม่คืน lastvalue จาก item.get แล้ว จึงต้องอ่านค่าล่าสุด
+ * ผ่าน history.get อีกทอด (ค่าเป็นข้อความ จึงใช้ history 4 = text และ 1 = str)
+ */
+interface ZabbixItem {
+  itemid: string;
+  hostid: string;
+  key_: string;
+}
+
+interface ZabbixHistory {
+  itemid: string;
+  value: string;
+  clock: string;
+}
+
+/** ดึงเลขดัชนีในวงเล็บเหลี่ยมของคีย์ เช่น lldp.rem.sysname[Gi0/1] -> "Gi0/1" */
+function keyIndex(key: string): string | null {
+  const m = key.match(/\[(.+)\]\s*$/);
+  return m ? m[1] : null;
+}
+
+/** ส่วนของคีย์ก่อนวงเล็บ แปลงเป็นตัวพิมพ์เล็กเพื่อเทียบแบบหลวม ๆ */
+function keyStem(key: string): string {
+  return key.split('[')[0].toLowerCase();
+}
+
+async function fetchZabbixNeighbors(
+  url: string,
+  token: string,
+  hostIdToDeviceId: Map<string, string>
+): Promise<DiscoveredNeighbor[]> {
+  const prefixes = (process.env.ZABBIX_NEIGHBOR_KEYS ?? 'lldp,cdp')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+
+  // ค้นทีละคำนำหน้า เพราะ item.get รับ search ได้ชุดเดียวต่อครั้ง
+  const itemGroups = await Promise.all(
+    prefixes.map((prefix) =>
+      zabbixRpc<ZabbixItem[]>(url, token, 'item.get', {
+        output: ['itemid', 'hostid', 'key_'],
+        hostids: [...hostIdToDeviceId.keys()],
+        search: { key_: prefix },
+        startSearch: true,
+      })
+    )
+  );
+  const items = itemGroups.flat();
+  if (items.length === 0) return [];
+
+  const history = await zabbixRpc<ZabbixHistory[]>(url, token, 'history.get', {
+    output: 'extend',
+    itemids: items.map((i) => i.itemid),
+    // 4 = text, 1 = character — ค่าของ LLDP/CDP เป็นข้อความเสมอ
+    history: 4,
+    sortfield: 'clock',
+    sortorder: 'DESC',
+    limit: items.length * 4,
+  }).catch(() => [] as ZabbixHistory[]);
+
+  const latest = new Map<string, string>();
+  for (const h of history) {
+    if (!latest.has(h.itemid)) latest.set(h.itemid, h.value);
+  }
+
+  /** รวม Item ที่มาจากพอร์ตเดียวกัน (ดัชนีในวงเล็บตรงกัน) ให้เป็นเพื่อนบ้านหนึ่งรายการ */
+  const grouped = new Map<
+    string,
+    { hostid: string; index: string; protocol: NeighborProtocol; fields: Map<string, string> }
+  >();
+
+  for (const item of items) {
+    const index = keyIndex(item.key_);
+    if (!index) continue;
+    const value = latest.get(item.itemid);
+    if (!value) continue;
+
+    const stem = keyStem(item.key_);
+    const protocol: NeighborProtocol = stem.includes('cdp') ? 'cdp' : 'lldp';
+    const groupKey = `${item.hostid}|${protocol}|${index}`;
+    const group =
+      grouped.get(groupKey) ??
+      { hostid: item.hostid, index, protocol, fields: new Map<string, string>() };
+    group.fields.set(stem, value);
+    grouped.set(groupKey, group);
+  }
+
+  const neighbors: DiscoveredNeighbor[] = [];
+  for (const group of grouped.values()) {
+    const localDeviceId = hostIdToDeviceId.get(group.hostid);
+    if (!localDeviceId) continue;
+
+    const pick = (...needles: string[]) => {
+      for (const [stem, value] of group.fields) {
+        if (needles.some((n) => stem.includes(n))) return value;
+      }
+      return undefined;
+    };
+
+    // ชื่อปลายทาง: LLDP ใช้ sysname, CDP ใช้ deviceid
+    const remoteSysName = pick('sysname', 'deviceid', 'remotename');
+    if (!remoteSysName) continue;
+
+    neighbors.push({
+      localDeviceId,
+      // บาง Template เก็บชื่อพอร์ตฝั่งเราไว้เป็น Item ต่างหาก ถ้าไม่มีก็ใช้ดัชนีในคีย์
+      localInterface: pick('locport', 'localport', 'ifname', 'localif') ?? group.index,
+      protocol: group.protocol,
+      remoteSysName,
+      remotePortId: pick('portid', 'deviceport', 'remoteport'),
+      remoteMgmtIp: pick('manaddr', 'mgmtaddr', 'cacheaddress', 'address'),
+    });
+  }
+
+  return neighbors;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
    ข้อมูลจำลอง — ใช้เมื่อยังไม่ได้ตั้งค่าต้นทางจริง
    ────────────────────────────────────────────────────────────────────────── */
+
+/** เพื่อนบ้านจำลอง — อ้าง id อุปกรณ์ให้ตรงกับที่ mockSnmpDevices สร้างไว้ */
+function mockNeighbors(): DiscoveredNeighbor[] {
+  return MOCK_LLDP_NEIGHBORS.map((n) => ({
+    ...n,
+    localDeviceId: `zabbix:${n.localDeviceId}`,
+    remoteMgmtIp: n.remoteMgmtIp || undefined,
+  }));
+}
 
 /** อุปกรณ์เครือข่ายที่ Zabbix ค้นพบผ่าน SNMP */
 function mockSnmpDevices(): DiscoveredDevice[] {
@@ -420,10 +591,11 @@ function mockDevicesFor(source: DiscoverySourceId): DiscoveredDevice[] {
 export async function discoverDevices(): Promise<DiscoveryResult> {
   applyTlsPolicy();
 
-  const fetchers: Record<DiscoverySourceId, () => Promise<DiscoveredDevice[]>> = {
+  const fetchers: Record<DiscoverySourceId, () => Promise<ZabbixDiscovery>> = {
+    // มีเพียง Zabbix ที่ให้ข้อมูลเพื่อนบ้าน — อีกสองต้นทางคืนรายการว่าง
     zabbix: fetchZabbixDevices,
-    'vmware-vcenter': fetchVCenterDevices,
-    'proxmox-ve': fetchProxmoxDevices,
+    'vmware-vcenter': async () => ({ devices: await fetchVCenterDevices(), neighbors: [] }),
+    'proxmox-ve': async () => ({ devices: await fetchProxmoxDevices(), neighbors: [] }),
   };
 
   const sourceIds = Object.keys(fetchers) as DiscoverySourceId[];
@@ -431,11 +603,17 @@ export async function discoverDevices(): Promise<DiscoveryResult> {
   const results = await Promise.all(
     sourceIds.map(async (id) => {
       try {
-        const devices = await fetchers[id]();
-        return { id, devices, live: true as const, error: undefined };
+        const { devices, neighbors } = await fetchers[id]();
+        return { id, devices, neighbors, live: true as const, error: undefined };
       } catch (e) {
         // ยังไม่ได้ตั้งค่า หรือเรียกไม่สำเร็จ → ใช้ข้อมูลจำลองของต้นทางนี้แทน
-        return { id, devices: mockDevicesFor(id), live: false as const, error: errorMessage(e) };
+        return {
+          id,
+          devices: mockDevicesFor(id),
+          neighbors: id === 'zabbix' ? mockNeighbors() : [],
+          live: false as const,
+          error: errorMessage(e),
+        };
       }
     })
   );
@@ -451,6 +629,7 @@ export async function discoverDevices(): Promise<DiscoveryResult> {
 
   return {
     devices: devices.sort((a, b) => a.name.localeCompare(b.name)),
+    neighbors: results.flatMap((r) => r.neighbors),
     sources,
     fetchedAt: new Date().toISOString(),
   };
