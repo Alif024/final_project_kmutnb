@@ -1889,5 +1889,65 @@
         { "label": "Alert Level:", "value": "Critical & High Only", "tone": "warning" }
       ]
     }
+  ],
+  "networkDevices": [
+    {
+      "id": "net-sw-core-01",
+      "name": "Core-Switch-01",
+      "ipAddress": "10.0.0.2",
+      "type": "switch",
+      "isVirtual": false,
+      "status": "warning",
+      "snmpCommunity": "public",
+      "lastSeen": "30 วินาทีที่แล้ว",
+      "interfaces": [
+        { "name": "Gi0/1", "adminStatus": "up", "operStatus": "up", "inOctets": 680000000, "outOctets": 544000000, "errorRate": 0.8, "packetLossPercent": 2.4, "utilizationPercent": 68 },
+        { "name": "Gi0/2", "adminStatus": "up", "operStatus": "up", "inOctets": 410000000, "outOctets": 328000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 41 },
+        { "name": "Gi0/24", "adminStatus": "up", "operStatus": "up", "inOctets": 220000000, "outOctets": 176000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 22 },
+        { "name": "Te1/1", "adminStatus": "up", "operStatus": "up", "inOctets": 550000000, "outOctets": 440000000, "errorRate": 0.1, "packetLossPercent": 0, "utilizationPercent": 55 }
+      ]
+    },
+    {
+      "id": "net-sw-acc-02",
+      "name": "Access-Switch-02",
+      "ipAddress": "10.0.0.3",
+      "type": "switch",
+      "isVirtual": false,
+      "status": "healthy",
+      "snmpCommunity": "public",
+      "lastSeen": "45 วินาทีที่แล้ว",
+      "interfaces": [
+        { "name": "Gi0/1", "adminStatus": "up", "operStatus": "up", "inOctets": 180000000, "outOctets": 144000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 18 },
+        { "name": "Gi0/2", "adminStatus": "up", "operStatus": "up", "inOctets": 120000000, "outOctets": 96000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 12 }
+      ]
+    },
+    {
+      "id": "net-rtr-edge-01",
+      "name": "Edge-Router-01",
+      "ipAddress": "10.0.1.1",
+      "type": "router",
+      "isVirtual": false,
+      "status": "healthy",
+      "snmpCommunity": "public",
+      "lastSeen": "1 นาทีที่แล้ว",
+      "interfaces": [
+        { "name": "Gi0/0/0", "adminStatus": "up", "operStatus": "up", "inOctets": 340000000, "outOctets": 272000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 34 },
+        { "name": "Gi0/0/1", "adminStatus": "up", "operStatus": "up", "inOctets": 290000000, "outOctets": 232000000, "errorRate": 0, "packetLossPercent": 0.1, "utilizationPercent": 29 }
+      ]
+    },
+    {
+      "id": "net-fw-perimeter-01",
+      "name": "Perimeter-Firewall-01",
+      "ipAddress": "10.0.0.254",
+      "type": "firewall",
+      "isVirtual": false,
+      "status": "healthy",
+      "snmpCommunity": "public",
+      "lastSeen": "40 วินาทีที่แล้ว",
+      "interfaces": [
+        { "name": "wan0", "adminStatus": "up", "operStatus": "up", "inOctets": 720000000, "outOctets": 576000000, "errorRate": 0.2, "packetLossPercent": 0, "utilizationPercent": 72 },
+        { "name": "lan0", "adminStatus": "up", "operStatus": "up", "inOctets": 610000000, "outOctets": 488000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 61 }
+      ]
+    }
   ]
 }

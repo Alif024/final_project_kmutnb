@@ -63,6 +63,24 @@
 ผ่านครบทั้งสามคำสั่งโดยไม่มี Error หรือ Warning — Next.js 15.5.24 สร้างผลลัพธ์เป็น 4 Route
 โดยหน้าหลักยังอยู่ที่ 278 kB First Load JS เท่าเดิม
 
+**อัปเดต (21 กันยายน 2569):** เพิ่มการค้นพบอุปกรณ์และเครื่องมือวาดผังเอง — พัฒนาบน branch
+`feature/device-discovery-topology-builder`
+
+- **Device Discovery** — ดึงรายชื่ออุปกรณ์จาก 3 ต้นทางผ่าน `GET /api/discovery`:
+  Zabbix (SNMP และ Zabbix Agent), VMware vCenter REST และ Proxmox VE API
+  โดยเขียนโค้ดเรียก API จริงไว้ครบ และ fallback เป็นข้อมูลจำลองรายต้นทางเมื่อยังไม่ได้ตั้งค่า env
+  พร้อมป้ายบอกบนหน้าจอว่าอุปกรณ์ชุดไหน "จริง" ชุดไหน "จำลอง"
+- **Manual Topology Builder** — ผู้ใช้ลากอุปกรณ์จากคลังมาวางบนผังเอง ย้ายตำแหน่ง
+  เชื่อมเส้นด้วยโหมดเชื่อมต่อ ลบเส้น/อุปกรณ์ ซูม และ Export/Import ผังเป็นไฟล์ JSON
+  **ไม่มีการสร้างผังอัตโนมัติ** ผังจึงสะท้อนการเชื่อมต่อจริงตามที่ผู้ดูแลระบบกำหนดเท่านั้น
+- ผังถูกบันทึกใน `localStorage` จึงไม่หายเมื่อรีเฟรชหรือสลับแท็บ และซิงก์ข้ามแท็บเบราว์เซอร์ให้ด้วย
+- แท็บ **Interfaces** ในแผงรายละเอียดเปลี่ยนจากตารางที่เขียนตายตัว มาอ่านค่ารายพอร์ตจริง
+  ของอุปกรณ์ที่ค้นพบผ่าน SNMP (ใช้ type `NetworkDevice` ที่เดิมประกาศไว้แต่ไม่มีใครใช้)
+
+ผ่าน `npx tsc --noEmit`, `npm run lint` และ `npm run build` ทั้งหมด
+และทดสอบด้วย Chrome จริงผ่าน `puppeteer-core` ครบทุกการโต้ตอบ — ลากวางจากคลัง, ย้ายกล่อง,
+สร้าง/ลบเส้นเชื่อม, เลือกดูรายละเอียด และยืนยันว่าผังยังอยู่หลังรีโหลดหน้า
+
 | ด้าน | สถานะ |
 |---|---|
 | หน้าจอ/ฟีเจอร์ UI | ✅ ครบทั้ง 7 โมดูล รวม 14 หน้าย่อย |
@@ -73,6 +91,8 @@
 | Log Explorer (ค้นหา Syslog รวมศูนย์) | ✅ ค้นหา / กรองแบบ Facet / เจาะช่วงเวลาจากกราฟ / แบ่งหน้า / กางดู Parsed Fields ได้จริงจากชุดข้อมูล 62 ข้อความ |
 | Log Evidence ในหน้า AI Analysis | ✅ ผูก Log เข้ากับ Root Cause Chain รายขั้น และข้ามไป Log Explorer แบบกรอง Incident ไว้ให้ |
 | จัดการรายการ Integration (เพิ่ม / ลบ / ทดสอบการเชื่อมต่อ) | ✅ ทำงานจริงแบบ in-memory ผ่าน Wizard และ Modal ยืนยัน (ผลการทดสอบเป็นการจำลอง) |
+| ค้นพบอุปกรณ์จาก Zabbix / vCenter / Proxmox | 🟡 เขียนโค้ดเรียก API จริงครบแล้วใน `lib/device-discovery.ts` แต่ยังไม่ได้ทดสอบกับเซิร์ฟเวอร์จริง — ถ้าไม่ตั้งค่า env จะใช้ข้อมูลจำลอง 18 อุปกรณ์ |
+| สร้างผัง Topology เอง (ลากวาง + เชื่อมเส้น) | ✅ ทำงานจริง บันทึกใน `localStorage` และ Export/Import เป็น JSON ได้ |
 | การเก็บ Telemetry จริง (vCenter / Proxmox / SNMP / Syslog) | ❌ ยังไม่เชื่อมต่อ — ยังไม่มี Collector จริงอยู่เบื้องหลังรายการ Integration |
 | การดึง Log จาก Graylog จริง | ❌ ยังไม่เชื่อมต่อ — อ่านจากข้อมูลจำลองผ่าน Adapter `lib/log-source.ts` ที่เตรียมจุดต่อไว้แล้ว |
 | ฐานข้อมูล / การคงข้อมูลถาวร | ❌ ยังไม่มี — State หายเมื่อรีเฟรชหน้า |
@@ -123,6 +143,10 @@ npm run dev          # เปิดที่ http://localhost:3000
 | `GEMINI_API_KEY` | สำหรับ AI Chat | คีย์ Gemini API ใช้ใน `/api/ai/chat` (ฝั่ง Server เท่านั้น) |
 | `APP_URL` | ไม่จำเป็น | URL ที่โฮสต์แอป (AI Studio ใส่ค่าให้อัตโนมัติ) |
 | `DISABLE_HMR` | ไม่จำเป็น | ตั้ง `true` เพื่อปิด File Watching ในโหมด dev |
+| `ZABBIX_URL` / `ZABBIX_TOKEN` | สำหรับ Discovery | Zabbix 6.4 ขึ้นไป ใช้ค้นหาอุปกรณ์ SNMP และ VM ที่ลง Zabbix Agent |
+| `VCENTER_URL` / `VCENTER_USERNAME` / `VCENTER_PASSWORD` | สำหรับ Discovery | vSphere 7.0 ขึ้นไป ใช้ดึง Host/VM |
+| `PROXMOX_URL` / `PROXMOX_TOKEN` | สำหรับ Discovery | Proxmox VE API Token รูปแบบ `user@realm!tokenid=secret` |
+| `DISCOVERY_ALLOW_INSECURE_TLS` | ไม่จำเป็น | `true` เพื่อข้ามการตรวจใบรับรอง Self-signed — เครื่องทดสอบเท่านั้น |
 
 ### NPM Scripts
 
@@ -141,7 +165,8 @@ npm run dev          # เปิดที่ http://localhost:3000
 ```
 final_project_kmutnb/
 ├── app/
-│   ├── api/ai/chat/route.ts     # API Route เดียวของระบบ — เรียก Gemini
+│   ├── api/ai/chat/route.ts     # API Route — เรียก Gemini
+│   ├── api/discovery/route.ts   # API Route — ค้นหาอุปกรณ์จาก Zabbix/vCenter/Proxmox
 │   ├── globals.css              # Design Tokens + Frosted Glass Utilities
 │   ├── icon.svg                 # ไอคอนของแอป (App Icon Convention ของ Next.js)
 │   ├── layout.tsx                # Root Layout (lang="th", ฟอนต์ Inter/Prompt)
@@ -153,6 +178,8 @@ final_project_kmutnb/
 │   ├── StatusBar.tsx              # แถบสถานะ Collector / AI Engine / Syslog
 │   ├── CommandPreviewModal.tsx    # ตัวอย่างคำสั่งก่อนอนุมัติ (Human-in-the-Loop)
 │   ├── RejectReasonModal.tsx      # ฟอร์มระบุเหตุผลการปฏิเสธ
+│   ├── DeviceInventoryPanel.tsx   # คลังอุปกรณ์ที่ตรวจพบ (ลากไปวางบนผังได้)
+│   ├── TopologyBuilder.tsx        # พื้นที่วาดผัง — ลากวาง เชื่อมเส้น ซูม Export/Import
 │   ├── AddIntegrationModal.tsx    # Add Integration Wizard 3 ขั้นตอน
 │   ├── DeleteIntegrationModal.tsx # ยืนยันก่อนลบการเชื่อมต่อ
 │   ├── ConnectionTestConsole.tsx  # กล่อง log ผลการทดสอบ (ใช้ร่วมวิซาร์ด/การ์ด)
@@ -162,11 +189,13 @@ final_project_kmutnb/
 │   ├── mock-data.ts             # ผูก TypeScript types ให้ JSON แล้ว re-export
 │   ├── integrations.ts          # Metadata ของประเภท Integration + ตัวสร้าง log ทดสอบ
 │   ├── log-source.ts            # Log Source Adapter — ค้นหา/กรอง Syslog + จุดต่อ Graylog API
+│   ├── device-discovery.ts      # Device Discovery Adapter — Zabbix/vCenter/Proxmox (ฝั่ง Server)
 │   └── utils.ts                 # `cn()` — clsx + tailwind-merge
 ├── types/ai-noc.ts              # TypeScript Interface ของโดเมนทั้งหมด
 ├── hooks/
 │   ├── use-mobile.ts            # Media Query Hook (ยังไม่มีการเรียกใช้งานจริง)
-│   └── use-connection-test.ts   # จำลองการทดสอบการเชื่อมต่อแบบไล่ log ทีละบรรทัด
+│   ├── use-connection-test.ts   # จำลองการทดสอบการเชื่อมต่อแบบไล่ log ทีละบรรทัด
+│   └── use-topology-layout.ts   # ผังที่ผู้ใช้วาดเอง (useSyncExternalStore + localStorage)
 ├── metadata.json                # Manifest สำหรับ Google AI Studio
 └── bugs.txt                     # บันทึกผลตรวจสอบบั๊กทั้งแอป (รายการที่แก้แล้ว/ยังไม่แก้)
 ```
@@ -285,10 +314,11 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 6. **การ Build ต้องใช้อินเทอร์เน็ต** เพราะโหลดฟอนต์ผ่าน `next/font/google`
 7. **ESLint ถูกข้ามตอน Build** (`eslint.ignoreDuringBuilds: true`) — ต้องรัน `npm run lint` แยกเอง
    ส่วนการตรวจชนิดข้อมูลของ TypeScript ยังบังคับใช้อยู่ (`ignoreBuildErrors: false`)
-8. **ผัง Topology ยังไม่ได้ render จาก `nodes`/`edges` แบบไดนามิกทั้งหมด** — เป็น SVG ที่วาดตายตัว
-   ด้วยมือ ทำให้ node 3 ตัวจากทั้งหมด 11 ตัวในข้อมูลจำลอง (Monitoring-VM, Log-Server-VM,
-   Backup-VM) ยังไม่ปรากฏ/เลือกไม่ได้บนผัง (แผงรายละเอียดของ node ที่ปรากฏอยู่แล้วดึงข้อมูลจริง
-   ถูกต้องแล้ว — ดู `bugs.txt` ข้อ 10-13)
+8. **โค้ดเรียก Zabbix / vCenter / Proxmox ยังไม่ได้ทดสอบกับเซิร์ฟเวอร์จริง** — เขียนตามเอกสาร
+   ของแต่ละ API ครบแล้ว แต่ยังไม่มีเครื่องจริงให้ยิงทดสอบ หากต่อแล้วไม่สำเร็จ ระบบจะไม่ล่ม
+   (จะ fallback เป็นข้อมูลจำลองพร้อมแสดงสาเหตุบนหน้าจอ) จุดที่ต้องตรวจก่อนคือเวอร์ชันของ API
+   และรูปแบบการยืนยันตัวตน นอกจากนี้ vCenter/Proxmox ไม่คืน IP ของ Guest มากับรายการหลัก
+   จึงต้องมี VMware Tools / QEMU Guest Agent และเรียก API เพิ่มรายตัวถึงจะได้ IP
 9. **`hooks/use-mobile.ts` (`useIsMobile`) ยังไม่ถูกเรียกใช้ที่ไหน** — Sidebar ยังไม่มีพฤติกรรม
    responsive สำหรับหน้าจอมือถือ (ย่ออัตโนมัติ/เปลี่ยนเป็น Drawer)
 10. **ชื่อโมเดล Gemini (`gemini-3.6-flash`) ยังไม่ได้ยืนยันกับบัญชีรายชื่อโมเดลจริง** — หากตั้งค่า
@@ -313,7 +343,9 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 - [ ] ทำ Export รายงาน PDF/Excel ให้ใช้งานได้จริง
 - [ ] เชื่อม Notification Gateway (LINE / Webhook) เข้ากับเหตุการณ์จริง
 - [ ] เพิ่มชุดทดสอบและ CI Pipeline
-- [ ] ทำให้ผัง Infrastructure Topology render จาก `nodes`/`edges` แบบไดนามิกทั้งหมด
+- [ ] ทดสอบ Device Discovery กับ Zabbix / vCenter / Proxmox เครื่องจริง
+- [ ] ดึง IP ของ Guest VM เพิ่ม (VMware Tools / QEMU Guest Agent) ให้ผังมี IP ครบทุกตัว
+- [ ] ย้ายผังที่ผู้ใช้วาดจาก `localStorage` ไปเก็บในฐานข้อมูล เพื่อให้ใช้ร่วมกันได้ทั้งทีม
 - [ ] เพิ่ม Responsive Layout สำหรับหน้าจอมือถือ (นำ `useIsMobile` มาใช้งานจริง)
 
 ---

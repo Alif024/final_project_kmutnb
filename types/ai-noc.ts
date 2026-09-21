@@ -335,3 +335,88 @@ export interface Integration {
   details: IntegrationDetail[];
   addedAt?: string;             // เวลาที่เพิ่มผ่าน Add Integration Wizard
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Device Discovery — อุปกรณ์ที่ "ตรวจพบ" จากระบบเฝ้าระวังจริง
+   (Zabbix ผ่าน SNMP / Zabbix Agent และ API ของ Hypervisor Type 1)
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/** ระบบต้นทางที่ไปดึงรายชื่ออุปกรณ์มา */
+export type DiscoverySourceId = 'zabbix' | 'vmware-vcenter' | 'proxmox-ve';
+
+/** วิธีที่อุปกรณ์ถูกตรวจพบ — ใช้แยกป้ายกำกับบนการ์ดในคลังอุปกรณ์ */
+export type DiscoveryMethod = 'snmp' | 'zabbix-agent' | 'hypervisor-api';
+
+/** ชนิดอุปกรณ์ที่ใช้เลือกไอคอนบนผัง */
+export type DiscoveredDeviceKind =
+  | 'firewall'
+  | 'switch'
+  | 'router'
+  | 'hypervisor'
+  | 'vm'
+  | 'storage'
+  | 'unknown';
+
+export interface DiscoveredDevice {
+  /** คีย์เสถียรข้ามการ Refresh: `<source>:<nativeId>` */
+  id: string;
+  /** id ฝั่งระบบต้นทาง (Zabbix hostid, vCenter host/vm id, Proxmox vmid) */
+  nativeId: string;
+  name: string;
+  ipAddress: string;
+  source: DiscoverySourceId;
+  method: DiscoveryMethod;
+  kind: DiscoveredDeviceKind;
+  status: HealthStatus;
+  /** OS หรือรุ่นอุปกรณ์ เช่น "Ubuntu 22.04 LTS", "Cisco IOS 15.2" */
+  osOrVendor?: string;
+  /** ชื่อ Hypervisor ที่ VM ตัวนี้รันอยู่ (เฉพาะ VM) */
+  parentName?: string;
+  lastSeen?: string;
+  tags?: string[];
+}
+
+/** สถานะการเชื่อมต่อของแต่ละต้นทางในรอบ Discovery หนึ่งครั้ง */
+export interface DiscoverySourceStatus {
+  id: DiscoverySourceId;
+  label: string;
+  /** true = ดึงจากระบบจริง, false = ใช้ข้อมูลจำลองเพราะยังไม่ได้ตั้งค่า env */
+  live: boolean;
+  deviceCount: number;
+  /** ข้อความผิดพลาดเมื่อเรียกระบบจริงไม่สำเร็จ (ไม่มี = สำเร็จ) */
+  error?: string;
+}
+
+export interface DiscoveryResult {
+  devices: DiscoveredDevice[];
+  sources: DiscoverySourceStatus[];
+  fetchedAt: string;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Topology Layout — ผังที่ "ผู้ใช้ลากวางเอง" เท่านั้น
+   ระบบไม่สร้างผังอัตโนมัติ: อุปกรณ์ที่ตรวจพบจะอยู่ในคลังจนกว่าจะถูกลากลงผัง
+   ──────────────────────────────────────────────────────────────────────────── */
+
+export interface TopologyLayoutNode {
+  /** อ้างถึง DiscoveredDevice.id */
+  deviceId: string;
+  x: number;
+  y: number;
+}
+
+export interface TopologyLayoutLink {
+  id: string;
+  source: string;               // DiscoveredDevice.id
+  target: string;               // DiscoveredDevice.id
+  linkStatus: 'up' | 'down' | 'degraded';
+  label?: string;
+}
+
+export interface TopologyLayout {
+  /** ใช้ตรวจความเข้ากันได้ตอนอ่านจาก localStorage หรือไฟล์ที่ Import เข้ามา */
+  version: 1;
+  nodes: TopologyLayoutNode[];
+  links: TopologyLayoutLink[];
+  updatedAt: string;
+}

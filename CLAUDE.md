@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AI-NOC — an AI-assisted Network Operation Center dashboard for virtualization platforms
 (VMware ESXi / Proxmox VE). KMUTNB senior project. It is a **UI-complete, mock-driven
-prototype**: every screen works, but all data comes from `lib/mock-data.json`. The only
-live external call is the Gemini chat route. `README.md` (Thai) holds the authoritative
+prototype**: every screen works, but all data falls back to `lib/mock-data.json`. The two
+routes that reach outside are the Gemini chat route and device discovery (Zabbix / vCenter /
+Proxmox), and discovery falls back to mock data per source when it is not configured. `README.md` (Thai) holds the authoritative
 feature/limitation matrix; `bugs.txt` records the findings of a full logic-bug audit
 (24 found, 20 fixed, 4 deliberately left).
 
@@ -21,6 +22,10 @@ npm run lint           # eslint . — must be run separately, see below
 npm run clean          # rm -rf .next (plain node script; `next clean` does not exist)
 npx tsc --noEmit       # type check
 ```
+
+`npm run start` is listed in package.json but **does not work**: `next start` refuses
+`output: 'standalone'`. To serve a build, run `node .next/standalone/server.js` after copying
+`.next/static` and `public` next to it, or just use `npm run dev`.
 
 There is **no test framework** in this repo — no test runner, no test files, no CI.
 Do not invent an `npm test` invocation. Verification is `npx tsc --noEmit` + `npm run lint`
@@ -52,6 +57,39 @@ Consequences to respect when adding features:
 - **Modals are keyed by record id** (`key={approveModalReq?.id}`) to force a fresh instance per
   request, so `isExecuting` state or a typed rejection reason never bleeds across requests.
   Keep that pattern for any new per-record modal.
+
+### Device discovery — go through `lib/device-discovery.ts`
+
+Server-only adapter (it reads credentials from env) that unifies three sources into one
+`DiscoveredDevice` shape: Zabbix JSON-RPC (`host.get`, SNMP vs Agent decided by interface
+`type`), vCenter REST (`/api/session` then `/api/vcenter/host`+`/vm`) and Proxmox
+(`/api2/json/nodes` + `/cluster/resources`). Never import it into a client component —
+the UI calls `GET /api/discovery`.
+
+Each source is fetched independently and **falls back to mock data on any failure**, reporting
+`sources[].live = false` plus the error so the UI can label that batch as simulated. A source
+being down never fails the whole request. Device ids are `` `<source>:<nativeId>` `` so they stay
+stable across refreshes — the saved topology references them.
+
+Note that vCenter and Proxmox do not return guest IPs in their list endpoints (that needs
+VMware Tools / QEMU Guest Agent and a per-VM call), so `ipAddress` is often `''`; code that
+matches devices to records falls back to matching by name.
+
+### Topology is user-drawn, never generated
+
+`TopologyBuilder` + `DeviceInventoryPanel` replace what used to be a hand-written SVG tree.
+**Do not add auto-layout or auto-generated topology** — this was an explicit product decision so
+the diagram reflects real cabling as the operator knows it, not a guess. Discovered devices sit
+in the inventory until dragged onto the canvas.
+
+`hooks/use-topology-layout.ts` holds the layout in a module-level store exposed through
+`useSyncExternalStore`, persisted to `localStorage`. It is deliberately **not** `useState` +
+`useEffect`: reading localStorage during render breaks hydration, and reading it in an effect
+trips `react-hooks/set-state-in-effect` (an error, not a warning, in this ESLint config) while
+causing a cascading render. `getServerSnapshot` returns a shared frozen empty layout — it must
+be the same object every call or React re-renders forever. The same rule is why the discovery
+fetch in `InfrastructureView` puts its first `setState` after an `await` and guards it with a
+`cancelled` flag (the view unmounts on every tab switch).
 
 ### Data layer
 
@@ -86,7 +124,7 @@ Non-obvious rules encoded there:
 
 ### AI integration
 
-`app/api/ai/chat/route.ts` is the only API route. It runs server-side, reads `GEMINI_API_KEY`,
+`app/api/ai/chat/route.ts` runs server-side, reads `GEMINI_API_KEY`,
 and returns a canned Thai mock reply when the key is missing — the app must keep working with
 no key set. The Thai system prompt hard-codes hypervisor/VM telemetry inline but pulls real log
 lines via `getCriticalLogsForContext()` / `formatLogsForPrompt()`, and instructs the model not

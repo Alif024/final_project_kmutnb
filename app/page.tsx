@@ -20,8 +20,6 @@ import SettingsView from '@/components/views/SettingsView';
 import {
   MOCK_HYPERVISORS,
   MOCK_VMS,
-  MOCK_TOPOLOGY_NODES,
-  MOCK_TOPOLOGY_EDGES,
   MOCK_INCIDENT_01,
   MOCK_DIAGNOSIS_01,
   MOCK_RECOMMENDATIONS,
@@ -32,6 +30,7 @@ import {
   MOCK_CHAT_MESSAGES,
   MOCK_AUDIT_LOGS,
   MOCK_INTEGRATIONS,
+  MOCK_NETWORK_DEVICES,
 } from '@/lib/mock-data';
 import { UserRole, ApprovalRequest, AuditLogEntry, Recommendation, Integration } from '@/types/ai-noc';
 import { getIntegrationMeta } from '@/lib/integrations';
@@ -234,8 +233,7 @@ export default function Page() {
               <InfrastructureView
                 hypervisors={MOCK_HYPERVISORS}
                 vms={MOCK_VMS}
-                nodes={MOCK_TOPOLOGY_NODES}
-                edges={MOCK_TOPOLOGY_EDGES}
+                networkDevices={MOCK_NETWORK_DEVICES}
                 syslogs={MOCK_SYSLOGS}
                 recentAlerts={MOCK_ALERTS}
                 initialSubTab={activeSubTab}
