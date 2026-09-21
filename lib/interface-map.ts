@@ -1,14 +1,13 @@
 /**
  * สรุปว่า "พอร์ตไหนของอุปกรณ์ต่อกับเครื่องอะไร" สำหรับแสดงตอนชี้เมาส์ที่กล่องบนผัง
  *
- * รวมข้อมูลสองทางเข้าด้วยกันโดยใช้ลำดับความสำคัญเดียวกับแท็บ Interfaces:
- *   1. ค่าที่ผู้ดูแลระบบระบุเองบนเส้นเชื่อม (ชนะเสมอ เพราะเป็นการยืนยันด้วยตาคน)
- *   2. ค่าที่อุปกรณ์ประกาศเองผ่าน LLDP/CDP
+ * ข้อมูลมาจากที่อุปกรณ์ประกาศตัวเองผ่าน LLDP/CDP เท่านั้น ระบบไม่เปิดให้กรอกเอง
+ * เพราะคู่พอร์ตที่คนกรอกไว้จะไม่อัปเดตตามเมื่อมีการย้ายสายจริง
  *
  * ตั้งใจไม่รวมสถานะ up/down ของพอร์ตไว้ที่นี่ — ผังมีสีเส้นบอกสถานะอยู่แล้ว
  * (ดู `lib/link-verification.ts`) tooltip นี้ตอบคำถามเดียวคือปลายสายคือใคร
  */
-import { DiscoveredDevice, DiscoveredNeighbor, TopologyLayoutLink } from '@/types/ai-noc';
+import { DiscoveredDevice, DiscoveredNeighbor } from '@/types/ai-noc';
 
 export interface InterfacePeer {
   /** พอร์ตของอุปกรณ์ตัวนี้ เช่น "Gi0/1" */
@@ -17,14 +16,13 @@ export interface InterfacePeer {
   peerName: string;
   /** พอร์ตของปลายทาง ถ้ารู้ */
   peerPort?: string;
-  /** ที่มาของข้อมูล ใช้ตัดสินว่าอันไหนทับอันไหนได้ */
-  source: 'manual' | 'lldp' | 'cdp';
+  /** โปรโตคอลที่ตรวจพบคู่นี้ */
+  source: 'lldp' | 'cdp';
 }
 
 interface BuildContext {
   devices: DiscoveredDevice[];
   neighbors: DiscoveredNeighbor[];
-  links: TopologyLayoutLink[];
 }
 
 function sameName(a: string, b: string): boolean {
@@ -52,38 +50,15 @@ function comparePort(a: InterfacePeer, b: InterfacePeer): number {
  */
 export function buildInterfacePeers(ctx: BuildContext): Map<string, InterfacePeer[]> {
   const byDevice = new Map<string, InterfacePeer[]>();
-  const nameOf = (deviceId: string) =>
-    ctx.devices.find((d) => d.id === deviceId)?.name ?? 'อุปกรณ์ที่หายไป';
 
   const add = (deviceId: string, entry: InterfacePeer) => {
     const list = byDevice.get(deviceId) ?? [];
-    // พอร์ตเดิมที่มีค่าจากผู้ใช้แล้ว ห้ามให้ค่าที่ตรวจพบมาทับ
+    // พอร์ตเดียวกันประกาศซ้ำได้ทั้ง LLDP และ CDP — เก็บรายการแรกที่เจอพอ
     if (list.some((e) => sameName(e.port, entry.port))) return;
     list.push(entry);
     byDevice.set(deviceId, list);
   };
 
-  // 1) ค่าที่ระบุเองบนเส้นเชื่อม
-  for (const link of ctx.links) {
-    if (link.sourceInterface) {
-      add(link.source, {
-        port: link.sourceInterface,
-        peerName: nameOf(link.target),
-        peerPort: link.targetInterface,
-        source: 'manual',
-      });
-    }
-    if (link.targetInterface) {
-      add(link.target, {
-        port: link.targetInterface,
-        peerName: nameOf(link.source),
-        peerPort: link.sourceInterface,
-        source: 'manual',
-      });
-    }
-  }
-
-  // 2) ค่าที่อุปกรณ์ประกาศเองผ่าน LLDP/CDP
   for (const neighbor of ctx.neighbors) {
     add(neighbor.localDeviceId, {
       port: neighbor.localInterface,

@@ -89,9 +89,22 @@ export function verifyLink(link: TopologyLayoutLink, ctx: VerifyContext): LinkVe
     };
   }
 
+  const neighborsOf = (device: DiscoveredDevice) =>
+    ctx.neighbors.filter((n) => n.localDeviceId === device.id);
+
+  /**
+   * พอร์ตที่ฝั่งนี้ใช้ต่อไปหาอีกฝั่ง
+   *
+   * ใช้ค่าที่เขียนไว้บนเส้นก่อน (เขียนตอนกดสร้างเส้นจากผลการตรวจจับ) ถ้าไม่มี
+   * ก็หาจากตารางเพื่อนบ้านโดยตรง เพราะเส้นที่ผู้ใช้ลากเองในโหมดเชื่อมต่อจะไม่มี
+   * ชื่อพอร์ตติดมา แต่ยังควรตรวจสถานะพอร์ตให้ได้
+   */
+  const portOf = (self: DiscoveredDevice, other: DiscoveredDevice, stored?: string) =>
+    stored ?? neighborsOf(self).find((n) => neighborIsDevice(n, other))?.localInterface;
+
   const sides = [
-    { device: source, port: link.sourceInterface },
-    { device: target, port: link.targetInterface },
+    { device: source, port: portOf(source, target, link.sourceInterface) },
+    { device: target, port: portOf(target, source, link.targetInterface) },
   ];
 
   // 1) พอร์ตดับมาก่อนเสมอ — ต่อให้ LLDP ยังจำเพื่อนบ้านเดิมไว้ สายก็ใช้งานไม่ได้
@@ -108,9 +121,6 @@ export function verifyLink(link: TopologyLayoutLink, ctx: VerifyContext): LinkVe
       };
     }
   }
-
-  const neighborsOf = (device: DiscoveredDevice) =>
-    ctx.neighbors.filter((n) => n.localDeviceId === device.id);
 
   // 2) ฝั่งใดฝั่งหนึ่งประกาศว่าเห็นอีกฝั่งอยู่จริง ถือว่ายืนยันแล้ว
   for (const [self, other] of [

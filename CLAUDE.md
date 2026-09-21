@@ -112,15 +112,18 @@ the workspace on first read, so keep that path when changing the schema again. T
 least one diagram — deleting the last one creates a fresh empty replacement — so `activeDiagram`
 is never null. Import always adds a **new** diagram rather than overwriting the open one.
 
-A link also carries optional `sourceInterface`/`targetInterface` — which physical port each end
-uses. The Interfaces tab shows the LLDP/CDP-detected neighbor first and treats a manual assignment
-as an override, flagging the disagreement when the two differ. Detection never mutates the diagram
-on its own: `applyNeighborLink()` runs only when the operator clicks "เพิ่มเส้นเชื่อมนี้ลงผัง",
-which keeps the "no auto-generated topology" rule intact. The manual dropdown only offers devices
-already linked on the active diagram, so a port can never claim a cable that was not drawn, and
-both `assignInterface()` and `applyNeighborLink()` free the port from any other link first because
-one port maps to exactly one cable. Port lists come from `NetworkDevice.interfaces`, which only
-SNMP-discovered devices have, so the Interfaces tab renders for those devices only. It is deliberately **not** `useState` +
+**Port-to-device mapping comes from LLDP/CDP only — there is no manual entry, by product
+decision.** Hand-entered pairs go stale the moment someone re-patches a cable, and a diagram that
+silently drifts from reality is worse than one that admits it does not know. A port with no
+neighbor shows "—". Do not reintroduce an override control.
+
+A link carries optional `sourceInterface`/`targetInterface`, written **only** by
+`applyNeighborLink()` when the operator clicks "เพิ่มเส้นเชื่อมนี้ลงผัง" — detection never mutates
+the diagram on its own, which keeps the "no auto-generated topology" rule intact. Because links
+drawn by hand in connect mode carry no port names, `verifyLink()` falls back to looking the port up
+in the neighbor table, so the down/red verdict still works for them. Port lists come from
+`NetworkDevice.interfaces`, which only SNMP-discovered devices have, so the Interfaces tab renders
+for those devices only. It is deliberately **not** `useState` +
 `useEffect`: reading localStorage during render breaks hydration, and reading it in an effect
 trips `react-hooks/set-state-in-effect` (an error, not a warning, in this ESLint config) while
 causing a cascading render. `getServerSnapshot` returns a shared frozen empty layout — it must

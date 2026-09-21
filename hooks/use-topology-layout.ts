@@ -302,51 +302,10 @@ export function useTopologyLayout() {
   }, []);
 
   /**
-   * ระบุว่าพอร์ตหนึ่งของอุปกรณ์เชื่อมไปยังอุปกรณ์ปลายทางตัวไหน
-   *
-   * เลือกได้เฉพาะอุปกรณ์ที่ถูกลากเส้นเชื่อมไว้แล้วบนผัง เพราะพอร์ตควรผูกกับสาย
-   * ที่มีอยู่จริง ไม่ใช่สร้างการเชื่อมต่อใหม่ขึ้นมาเอง ส่ง peerDeviceId เป็น null
-   * เพื่อล้างการผูกพอร์ตนั้นทิ้ง
-   */
-  const assignInterface = useCallback(
-    (deviceId: string, interfaceName: string, peerDeviceId: string | null) => {
-      updateActiveDiagram((active) => {
-        // หนึ่งพอร์ตผูกได้เส้นเดียว จึงต้องปลดพอร์ตนี้ออกจากเส้นเดิมก่อนเสมอ
-        let links = active.links.map((l) => {
-          if (l.source === deviceId && l.sourceInterface === interfaceName) {
-            return { ...l, sourceInterface: undefined };
-          }
-          if (l.target === deviceId && l.targetInterface === interfaceName) {
-            return { ...l, targetInterface: undefined };
-          }
-          return l;
-        });
-
-        if (peerDeviceId) {
-          const link = links.find(
-            (l) =>
-              (l.source === deviceId && l.target === peerDeviceId) ||
-              (l.target === deviceId && l.source === peerDeviceId)
-          );
-          if (!link) return null;
-          links = links.map((l) =>
-            l.id !== link.id
-              ? l
-              : l.source === deviceId
-              ? { ...l, sourceInterface: interfaceName }
-              : { ...l, targetInterface: interfaceName }
-          );
-        }
-
-        return { nodes: active.nodes, links };
-      });
-    },
-    []
-  );
-
-  /**
    * สร้างเส้นเชื่อมจากคู่พอร์ตที่ LLDP/CDP ตรวจพบ แล้วใส่ชื่อพอร์ตให้ทั้งสองฝั่งในครั้งเดียว
-   * ผู้ใช้เป็นคนกดเอง ระบบไม่ลากเส้นให้เองจากผลการตรวจจับ
+   *
+   * นี่เป็นทางเดียวที่ชื่อพอร์ตจะถูกเขียนลงเส้นเชื่อม — ระบบไม่เปิดให้กรอกเอง
+   * แต่ผู้ใช้ยังต้องกดปุ่มเอง ระบบไม่ลากเส้นให้อัตโนมัติจากผลการตรวจจับ
    */
   const applyNeighborLink = useCallback(
     (localId: string, localInterface: string, peerId: string, peerInterface?: string) => {
@@ -498,7 +457,6 @@ export function useTopologyLayout() {
     removeNode,
     addLink,
     removeLink,
-    assignInterface,
     applyNeighborLink,
     clearLayout,
     selectDiagram,
