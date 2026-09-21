@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Network,
   Server,
@@ -28,18 +28,23 @@ import {
 import {
   Hypervisor,
   VirtualMachine,
-  TopologyNode,
-  TopologyEdge,
+  NetworkDevice,
   SyslogEntry,
   Alert,
-  HealthStatus
+  HealthStatus,
+  DiscoveryResult,
+  DiscoveredNeighbor
 } from '@/types/ai-noc';
+import DeviceInventoryPanel from '@/components/DeviceInventoryPanel';
+import TopologyBuilder from '@/components/TopologyBuilder';
+import { parseLayout, useTopologyLayout } from '@/hooks/use-topology-layout';
+import { buildInterfacePeers } from '@/lib/interface-map';
+import { verifyLinks } from '@/lib/link-verification';
 
 interface InfrastructureViewProps {
   hypervisors: Hypervisor[];
   vms: VirtualMachine[];
-  nodes: TopologyNode[];
-  edges: TopologyEdge[];
+  networkDevices: NetworkDevice[];
   syslogs: SyslogEntry[];
   recentAlerts: Alert[];
   initialSubTab?: string;
@@ -74,8 +79,7 @@ function usageColor(pct: number) {
 export default function InfrastructureView({
   hypervisors,
   vms,
-  nodes,
-  edges,
+  networkDevices,
   syslogs,
   recentAlerts,
   initialSubTab = 'topology',
@@ -84,12 +88,89 @@ export default function InfrastructureView({
   const [subTab, setSubTab] = useState<'topology' | 'monitoring'>(
     initialSubTab === 'monitoring' ? 'monitoring' : 'topology'
   );
-  const [selectedNodeId, setSelectedNodeId] = useState<string>('node-fw');
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [selectedHypervisorId, setSelectedHypervisorId] = useState<string>('hyp-01');
   const [nodeDetailTab, setNodeDetailTab] = useState<'overview' | 'interfaces' | 'performance' | 'logs' | 'alerts' | 'vm-info'>('overview');
   const [hypDetailTab, setHypDetailTab] = useState<'overview' | 'performance' | 'vms' | 'datastores' | 'alerts' | 'logs'>('overview');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState('All');
+  const [importError, setImportError] = useState<string | undefined>(undefined);
+
+  // ผลการค้นหาอุปกรณ์จาก Zabbix / vCenter / Proxmox ผ่าน API Route ฝั่ง Server
+  const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
+  const [discoveryLoading, setDiscoveryLoading] = useState(true);
+  const [discoveryError, setDiscoveryError] = useState<string | undefined>(undefined);
+
+  // ผังที่ผู้ใช้ลากวางเอง เก็บไว้ใน localStorage เพราะ View ถูก unmount ทุกครั้งที่สลับแท็บ
+  const topology = useTopologyLayout();
+
+  // เพิ่มค่านี้เพื่อสั่งให้ Effect ด้านล่างค้นหาอุปกรณ์รอบใหม่
+  const [discoveryToken, setDiscoveryToken] = useState(0);
+
+  const loadDevices = () => {
+    setDiscoveryLoading(true);
+    setDiscoveryError(undefined);
+    setDiscoveryToken((t) => t + 1);
+  };
+
+  useEffect(() => {
+    // View นี้ถูก unmount ทุกครั้งที่สลับแท็บ จึงต้องกันไม่ให้คำตอบที่มาช้า
+    // ย้อนกลับมาเขียน State ของ Component ที่ถูกถอดออกไปแล้ว
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch('/api/discovery', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`เรียก /api/discovery ไม่สำเร็จ (HTTP ${res.status})`);
+        const data = (await res.json()) as DiscoveryResult;
+        if (!cancelled) setDiscovery(data);
+      } catch (e) {
+        if (!cancelled) setDiscoveryError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setDiscoveryLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [discoveryToken]);
+
+  const discoveredDevices = discovery?.devices ?? [];
+  const discoverySources = discovery?.sources ?? [];
+  const placedIds = new Set(topology.layout.nodes.map((n) => n.deviceId));
+
+  /** วางอุปกรณ์ลงผังโดยไม่ต้องลาก — ไล่เรียงเป็นตารางจากมุมซ้ายบน */
+  const addDeviceToCanvas = (deviceId: string) => {
+    const i = topology.layout.nodes.length;
+    topology.addNode(deviceId, 40 + (i % 6) * 190, 40 + Math.floor(i / 6) * 90);
+  };
+
+  const exportLayout = () => {
+    const blob = new Blob([JSON.stringify(topology.layout, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    // ใส่ชื่อผังลงในชื่อไฟล์ เพื่อให้แยกไฟล์ของแต่ละผังออกจากกันได้
+    const safeName = topology.activeDiagram.name.replace(/[\\/:*?"<>|]/g, '-').trim();
+    a.download = `ai-noc-topology-${safeName}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /** นำผังจากไฟล์เข้ามาเป็นผังใบใหม่เสมอ เพื่อไม่ให้ทับผังที่เปิดอยู่ */
+  const importLayout = async (file: File) => {
+    try {
+      const parsed = parseLayout(JSON.parse(await file.text()));
+      if (!parsed) {
+        setImportError('ไฟล์นี้ไม่ใช่ผัง Topology ของ AI-NOC (รูปแบบไม่ถูกต้อง)');
+        return;
+      }
+      topology.importDiagram(parsed);
+      setSelectedDeviceId(null);
+      setImportError(undefined);
+    } catch {
+      setImportError('อ่านไฟล์ไม่สำเร็จ — ต้องเป็นไฟล์ JSON ที่ Export จากระบบนี้');
+    }
+  };
 
   // Performance sample data
   const perfData = [
@@ -100,21 +181,86 @@ export default function InfrastructureView({
     { t: '15:42', cpu: 65, mem: 72, sto: 81, ready: 4.8, latency: 38.6 },
   ];
 
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId) || nodes[1];
+  const selectedDevice = discoveredDevices.find((d) => d.id === selectedDeviceId) ?? null;
   const selectedHyp = hypervisors.find((h) => h.id === selectedHypervisorId) || hypervisors[0];
 
-  // A topology node that represents a VM can be cross-referenced to its real
-  // VirtualMachine record (and from there, its host) by matching IP address.
-  const matchedVm = vms.find((v) => v.ipAddress === selectedNode.ipAddress);
+  // อุปกรณ์ที่ตรวจพบถูกโยงกลับไปหาเรกคอร์ดจริงในระบบด้วย IP ก่อน แล้วค่อยใช้ชื่อ
+  // เพราะ API ของ Hypervisor บางตัวไม่คืน IP ของ Guest มาให้ (ต้องมี Guest Agent)
+  const matchedVm = selectedDevice
+    ? vms.find(
+        (v) =>
+          (!!selectedDevice.ipAddress && v.ipAddress === selectedDevice.ipAddress) ||
+          v.name === selectedDevice.name
+      )
+    : undefined;
   const matchedVmHost = matchedVm ? hypervisors.find((h) => h.id === matchedVm.hypervisorId) : undefined;
-  const nodeAlerts = recentAlerts.filter(
-    (a) => (matchedVm && a.entityId === matchedVm.id) || a.entityName === selectedNode.label
-  );
 
-  // Syslog ของโหนดที่เลือกอยู่ — จับคู่ผ่าน VM ที่ IP ตรงกัน หรือชื่อโหนดตรงกับ source
-  const nodeLogs = syslogs.filter(
-    (s) => (matchedVm && s.sourceId === matchedVm.id) || s.sourceName === selectedNode.label
-  );
+  // อุปกรณ์เครือข่ายที่ค้นพบผ่าน SNMP มีข้อมูล Interface จริงให้แสดงในแท็บ Interfaces
+  const matchedNetDevice = selectedDevice
+    ? networkDevices.find(
+        (n) =>
+          (!!selectedDevice.ipAddress && n.ipAddress === selectedDevice.ipAddress) ||
+          n.name === selectedDevice.name
+      )
+    : undefined;
+
+  /** อุปกรณ์ที่เลือกอยู่ถูกเชื่อมกับตัวไหนบ้างบนผังปัจจุบัน */
+  const linkedPeerIds = selectedDevice
+    ? new Set(
+        topology.layout.links
+          .filter((l) => l.source === selectedDevice.id || l.target === selectedDevice.id)
+          .map((l) => (l.source === selectedDevice.id ? l.target : l.source))
+      )
+    : new Set<string>();
+
+  /** เพื่อนบ้าน LLDP/CDP ที่อุปกรณ์ซึ่งเลือกอยู่ประกาศไว้ */
+  const deviceNeighbors = selectedDevice
+    ? (discovery?.neighbors ?? []).filter((n) => n.localDeviceId === selectedDevice.id)
+    : [];
+
+  /**
+   * จับชื่อ/IP ที่ปลายทางประกาศมา กลับไปหาอุปกรณ์ในระบบ
+   * เทียบ IP ก่อนเพราะแม่นกว่า แล้วค่อยเทียบชื่อแบบไม่สนตัวพิมพ์
+   */
+  const matchNeighborDevice = (neighbor: DiscoveredNeighbor) => {
+    if (neighbor.remoteMgmtIp) {
+      const byIp = discoveredDevices.find((d) => d.ipAddress === neighbor.remoteMgmtIp);
+      if (byIp) return byIp;
+    }
+    const wanted = neighbor.remoteSysName.toLowerCase();
+    return discoveredDevices.find((d) => d.name.toLowerCase() === wanted);
+  };
+
+  const placedIdSet = placedIds;
+
+  /**
+   * ตรวจทุกเส้นบนผังที่เปิดอยู่เทียบกับ LLDP/CDP เพื่อกำหนดสีเส้นบนพื้นที่วาด
+   * คำนวณที่นี่เพราะเป็นจุดเดียวที่มีครบทั้งผัง อุปกรณ์ที่ค้นพบ และข้อมูลพอร์ต
+   */
+  /** พอร์ตของแต่ละอุปกรณ์ว่าต่อกับเครื่องไหน สำหรับ tooltip บนกล่องในผัง */
+  const interfacePeers = buildInterfacePeers({
+    devices: discoveredDevices,
+    neighbors: discovery?.neighbors ?? [],
+  });
+
+  const linkVerifications = verifyLinks(topology.layout.links, {
+    devices: discoveredDevices,
+    neighbors: discovery?.neighbors ?? [],
+    networkDevices,
+  });
+
+  const nodeAlerts = selectedDevice
+    ? recentAlerts.filter(
+        (a) => (matchedVm && a.entityId === matchedVm.id) || a.entityName === selectedDevice.name
+      )
+    : [];
+
+  // Syslog ของอุปกรณ์ที่เลือกอยู่ — จับคู่ผ่าน VM ที่ IP ตรงกัน หรือชื่อตรงกับ source
+  const nodeLogs = selectedDevice
+    ? syslogs.filter(
+        (s) => (matchedVm && s.sourceId === matchedVm.id) || s.sourceName === selectedDevice.name
+      )
+    : [];
 
   const hypVms = vms.filter((v) => v.hypervisorId === selectedHyp.id);
   const hypAlerts = recentAlerts.filter((a) => a.entityId === selectedHyp.id || a.entityName === selectedHyp.name);
@@ -128,7 +274,7 @@ export default function InfrastructureView({
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Infrastructure</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {subTab === 'topology'
-              ? 'แผนผังโครงสร้างเครือข่ายและระบบเสมือน (Interactive Topology Tree)'
+              ? 'อุปกรณ์ที่ตรวจพบจาก Zabbix / vCenter / Proxmox — ลากวางเพื่อสร้างผังเอง (Manual Topology Builder)'
               : 'ติดตามสถานะอุปกรณ์เครือข่าย และ Hypervisor (Device & Hypervisor Monitoring)'}
           </p>
         </div>
@@ -162,261 +308,97 @@ export default function InfrastructureView({
       {/* SUBTAB 1: TOPOLOGY */}
       {subTab === 'topology' && (
         <div className="space-y-6">
-          {/* Topology Controls Toolbar */}
-          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
-            <div className="flex items-center gap-2">
-              <button className="px-3 py-1.5 bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl text-xs font-semibold text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 shadow-sm">
-                <Sliders className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                Auto Layout
-              </button>
-              <button className="px-3 py-1.5 bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl text-xs font-semibold text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 shadow-sm">
-                <Maximize2 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                Fit to Screen
-              </button>
-              <button className="px-3 py-1.5 bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl text-xs font-semibold text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 shadow-sm">
-                <RefreshCw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                Refresh
-              </button>
+          {importError && (
+            <div className="bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-300 rounded-xl px-4 py-2 text-xs">
+              {importError}
             </div>
+          )}
 
-            {/* Legend */}
-            <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50"></span> Healthy
-              </span>
-              <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50"></span> Warning
-              </span>
-              <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50"></span> Critical
-              </span>
-              <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-500"></span> Unknown
-              </span>
-            </div>
-
-            {/* Search and Filters */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search device..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50 w-44"
-                />
+          {/* คลังอุปกรณ์ที่ตรวจพบ (ซ้าย) + พื้นที่วาดผังที่ผู้ใช้สร้างเอง (ขวา) */}
+          <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-4">
+            {/* ครอบด้วยกล่องตำแหน่งสัมพัทธ์ แล้วให้คลังอุปกรณ์ลอยเต็มกล่อง
+                ความสูงของแถวจึงถูกกำหนดโดยพื้นที่วาดฝั่งขวาเพียงอย่างเดียว
+                ไม่ใช่โดยจำนวนอุปกรณ์ในคลัง (จอเล็กกว่า lg ยังไหลตามปกติ) */}
+            <div className="relative">
+              <div className="lg:absolute lg:inset-0 lg:flex">
+            <DeviceInventoryPanel
+              devices={discoveredDevices}
+              sources={discoverySources}
+              placedIds={placedIds}
+              loading={discoveryLoading}
+              error={discoveryError}
+              onRefresh={loadDevices}
+              onAddDevice={addDeviceToCanvas}
+            />
               </div>
-
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500/50"
-              >
-                <option value="All" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">All Types</option>
-                <option value="firewall" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">Firewall</option>
-                <option value="switch" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">Switch</option>
-                <option value="vm" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">Virtual Machine</option>
-                <option value="hypervisor" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">Hypervisor</option>
-              </select>
             </div>
+
+            <TopologyBuilder
+              devices={discoveredDevices}
+              layout={topology.layout}
+              diagrams={topology.diagrams}
+              activeDiagram={topology.activeDiagram}
+              linkVerifications={linkVerifications}
+              interfacePeers={interfacePeers}
+              onSelectDiagram={(id) => {
+                topology.selectDiagram(id);
+                // อุปกรณ์ที่เลือกไว้อาจไม่มีอยู่ในผังใบใหม่ จึงล้างการเลือกทิ้ง
+                setSelectedDeviceId(null);
+              }}
+              onCreateDiagram={() => {
+                topology.createDiagram();
+                setSelectedDeviceId(null);
+              }}
+              onDuplicateDiagram={topology.duplicateDiagram}
+              onRenameDiagram={topology.renameDiagram}
+              onDeleteDiagram={(id) => {
+                topology.deleteDiagram(id);
+                setSelectedDeviceId(null);
+              }}
+              selectedDeviceId={selectedDeviceId}
+              onSelectDevice={setSelectedDeviceId}
+              onAddNode={topology.addNode}
+              onMoveNode={topology.moveNode}
+              onRemoveNode={(id) => {
+                topology.removeNode(id);
+                if (selectedDeviceId === id) setSelectedDeviceId(null);
+              }}
+              onAddLink={topology.addLink}
+              onRemoveLink={topology.removeLink}
+              onClear={() => {
+                topology.clearLayout();
+                setSelectedDeviceId(null);
+              }}
+              onExport={exportLayout}
+              onImport={importLayout}
+            />
           </div>
 
-          {/* Topology Canvas Container */}
-          <div className="bg-white dark:bg-slate-950/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl p-6 relative min-h-[460px] overflow-hidden shadow-2xl flex flex-col justify-between">
-            {/* Canvas Control overlay */}
-            <div className="absolute top-4 left-4 z-10 flex flex-col gap-1 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-white/10 rounded-xl p-1 backdrop-blur-md shadow-lg">
-              <button className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg">
-                <ZoomIn className="w-4 h-4" />
-              </button>
-              <button className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg">
-                <ZoomOut className="w-4 h-4" />
-              </button>
-              <button className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg">
-                <Maximize2 className="w-4 h-4" />
-              </button>
+          {/* แผงรายละเอียดของอุปกรณ์ที่เลือกอยู่บนผัง */}
+          {!selectedDevice ? (
+            <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-8 text-center shadow-lg">
+              <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+                ยังไม่ได้เลือกอุปกรณ์
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                คลิกกล่องอุปกรณ์บนผังเพื่อดูรายละเอียด เมตริก Alert และ Syslog ของอุปกรณ์นั้น
+              </p>
             </div>
-
-            {/* Hierarchical Tree Canvas Visualization */}
-            <div className="w-full h-full flex flex-col items-center justify-center space-y-8 my-4 py-2 relative">
-              {/* SVG Connecting Edges Layer */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-slate-900/10 dark:stroke-white/20" style={{ zIndex: 0 }}>
-                {/* Connector lines between hierarchy levels */}
-                <line x1="50%" y1="60" x2="50%" y2="120" stroke="#EF4444" strokeWidth="2" strokeDasharray="4 4" className="animate-pulse" />
-                <line x1="50%" y1="170" x2="50%" y2="230" stroke="#22C55E" strokeWidth="2" />
-                {/* Branches from Core Switch to Edge Devices */}
-                <path d="M 50% 270 L 15% 330" stroke="#22C55E" strokeWidth="2" fill="none" />
-                <path d="M 50% 270 L 32% 330" stroke="#22C55E" strokeWidth="2" fill="none" />
-                <path d="M 50% 270 L 50% 330" stroke="#F59E0B" strokeWidth="2" strokeDasharray="3 3" fill="none" />
-                <path d="M 50% 270 L 68% 330" stroke="#22C55E" strokeWidth="2" fill="none" />
-                <path d="M 50% 270 L 85% 330" stroke="#F59E0B" strokeWidth="2" fill="none" />
-              </svg>
-
-              {/* Level 1: Internet */}
-              <div className="z-10">
-                <div
-                  onClick={() => setSelectedNodeId('node-internet')}
-                  className={`px-5 py-2.5 bg-white dark:bg-white/5 backdrop-blur-md border rounded-2xl flex items-center gap-3 cursor-pointer transition-all shadow-lg ${
-                    selectedNodeId === 'node-internet'
-                      ? 'border-blue-500 ring-2 ring-blue-500/30'
-                      : 'border-emerald-500/60 hover:border-emerald-500'
-                  }`}
-                >
-                  <Radio className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                  <div>
-                    <span className="font-bold text-xs text-slate-900 dark:text-white block">Internet</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400">0.0.0.0/0</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Level 2: Firewall-VM (Critical) */}
-              <div className="z-10">
-                <div
-                  onClick={() => setSelectedNodeId('node-fw')}
-                  className={`px-5 py-3 bg-rose-500/10 backdrop-blur-md border-2 rounded-2xl flex items-center gap-3 cursor-pointer transition-all shadow-xl relative ${
-                    selectedNodeId === 'node-fw'
-                      ? 'border-rose-500 ring-4 ring-rose-500/20'
-                      : 'border-rose-500/70 hover:border-rose-400'
-                  }`}
-                >
-                  <span className="absolute -top-2 -right-2 bg-rose-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center animate-bounce shadow">
-                    2
-                  </span>
-                  <div className="w-9 h-9 rounded-xl bg-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400 border border-rose-500/30">
-                    <ShieldAlert className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-sm text-slate-900 dark:text-white">Firewall-VM</span>
-                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-rose-500/20 text-rose-600 dark:text-rose-300 rounded border border-rose-500/30">Critical</span>
-                    </div>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">10.0.0.1</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Level 3: Core Switch */}
-              <div className="z-10">
-                <div
-                  onClick={() => setSelectedNodeId('node-sw')}
-                  className={`px-5 py-2.5 bg-white dark:bg-white/5 backdrop-blur-md border rounded-2xl flex items-center gap-3 cursor-pointer transition-all shadow-lg ${
-                    selectedNodeId === 'node-sw'
-                      ? 'border-blue-500 ring-2 ring-blue-500/30'
-                      : 'border-emerald-500/60 hover:border-emerald-500'
-                  }`}
-                >
-                  <Network className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                  <div>
-                    <span className="font-bold text-xs text-slate-900 dark:text-white block">Core-Switch-01</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">10.0.0.2</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Level 4: Edge Nodes Row */}
-              <div className="z-10 flex flex-wrap items-center justify-center gap-4 w-full max-w-4xl px-4">
-                {/* Edge Router */}
-                <div
-                  onClick={() => setSelectedNodeId('node-router')}
-                  className={`p-3 bg-white dark:bg-white/5 backdrop-blur-md border rounded-xl flex items-center gap-2.5 cursor-pointer transition-all ${
-                    selectedNodeId === 'node-router' ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-emerald-500/50 hover:border-emerald-500'
-                  }`}
-                >
-                  <Server className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <div className="text-left">
-                    <span className="font-bold text-xs text-slate-900 dark:text-white block">Edge-Router-01</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">10.0.1.1</span>
-                  </div>
-                </div>
-
-                {/* Web VM */}
-                <div
-                  onClick={() => setSelectedNodeId('node-web')}
-                  className={`p-3 bg-white dark:bg-white/5 backdrop-blur-md border rounded-xl flex items-center gap-2.5 cursor-pointer transition-all relative ${
-                    selectedNodeId === 'node-web' ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-emerald-500/50 hover:border-emerald-500'
-                  }`}
-                >
-                  <Layers className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <div className="text-left">
-                    <span className="font-bold text-xs text-slate-900 dark:text-white block">Web-VM-01</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">10.0.1.10</span>
-                  </div>
-                </div>
-
-                {/* App VM (ERP) - Warning */}
-                <div
-                  onClick={() => setSelectedNodeId('node-app')}
-                  className={`p-3 bg-white dark:bg-white/5 backdrop-blur-md border rounded-xl flex items-center gap-2.5 cursor-pointer transition-all relative ${
-                    selectedNodeId === 'node-app' ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-amber-500/70 hover:border-amber-400'
-                  }`}
-                >
-                  <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-black text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                    !
-                  </span>
-                  <Layers className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <div className="text-left">
-                    <span className="font-bold text-xs text-slate-900 dark:text-white block">App-VM-01</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">10.0.1.20</span>
-                  </div>
-                </div>
-
-                {/* DB VM */}
-                <div
-                  onClick={() => setSelectedNodeId('node-db')}
-                  className={`p-3 bg-white dark:bg-white/5 backdrop-blur-md border rounded-xl flex items-center gap-2.5 cursor-pointer transition-all ${
-                    selectedNodeId === 'node-db' ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-emerald-500/50 hover:border-emerald-500'
-                  }`}
-                >
-                  <Database className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <div className="text-left">
-                    <span className="font-bold text-xs text-slate-900 dark:text-white block">DB-VM-01</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">10.0.1.30</span>
-                  </div>
-                </div>
-
-                {/* IDS VM */}
-                <div
-                  onClick={() => setSelectedNodeId('node-ids')}
-                  className={`p-3 bg-white dark:bg-white/5 backdrop-blur-md border rounded-xl flex items-center gap-2.5 cursor-pointer transition-all relative ${
-                    selectedNodeId === 'node-ids' ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-amber-500/70 hover:border-amber-400'
-                  }`}
-                >
-                  <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <div className="text-left">
-                    <span className="font-bold text-xs text-slate-900 dark:text-white block">IDS-VM-01</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">10.0.1.40</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Minimap Box overlay */}
-              <div className="absolute bottom-3 right-3 w-32 h-20 bg-white dark:bg-slate-950/80 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-xl p-1.5 flex flex-col justify-between shadow-lg">
-                <span className="text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold tracking-wider">Minimap</span>
-                <div className="w-full h-full flex flex-col items-center justify-center gap-1 opacity-60">
-                  <div className="w-4 h-1.5 bg-emerald-500 rounded"></div>
-                  <div className="w-6 h-2 bg-rose-500 rounded"></div>
-                  <div className="w-8 h-1.5 bg-emerald-500 rounded"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Topology Selected Node Detail Panel (at bottom of canvas) */}
+          ) : (
           <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-5 space-y-4 shadow-lg">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-white/10 pb-3">
               <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold ${statusClasses(selectedNode.status).icon}`}>
+                <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold ${statusClasses(selectedDevice.status).icon}`}>
                   <ShieldAlert className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-base text-slate-900 dark:text-white">{selectedNode.label}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full border font-bold uppercase ${statusClasses(selectedNode.status).badge}`}>
-                      {selectedNode.status}
+                    <h3 className="font-bold text-base text-slate-900 dark:text-white">{selectedDevice.name}</h3>
+                    <span className={`text-xs px-2 py-0.5 rounded-full border font-bold uppercase ${statusClasses(selectedDevice.status).badge}`}>
+                      {selectedDevice.status}
                     </span>
                   </div>
-                  <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{selectedNode.ipAddress}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">{selectedDevice.ipAddress || '—'}</span>
                 </div>
               </div>
 
@@ -445,8 +427,8 @@ export default function InfrastructureView({
                     Device Information
                   </h4>
                   <div className="space-y-1.5">
-                    <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Type:</span> <span className="font-semibold text-slate-900 dark:text-white capitalize">{matchedVm ? `Virtual Machine (${matchedVm.role})` : selectedNode.nodeType}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">IP Address:</span> <span className="font-mono text-slate-900 dark:text-white">{selectedNode.ipAddress}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Type:</span> <span className="font-semibold text-slate-900 dark:text-white capitalize">{matchedVm ? `Virtual Machine (${matchedVm.role})` : selectedDevice.kind}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">IP Address:</span> <span className="font-mono text-slate-900 dark:text-white">{selectedDevice.ipAddress || '—'}</span></div>
                     <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Vendor / Model:</span> <span className="font-semibold text-blue-600 dark:text-blue-400">{matchedVm?.vendorModel ?? '—'}</span></div>
                     <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Uptime:</span> <span className="text-slate-900 dark:text-white">{matchedVm ? formatUptime(matchedVm.uptimeSeconds) : '—'}</span></div>
                     <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Location Host:</span> <span className="text-slate-900 dark:text-white">{matchedVmHost?.name ?? '—'}</span></div>
@@ -492,8 +474,8 @@ export default function InfrastructureView({
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500 dark:text-slate-400">Overall Status:</span>
-                      <span className={`px-2 py-0.5 rounded-full font-bold uppercase border ${statusClasses(selectedNode.status).badge}`}>
-                        {selectedNode.status}
+                      <span className={`px-2 py-0.5 rounded-full font-bold uppercase border ${statusClasses(selectedDevice.status).badge}`}>
+                        {selectedDevice.status}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -602,36 +584,133 @@ export default function InfrastructureView({
               </div>
             )}
 
-            {/* Interfaces Tab */}
+            {/* Interfaces Tab — ใช้ข้อมูลจริงของอุปกรณ์ที่ค้นพบผ่าน SNMP */}
             {nodeDetailTab === 'interfaces' && (
               <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-xs">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
-                      <th className="pb-2">Interface</th>
-                      <th className="pb-2">Status</th>
-                      <th className="pb-2">Utilization</th>
-                      <th className="pb-2">Packet Loss</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                    <tr>
-                      <td className="py-2 font-mono text-slate-900 dark:text-white">vtnet0 (WAN)</td>
-                      <td className="py-2 text-emerald-600 dark:text-emerald-400 font-bold">UP</td>
-                      <td className="py-2 text-slate-900 dark:text-white">82%</td>
-                      <td className="py-2 text-rose-600 dark:text-rose-400 font-bold">2.1%</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 font-mono text-slate-900 dark:text-white">vtnet1 (LAN)</td>
-                      <td className="py-2 text-emerald-600 dark:text-emerald-400 font-bold">UP</td>
-                      <td className="py-2 text-slate-900 dark:text-white">45%</td>
-                      <td className="py-2 text-emerald-600 dark:text-emerald-400 font-bold">0%</td>
-                    </tr>
-                  </tbody>
-                </table>
+                {!matchedNetDevice ? (
+                  <p className="text-slate-500 py-4 text-center">
+                    อุปกรณ์นี้ไม่มีข้อมูล Interface — ระบบอ่านค่ารายพอร์ตได้เฉพาะอุปกรณ์เครือข่าย
+                    ที่ค้นพบผ่าน SNMP เท่านั้น
+                  </p>
+                ) : (
+                  <>
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-white/10">
+                          <th className="pb-2">Interface</th>
+                          <th className="pb-2">Status</th>
+                          <th className="pb-2">Utilization</th>
+                          <th className="pb-2">Packet Loss</th>
+                          <th className="pb-2">เชื่อมกับ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                        {matchedNetDevice.interfaces.map((iface) => {
+                          // ปลายสายมาจากที่อุปกรณ์ประกาศเองผ่าน LLDP/CDP เท่านั้น
+                          const detected = deviceNeighbors.find((n) => n.localInterface === iface.name);
+                          const detectedDevice = detected ? matchNeighborDevice(detected) : undefined;
+                          const alreadyLinked = detectedDevice && linkedPeerIds.has(detectedDevice.id);
+                          const shownName = detectedDevice?.name ?? detected?.remoteSysName;
+
+                          return (
+                            <tr key={iface.name}>
+                              <td className="py-2 font-mono text-slate-900 dark:text-white">{iface.name}</td>
+                              <td
+                                className={`py-2 font-bold ${
+                                  iface.operStatus === 'up'
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-rose-600 dark:text-rose-400'
+                                }`}
+                              >
+                                {iface.operStatus.toUpperCase()}
+                              </td>
+                              <td className="py-2 text-slate-900 dark:text-white">{iface.utilizationPercent}%</td>
+                              <td
+                                className={`py-2 font-bold ${
+                                  iface.packetLossPercent > 0
+                                    ? 'text-rose-600 dark:text-rose-400'
+                                    : 'text-emerald-600 dark:text-emerald-400'
+                                }`}
+                              >
+                                {iface.packetLossPercent}%
+                              </td>
+                              <td className="py-2 space-y-1 align-top">
+                                {shownName ? (
+                                  <>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-semibold text-slate-900 dark:text-white">
+                                        {shownName}
+                                      </span>
+                                      {detected && (
+                                        <span
+                                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${
+                                            detected.protocol === 'cdp'
+                                              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30'
+                                              : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/30'
+                                          }`}
+                                          title="ตรวจพบอัตโนมัติจากที่อุปกรณ์ปลายทางประกาศตัวเอง"
+                                        >
+                                          {detected.protocol}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                                      {detected?.remotePortId
+                                        ? `พอร์ต ${detected.remotePortId}`
+                                        : 'ไม่ทราบพอร์ตปลายทาง'}
+                                      {detected?.remoteMgmtIp ? ` · ${detected.remoteMgmtIp}` : ''}
+                                    </div>
+
+                                    {!detectedDevice && (
+                                      <div className="text-[10px] text-amber-600 dark:text-amber-400">
+                                        ไม่อยู่ในรายการอุปกรณ์ที่ระบบค้นพบ
+                                      </div>
+                                    )}
+                                    {detectedDevice && !placedIdSet.has(detectedDevice.id) && (
+                                      <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                                        ยังไม่ได้วางอุปกรณ์นี้บนผัง
+                                      </div>
+                                    )}
+                                    {detectedDevice && !alreadyLinked && placedIdSet.has(detectedDevice.id) && (
+                                      <button
+                                        onClick={() =>
+                                          topology.applyNeighborLink(
+                                            selectedDevice.id,
+                                            iface.name,
+                                            detectedDevice.id,
+                                            detected?.remotePortId
+                                          )
+                                        }
+                                        className="text-[10px] font-semibold text-blue-600 dark:text-blue-300 hover:underline"
+                                      >
+                                        + เพิ่มเส้นเชื่อมนี้ลงผัง
+                                      </button>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-slate-500 dark:text-slate-400" title="ไม่มีเพื่อนบ้านประกาศตัวมาที่พอร์ตนี้">
+                                    —
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3 pt-3 border-t border-slate-200 dark:border-white/10">
+                      {deviceNeighbors.length > 0
+                        ? `ปลายทางทั้งหมดมาจากที่อุปกรณ์ประกาศตัวเองผ่าน LLDP/CDP (พบ ${deviceNeighbors.length} พอร์ต) ระบบไม่เปิดให้กรอกเอง เพื่อให้ข้อมูลตรงกับการเดินสายจริงเสมอ`
+                        : 'ยังไม่พบข้อมูล LLDP/CDP ของอุปกรณ์นี้ — ตรวจว่าเปิด LLDP/CDP ที่อุปกรณ์แล้ว และ Zabbix เก็บค่าจาก SNMP มาให้ครบหรือยัง'}
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>
+          )}
         </div>
       )}
 

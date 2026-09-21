@@ -335,3 +335,143 @@ export interface Integration {
   details: IntegrationDetail[];
   addedAt?: string;             // เวลาที่เพิ่มผ่าน Add Integration Wizard
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Device Discovery — อุปกรณ์ที่ "ตรวจพบ" จากระบบเฝ้าระวังจริง
+   (Zabbix ผ่าน SNMP / Zabbix Agent และ API ของ Hypervisor Type 1)
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/** ระบบต้นทางที่ไปดึงรายชื่ออุปกรณ์มา */
+export type DiscoverySourceId = 'zabbix' | 'vmware-vcenter' | 'proxmox-ve';
+
+/** วิธีที่อุปกรณ์ถูกตรวจพบ — ใช้แยกป้ายกำกับบนการ์ดในคลังอุปกรณ์ */
+export type DiscoveryMethod = 'snmp' | 'zabbix-agent' | 'hypervisor-api';
+
+/** ชนิดอุปกรณ์ที่ใช้เลือกไอคอนบนผัง */
+export type DiscoveredDeviceKind =
+  | 'firewall'
+  | 'switch'
+  | 'router'
+  | 'hypervisor'
+  | 'vm'
+  | 'storage'
+  | 'unknown';
+
+export interface DiscoveredDevice {
+  /** คีย์เสถียรข้ามการ Refresh: `<source>:<nativeId>` */
+  id: string;
+  /** id ฝั่งระบบต้นทาง (Zabbix hostid, vCenter host/vm id, Proxmox vmid) */
+  nativeId: string;
+  name: string;
+  ipAddress: string;
+  source: DiscoverySourceId;
+  method: DiscoveryMethod;
+  kind: DiscoveredDeviceKind;
+  status: HealthStatus;
+  /** OS หรือรุ่นอุปกรณ์ เช่น "Ubuntu 22.04 LTS", "Cisco IOS 15.2" */
+  osOrVendor?: string;
+  /** ชื่อ Hypervisor ที่ VM ตัวนี้รันอยู่ (เฉพาะ VM) */
+  parentName?: string;
+  lastSeen?: string;
+  tags?: string[];
+}
+
+/** สถานะการเชื่อมต่อของแต่ละต้นทางในรอบ Discovery หนึ่งครั้ง */
+export interface DiscoverySourceStatus {
+  id: DiscoverySourceId;
+  label: string;
+  /** true = ดึงจากระบบจริง, false = ใช้ข้อมูลจำลองเพราะยังไม่ได้ตั้งค่า env */
+  live: boolean;
+  deviceCount: number;
+  /** ข้อความผิดพลาดเมื่อเรียกระบบจริงไม่สำเร็จ (ไม่มี = สำเร็จ) */
+  error?: string;
+}
+
+/** โปรโตคอลที่ใช้ประกาศตัวกับอุปกรณ์ข้างเคียง */
+export type NeighborProtocol = 'lldp' | 'cdp';
+
+/**
+ * เพื่อนบ้านที่อุปกรณ์ตรวจพบเองผ่าน LLDP/CDP
+ *
+ * อุปกรณ์เครือข่ายประกาศชื่อและพอร์ตของตัวเองออกไปทุกพอร์ตเป็นระยะ ฝั่งตรงข้าม
+ * จึงรู้ว่า "พอร์ตนี้ปลายสายคือใคร" โดยไม่ต้องให้คนกรอก — ระบบอ่านค่านี้ผ่าน
+ * Zabbix ซึ่ง SNMP walk ตาราง LLDP-MIB / CISCO-CDP-MIB มาเก็บไว้
+ */
+export interface DiscoveredNeighbor {
+  /** อุปกรณ์ฝั่งที่มองเห็น (DiscoveredDevice.id) */
+  localDeviceId: string;
+  /** พอร์ตของฝั่งนี้ เช่น "Gi0/1" */
+  localInterface: string;
+  protocol: NeighborProtocol;
+  /** ชื่อที่ปลายทางประกาศมา (sysName ของ LLDP หรือ deviceId ของ CDP) */
+  remoteSysName: string;
+  /** พอร์ตที่ปลายทางประกาศมา เช่น "lan0" */
+  remotePortId?: string;
+  /** IP สำหรับจัดการของปลายทาง ใช้จับคู่กับอุปกรณ์ในระบบได้แม่นกว่าชื่อ */
+  remoteMgmtIp?: string;
+}
+
+export interface DiscoveryResult {
+  devices: DiscoveredDevice[];
+  /** คู่พอร์ตที่อุปกรณ์ตรวจพบเองผ่าน LLDP/CDP */
+  neighbors: DiscoveredNeighbor[];
+  sources: DiscoverySourceStatus[];
+  fetchedAt: string;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Topology Layout — ผังที่ "ผู้ใช้ลากวางเอง" เท่านั้น
+   ระบบไม่สร้างผังอัตโนมัติ: อุปกรณ์ที่ตรวจพบจะอยู่ในคลังจนกว่าจะถูกลากลงผัง
+   ──────────────────────────────────────────────────────────────────────────── */
+
+export interface TopologyLayoutNode {
+  /** อ้างถึง DiscoveredDevice.id */
+  deviceId: string;
+  x: number;
+  y: number;
+}
+
+export interface TopologyLayoutLink {
+  id: string;
+  source: string;               // DiscoveredDevice.id
+  target: string;               // DiscoveredDevice.id
+  linkStatus: 'up' | 'down' | 'degraded';
+  label?: string;
+  /**
+   * พอร์ตที่ใช้เชื่อมของแต่ละฝั่ง เช่น "Gi0/1" — ผู้ใช้ระบุเองจากแท็บ Interfaces
+   * ระบบไม่เดาให้ เพราะการจับคู่พอร์ตต้องดูจากการเดินสายจริง
+   * (ถ้าต่อ Zabbix จริงในอนาคต อาจเติมให้อัตโนมัติจาก LLDP/CDP neighbor ได้)
+   */
+  sourceInterface?: string;
+  targetInterface?: string;
+}
+
+/** ผังหนึ่งใบ — ใช้เป็นทั้งรูปแบบไฟล์ Export และเนื้อหาของผังที่กำลังแก้ไขอยู่ */
+export interface TopologyLayout {
+  /** ใช้ตรวจความเข้ากันได้ตอนอ่านจาก localStorage หรือไฟล์ที่ Import เข้ามา */
+  version: 1;
+  /** ชื่อผัง — ไฟล์ที่ Export จากเวอร์ชันก่อนหน้าไม่มีฟิลด์นี้ จึงเป็นตัวเลือก */
+  name?: string;
+  nodes: TopologyLayoutNode[];
+  links: TopologyLayoutLink[];
+  updatedAt: string;
+}
+
+/** ผังหนึ่งใบที่ถูกบันทึกไว้ในระบบ (มีชื่อและรหัสประจำผัง) */
+export interface TopologyDiagram {
+  id: string;
+  name: string;
+  nodes: TopologyLayoutNode[];
+  links: TopologyLayoutLink[];
+  updatedAt: string;
+}
+
+/**
+ * คลังผังทั้งหมดของผู้ใช้ — เก็บได้หลายผังและจำว่ากำลังเปิดผังไหนอยู่
+ * เช่น แยกผังตามอาคาร ตามวง VLAN หรือเก็บผัง "ก่อน/หลัง" การปรับปรุงระบบ
+ */
+export interface TopologyWorkspace {
+  version: 2;
+  diagrams: TopologyDiagram[];
+  activeId: string;
+}

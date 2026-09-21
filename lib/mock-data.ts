@@ -20,7 +20,9 @@ import {
   ChatSession,
   ChatMessage,
   SyslogEntry,
-  Integration
+  Integration,
+  NetworkDevice,
+  DiscoveredNeighbor
 } from '@/types/ai-noc';
 import mockDataJson from './mock-data.json';
 
@@ -39,6 +41,8 @@ export interface MockData {
   chatMessages: ChatMessage[];
   syslogs: SyslogEntry[];
   integrations: Integration[];
+  networkDevices: NetworkDevice[];
+  lldpNeighbors: DiscoveredNeighbor[];
 }
 
 // JSON ให้ชนิดเป็น string กว้างๆ จึง cast กลับเป็น union types ที่ประกาศไว้ใน types/ai-noc
@@ -60,6 +64,8 @@ export const initialChatSessions: ChatSession[] = data.chatSessions;
 export const initialChatMessages: ChatMessage[] = data.chatMessages;
 export const sampleSyslogs: SyslogEntry[] = data.syslogs;
 export const initialIntegrations: Integration[] = data.integrations;
+export const initialNetworkDevices: NetworkDevice[] = data.networkDevices;
+export const initialLldpNeighbors: DiscoveredNeighbor[] = data.lldpNeighbors;
 
 // Alias Exports matching app imports
 export const MOCK_HYPERVISORS = initialHypervisors;
@@ -76,3 +82,5 @@ export const MOCK_CHAT_SESSIONS = initialChatSessions;
 export const MOCK_CHAT_MESSAGES = initialChatMessages;
 export const MOCK_SYSLOGS = sampleSyslogs;
 export const MOCK_INTEGRATIONS = initialIntegrations;
+export const MOCK_NETWORK_DEVICES = initialNetworkDevices;
+export const MOCK_LLDP_NEIGHBORS = initialLldpNeighbors;
