@@ -258,7 +258,68 @@ server {
 
 ```bash
 # ก) จากเครื่องพัฒนา — ไม่ต้องใช้สิทธิ์เข้าถึง repo บนเซิร์ฟเวอร์
-git archive --format=tar HEAD | gzip > src.tgz
+# บน Windows ต้องใส่ -c core.autocrlf=false -c core.eol=lf ด้วย ไม่งั้น git archive
+# จะแปลงทุกไฟล์เป็น CRLF ติดขึ้นไปกับเซิร์ฟเวอร์ แล้ว bash จะรันสคริปต์ไม่ได้
+# (ขึ้น error แบบ syntax error near unexpected token `
+scp src.tgz root@<server>:/tmp/
+ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz"
+ssh root@<server> "sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
+
+# ข) บนเซิร์ฟเวอร์ — ต้องมีสิทธิ์ clone repo จากเครื่องนั้นได้
+sudo -u ghrunner git clone https://github.com/Alif024/final_project_kmutnb.git /home/ghrunner/src
+```
+
+**ขั้นที่ 2 — สั่ง Deploy**
+
+```bash
+sudo -iu ghrunner
+./manual-deploy.sh ~/src
+```
+
+สคริปต์จะ Build → ประกอบชุดไฟล์ → วาง Release ใหม่ → สลับ Symlink → `sudo -n systemctl restart`
+→ ตรวจสุขภาพ 30 ครั้ง (60 วินาที) → ถ้าไม่ผ่านจะย้อน Symlink กลับและ restart ให้เอง
+→ ลบ Release เก่าที่เกินโควตา ปรับค่าได้ด้วยตัวแปรเดียวกับ Workflow เช่น
+`HEALTH_URL=http://127.0.0.1:3001/ KEEP_RELEASES=5 ./manual-deploy.sh ~/src`
+
+> ชื่อโฟลเดอร์ Release จะลงท้ายด้วย `-manual` เมื่อซอร์สไม่ได้มาจาก git clone
+> (ไฟล์จาก `git archive` ไม่มีโฟลเดอร์ `.git` ติดมาด้วย)
+
+## คำสั่งที่ใช้บ่อย
+
+```bash
+# ดูว่าตอนนี้รันเวอร์ชันไหน
+readlink -f /opt/ai-noc/current
+
+# รายการเวอร์ชันที่ยังเก็บไว้ (ใหม่ไปเก่า)
+ls -1dt /opt/ai-noc/releases/*/
+
+# ย้อนกลับด้วยมือ
+sudo -u ghrunner ln -sfn /opt/ai-noc/releases/<ชื่อโฟลเดอร์เก่า> /opt/ai-noc/current.tmp
+sudo -u ghrunner mv -T /opt/ai-noc/current.tmp /opt/ai-noc/current
+sudo systemctl restart ai-noc
+```
+
+## ข้อควรรู้
+
+- **ย้อนกลับอัตโนมัติมีเฉพาะกรณี Health Check ไม่ผ่าน** ถ้าแอปขึ้นได้แต่ทำงานผิด
+  ต้องย้อนเองด้วยคำสั่งด้านบน
+- **Build กินแรงเครื่อง** `next build` ใช้ CPU/RAM พอสมควรบนเครื่องเดียวกับที่แอปรัน
+  ถ้าเซิร์ฟเวอร์เล็ก ให้ตั้งเวลา Deploy นอกเวลาทำการ หรือย้ายไป Build บนเครื่องอื่นแล้วส่งไฟล์มาแทน
+- **ทุกครั้งเป็นการ Build แบบเย็น** `actions/checkout` ล้าง Workspace ด้วย `git clean -ffdx`
+  ทั้ง `node_modules` และ `.next` จึงหายทุกรอบ ผลลัพธ์แน่นอนกว่าแต่ช้ากว่า ถ้าช้าจนชน
+  `timeout-minutes: 30` ค่อยเพิ่ม `with: clean: false` ให้ `actions/checkout` เพื่อเก็บแคช `.next` ไว้
+- **`npm ci` ดึง `firebase-tools` มาด้วยทุกรอบ** ทั้งที่ `next build` ไม่ได้ใช้ เพราะอยู่ใน
+  `devDependencies` ซึ่งจำเป็นต่อ build ตัวอื่น (typescript/tailwind) จึงตัดทิ้งทั้งชุดไม่ได้
+  ถ้าต้องการให้เร็วขึ้นจริง ๆ ต้องถอด `firebase-tools` ออกจาก `package.json` ซึ่งเป็นการแก้โปรเจกต์
+  ไม่ใช่แก้ Workflow (แพ็กเกจ `re2` ที่พ่วงมาเป็น optional — คอมไพล์ไม่ผ่านก็ข้ามไป ไม่ทำให้ `npm ci` ล้ม)
+- **ฐานข้อมูลผังเครือข่ายอยู่ที่ `localStorage` ของเบราว์เซอร์** (`ai-noc:topology-workspace`)
+  การ Deploy จึงไม่กระทบผังที่ผู้ใช้วาดไว้ และการย้ายเครื่องก็ไม่ได้พาผังไปด้วย
+- **ไฟล์ `.env*` ถูก `.gitignore` ไว้** ชุดไฟล์ที่ปล่อยขึ้นเซิร์ฟเวอร์จึงไม่มีค่าลับติดไปด้วย
+  ค่าทุกตัวมาจาก `EnvironmentFile` ของ systemd เท่านั้น
+- **ห้ามใช้ `npm run start`** เพราะ `next start` ไม่รองรับ `output: 'standalone'`
+  ต้องรัน `node server.js` ในโฟลเดอร์ Release ตามที่ unit ตั้งไว้
+do'`)
+git -c core.autocrlf=false -c core.eol=lf archive --format=tar HEAD | gzip > src.tgz
 scp src.tgz root@<server>:/tmp/
 ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz"
 ssh root@<server> "sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
