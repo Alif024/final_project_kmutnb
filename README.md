@@ -112,13 +112,26 @@
   ที่ติดตั้งบนเครื่องปลายทางเอง** Build ที่นั่นแล้วสลับ Symlink `current` ไปเวอร์ชันใหม่
   ก่อนสั่ง `systemctl restart` ตรวจสุขภาพด้วย HTTP และ **ย้อนกลับเวอร์ชันเดิมอัตโนมัติ**
   เมื่อแอปไม่ตอบใน 60 วินาที ไม่ต้องใช้ SSH Key หรือ Secret ใด ๆ ใน GitHub
-- `.github/workflows/ci.yml` — ตรวจ `tsc --noEmit`, `eslint` และ `build` ทุก Pull Request
+- `.github/workflows/ci.yml` — ตรวจ `tsc --noEmit`, `eslint` และ `build` ก่อน Merge
 - `deploy/` — แม่แบบ systemd unit, ไฟล์สิทธิ์ sudo เฉพาะคำสั่งที่ต้องใช้
   และคู่มือตั้งค่าเครื่อง Linux กับ Self-hosted Runner ทีละขั้น
 - **เครื่องปลายทางไม่ต้องตั้งค่าอะไรเลยก็รันได้** ตามสถานะปัจจุบันที่ยังใช้ข้อมูลจำลอง
   (unit ใช้ `EnvironmentFile=-` จึงสตาร์ตได้แม้ไม่มีไฟล์ค่าลับ) ใส่เฉพาะ `GEMINI_API_KEY`
   เมื่อต้องการให้ AI Chat เรียกโมเดลจริง ส่วนตัวแปรของ Zabbix/vCenter/Proxmox เติมทีหลังได้
   ทีละต้นทางโดยไม่ต้องแก้ Workflow
+
+**ทดสอบกับเซิร์ฟเวอร์จริงแล้ว** (Ubuntu 24.04, 2 vCPU / 3 GB) — รันทุกคำสั่งของ `deploy.yml`
+ในฐานะผู้ใช้ที่รัน Runner ผ่านครบ: `npm ci` 30 วินาที, `tsc` 9 วินาที, `lint` 12 วินาที,
+`build` 61 วินาที, ชุด Release 68 MB, สลับ Symlink และ restart ผ่าน Health Check ในครั้งแรก
+รวมประมาณ 2 นาที จากนั้น **ย้ายระบบที่ให้บริการอยู่มาใช้โครงนี้แล้ว** — จากเดิมที่ Deploy
+ด้วยมือไว้ใน `/root/project_app` และรันเป็น root มาเป็น `/opt/ai-noc/current`
+ที่รันด้วยผู้ใช้ธรรมดา โดยเก็บของเดิมและ unit เดิมไว้เป็นทางถอย
+
+- เพิ่ม `deploy/manual-deploy.sh` — Deploy ด้วยมือด้วยขั้นตอนเดียวกับ Workflow ทุกคำสั่ง
+  รวมการย้อนเวอร์ชันอัตโนมัติ ใช้ตอนที่สั่งผ่าน GitHub Actions ไม่ได้
+- **พัก trigger อัตโนมัติของทั้งสอง Workflow ไว้ชั่วคราว** (เหลือ `workflow_dispatch`)
+  เพราะบัญชี GitHub ถูกล็อกการเรียกเก็บเงิน ทุก Run จึงตายที่ Startup failure แล้วส่งเมลแจ้ง
+  คอมเมนต์หัวไฟล์ทั้งสองระบุไว้แล้วว่าต้องใส่ trigger อะไรกลับเมื่อปลดล็อก
 
 ไม่มีการแก้โค้ดแอปในรอบนี้ — ทั้ง `/api/ai/chat` และ `lib/device-discovery.ts`
 กลับไปใช้ข้อมูลจำลองรายต้นทางอยู่แล้วเมื่อไม่มีค่าใน env
@@ -142,8 +155,8 @@
 | ฐานข้อมูล / การคงข้อมูลถาวร | ❌ ยังไม่มีฐานข้อมูล — State ส่วนใหญ่หายเมื่อรีเฟรช ยกเว้นคลังผัง Topology ที่เก็บใน `localStorage` ของเบราว์เซอร์ |
 | การยืนยันตัวตน (Authentication) | ❌ ยังไม่มี — RBAC เป็น Role Switcher สำหรับสาธิต |
 | Export PDF / Excel | ❌ เป็นปุ่ม Stub (`alert()`) ยกเว้นปุ่ม Print ที่ใช้ `window.print()` ได้ |
-| CI (ตรวจ Type / Lint / Build อัตโนมัติ) | ✅ GitHub Actions — `ci.yml` ทุก Pull Request และ `deploy.yml` ตรวจซ้ำก่อนปล่อยขึ้นเซิร์ฟเวอร์ |
-| Deploy ขึ้นเซิร์ฟเวอร์ Linux (Self-hosted Runner + systemd) | 🟡 ทดสอบทุกคำสั่งบนเซิร์ฟเวอร์จริงแล้วผ่านหมด (`npm ci` → `tsc` → `lint` → `build` → วาง release → สลับ symlink → restart → health check รวม ~2 นาที) และย้ายระบบที่ให้บริการอยู่มาใช้โครงนี้แล้ว เหลือยืนยันการสั่งงานอัตโนมัติจากฝั่ง GitHub Actions |
+| CI (ตรวจ Type / Lint / Build อัตโนมัติ) | 🟡 เขียน `ci.yml` และ `deploy.yml` ครบแล้ว แต่ **พัก trigger อัตโนมัติไว้ชั่วคราว** เพราะบัญชี GitHub ถูกล็อกการเรียกเก็บเงิน ทุก Run จึงตายที่ Startup failure — ดูข้อจำกัดข้อ 13 |
+| Deploy ขึ้นเซิร์ฟเวอร์ Linux (Self-hosted Runner + systemd) | 🟡 ทดสอบทุกคำสั่งบนเซิร์ฟเวอร์จริงแล้วผ่านหมด (`npm ci` → `tsc` → `lint` → `build` → วาง release → สลับ symlink → restart → health check รวม ~2 นาที) และย้ายระบบที่ให้บริการอยู่มาใช้โครงนี้แล้ว เหลือยืนยันการสั่งงานอัตโนมัติจากฝั่ง GitHub Actions ซึ่งติดที่ billing ของบัญชี ระหว่างนี้ปล่อยเวอร์ชันด้วย `deploy/manual-deploy.sh` ได้ |
 | Unit Test | ❌ ยังไม่มี — ไม่มี Test Runner หรือไฟล์ทดสอบในโปรเจกต์ |
 
 ---
@@ -341,7 +354,8 @@ final_project_kmutnb/
 ├── deploy/
 │   ├── README.md                # ขั้นตอนตั้งค่าเครื่อง Linux + Self-hosted Runner
 │   ├── ai-noc.service           # แม่แบบ systemd unit ของเซิร์ฟเวอร์ปลายทาง
-│   └── ai-noc-deploy.sudoers    # สิทธิ์ sudo เฉพาะคำสั่ง restart/status ของ service
+│   ├── ai-noc-deploy.sudoers    # สิทธิ์ sudo เฉพาะคำสั่ง restart/status ของ service
+│   └── manual-deploy.sh         # Deploy ด้วยมือ ใช้ขั้นตอนเดียวกับ deploy.yml ทุกคำสั่ง
 ├── metadata.json                # Manifest สำหรับ Google AI Studio
 └── bugs.txt                     # บันทึกผลตรวจสอบบั๊กทั้งแอป (รายการที่แก้แล้ว/ยังไม่แก้)
 ```
