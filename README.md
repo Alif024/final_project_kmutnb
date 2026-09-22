@@ -265,7 +265,9 @@ git pull
 # ใช้ --format=tar.gz ให้ git บีบอัดเอง จะได้ไม่ต้องพึ่ง gzip ซึ่งไม่มีใน PATH ของ cmd/PowerShell
 git -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o src.tgz HEAD
 
-scp src.tgz root@<server>:/tmp/
+# -O บังคับให้ scp ใช้โปรโตคอลเดิมแทน SFTP เพราะ sshd ของเครื่องนี้ปิด Subsystem sftp ไว้
+# ถ้าไม่ใส่จะขึ้น "subsystem request failed on channel 0"
+scp -O src.tgz root@<server>:/tmp/
 ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz && rm -f /tmp/src.tgz && sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
 
 # ── ขั้นที่ 2: บนเซิร์ฟเวอร์ — สั่ง Deploy ────────────────────────────────────

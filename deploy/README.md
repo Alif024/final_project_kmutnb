@@ -36,6 +36,7 @@ Build เกิดบนเครื่องปลายทางทั้ง�
 | พอร์ตของแอป | `127.0.0.1:3001` |
 | Reverse Proxy | Nginx site `ai-noc.n8n-lifrpi.uk` → `proxy_pass http://127.0.0.1:3001` |
 | ไฟล์ค่าลับ | `/etc/ai-noc/ai-noc.env` (ยังไม่มี `GEMINI_API_KEY` — AI Chat จึงอยู่ในโหมดจำลอง) |
+| SFTP | ❌ `Subsystem sftp` ถูกคอมเมนต์ไว้ใน `/etc/ssh/sshd_config` บรรทัด 115 — `scp` ต้องใส่ `-O` เสมอ |
 
 > **ย้ายมาใช้โครงนี้แล้วเมื่อ 22 กันยายน 2569** — ก่อนหน้านั้นแอปถูก Deploy ด้วยมือไว้ที่
 > `/root/project_app` และรันเป็น root ตอนนี้ service รันเป็น `ghrunner` จาก `/opt/ai-noc/current`
@@ -280,7 +281,8 @@ server {
 # บน Windows ต้องใส่ -c core.autocrlf=false -c core.eol=lf ด้วย ไม่งั้น git archive
 # จะแปลงทุกไฟล์เป็น CRLF ติดขึ้นไปกับเซิร์ฟเวอร์ แล้ว bash จะรันสคริปต์ไม่ได้
 # (ขึ้น error แบบ syntax error near unexpected token `
-scp src.tgz root@<server>:/tmp/
+# -O บังคับใช้โปรโตคอลเดิมแทน SFTP เพราะ sshd ของเครื่องนี้ปิด Subsystem sftp ไว้
+scp -O src.tgz root@<server>:/tmp/
 ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz"
 ssh root@<server> "sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
 
