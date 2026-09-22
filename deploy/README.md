@@ -198,8 +198,23 @@ exit
 
 workflow นี้ **ไม่ใช้ Secret ใด ๆ** — ค่าลับทั้งหมดอยู่ในไฟล์ของเครื่องตามข้อ 2
 
-นอกจากนี้ workflow อ้าง Environment ชื่อ `production` ถ้าต้องการให้มีการอนุมัติก่อน Deploy
-ให้ไปตั้ง Required reviewers ที่ **Settings → Environments → production**
+### ข้อจำกัดของแพ็กเกจ Free
+
+Repository นี้เป็นแบบส่วนตัวบนแพ็กเกจ Free — **Environment ของ GitHub ใช้ไม่ได้**
+(ต้องเป็น Pro/Team/Enterprise หรือเป็น Repository สาธารณะ) workflow จึงไม่อ้าง Environment
+และไม่มีขั้นตอนอนุมัติก่อน Deploy ถ้าอยากได้ขั้นตอนอนุมัติโดยไม่อัปเกรดแพ็กเกจ
+ให้ตัด trigger `push` ออกจาก `deploy.yml` เหลือแค่ `workflow_dispatch`
+แล้วสั่ง Run workflow เองทุกครั้งจากแท็บ Actions
+
+ส่วนอื่นใช้ได้ครบบน Free:
+
+| รายการ | สถานะบน Free |
+|---|---|
+| Self-hosted Runner (`deploy.yml`) | ✅ ไม่จำกัดนาที — งานที่รันบนเครื่องตัวเองไม่นับโควตา |
+| GitHub-hosted Runner (`ci.yml`) | ✅ 2,000 นาที/เดือน — งานนี้ใช้ ~3 นาทีต่อ Pull Request |
+| Repository Secrets และ Variables | ✅ ใช้ได้ตามปกติ |
+| Cache ของ `actions/setup-node` | ✅ ใช้ได้ (โควตา 10 GB) |
+| Environment / Environment Secrets / Required reviewers | ❌ ต้องอัปเกรดแพ็กเกจ |
 
 ## 7. Deploy ครั้งแรก
 

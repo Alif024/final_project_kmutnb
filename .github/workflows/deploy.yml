@@ -21,8 +21,9 @@ jobs:
     name: Build และ Restart Service
     # จับเฉพาะ Runner ที่มี Label `ai-noc` (ตั้งตอน config.sh --labels ai-noc)
     runs-on: ai-noc
-    # ใช้ Environment เพื่อกำหนดสิทธิ์อนุมัติก่อน Deploy ได้ (Settings -> Environments)
-    environment: production
+    # ไม่ผูกกับ Environment ของ GitHub — Repository ส่วนตัวบนแพ็กเกจ Free ใช้ Environment ไม่ได้
+    # ถ้าต้องการให้มีคนกดอนุมัติก่อน Deploy โดยไม่ต้องอัปเกรดแพ็กเกจ ให้ตัด trigger push ออก
+    # เหลือแค่ workflow_dispatch แล้วสั่ง Run workflow เองจากแท็บ Actions
     timeout-minutes: 30
 
     env:
