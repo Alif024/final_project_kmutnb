@@ -127,8 +127,9 @@ sudo ./svc.sh install ainoc
 sudo ./svc.sh start
 ```
 
-`runs-on: [self-hosted, linux, ai-noc]` ใน workflow จะจับเฉพาะ Runner ที่มี Label ครบสามตัว
-ถ้าเครื่องไม่ตรง งานจะค้างอยู่ในคิวโดยไม่มี Error — ตรวจ Label ที่หน้า Runners ได้
+`runs-on: ai-noc` ใน workflow จะจับเฉพาะ Runner ที่มี Label นี้ ถ้าสะกดไม่ตรงกัน
+งานจะค้างอยู่ในคิวเงียบ ๆ โดยไม่มี Error — ตรวจ Label ที่หน้า Settings -> Actions -> Runners ได้
+(`self-hosted`, `Linux`, `X64` เป็น Label ที่ GitHub ติดให้เองอยู่แล้ว ไม่ต้องตั้ง)
 
 ## 5. ให้สิทธิ์ sudo เฉพาะคำสั่งที่จำเป็น
 

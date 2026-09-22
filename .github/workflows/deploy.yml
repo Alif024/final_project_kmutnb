@@ -18,8 +18,8 @@ permissions:
 jobs:
   deploy:
     name: Build และ Restart Service
-    # Runner ต้องมี Label ครบทั้งสามตัว — ตั้ง Label `ai-noc` ตอนติดตั้ง Runner
-    runs-on: [self-hosted, linux, ai-noc]
+    # จับเฉพาะ Runner ที่มี Label `ai-noc` (ตั้งตอน config.sh --labels ai-noc)
+    runs-on: ai-noc
     # ใช้ Environment เพื่อกำหนดสิทธิ์อนุมัติก่อน Deploy ได้ (Settings -> Environments)
     environment: production
     timeout-minutes: 30
@@ -102,8 +102,10 @@ jobs:
           sudo -n systemctl status "$SERVICE_NAME" --no-pager --lines=40 || true
           exit 1
 
+      # RELEASE_DIR ถูกเขียนลง GITHUB_ENV หลังสลับ Symlink สำเร็จเท่านั้น จึงใช้เป็นเงื่อนไขได้ว่า
+      # "ของใหม่ขึ้นไปแล้วจริง" — ถ้าพังตอนคัดลอกไฟล์ Symlink ยังไม่ขยับ ไม่ต้อง restart ให้แอปดับฟรี
       - name: ย้อนกลับเวอร์ชันก่อนหน้าเมื่อ Deploy ล้มเหลว
-        if: failure() && env.PREVIOUS_RELEASE != ''
+        if: failure() && env.RELEASE_DIR != '' && env.PREVIOUS_RELEASE != ''
         run: |
           set -euo pipefail
           echo "::warning::ย้อนกลับไปที่ $PREVIOUS_RELEASE"

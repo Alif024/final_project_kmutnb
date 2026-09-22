@@ -105,6 +105,24 @@
 > `setPointerCapture` ตอน pointerdown ทำให้ `click` ไปตกที่กล่องแทนปุ่ม — สคริปต์ทดสอบเดิม
 > ใช้ `element.click()` ซึ่งข้าม pointer events จึงผ่านตลอด ต้องคลิกตามพิกัดเมาส์จริงถึงจะเจอ
 
+**อัปเดตล่าสุด (22 กันยายน 2569):** เพิ่มการนำขึ้นเซิร์ฟเวอร์แบบอัตโนมัติ — พัฒนาบน branch
+`feature/deploy-workflow`
+
+- `.github/workflows/deploy.yml` — Deploy ขึ้นเซิร์ฟเวอร์ Linux ผ่าน **Self-hosted Runner
+  ที่ติดตั้งบนเครื่องปลายทางเอง** Build ที่นั่นแล้วสลับ Symlink `current` ไปเวอร์ชันใหม่
+  ก่อนสั่ง `systemctl restart` ตรวจสุขภาพด้วย HTTP และ **ย้อนกลับเวอร์ชันเดิมอัตโนมัติ**
+  เมื่อแอปไม่ตอบใน 60 วินาที ไม่ต้องใช้ SSH Key หรือ Secret ใด ๆ ใน GitHub
+- `.github/workflows/ci.yml` — ตรวจ `tsc --noEmit`, `eslint` และ `build` ทุก Pull Request
+- `deploy/` — แม่แบบ systemd unit, ไฟล์สิทธิ์ sudo เฉพาะคำสั่งที่ต้องใช้
+  และคู่มือตั้งค่าเครื่อง Linux กับ Self-hosted Runner ทีละขั้น
+- **เครื่องปลายทางไม่ต้องตั้งค่าอะไรเลยก็รันได้** ตามสถานะปัจจุบันที่ยังใช้ข้อมูลจำลอง
+  (unit ใช้ `EnvironmentFile=-` จึงสตาร์ตได้แม้ไม่มีไฟล์ค่าลับ) ใส่เฉพาะ `GEMINI_API_KEY`
+  เมื่อต้องการให้ AI Chat เรียกโมเดลจริง ส่วนตัวแปรของ Zabbix/vCenter/Proxmox เติมทีหลังได้
+  ทีละต้นทางโดยไม่ต้องแก้ Workflow
+
+ไม่มีการแก้โค้ดแอปในรอบนี้ — ทั้ง `/api/ai/chat` และ `lib/device-discovery.ts`
+กลับไปใช้ข้อมูลจำลองรายต้นทางอยู่แล้วเมื่อไม่มีค่าใน env
+
 | ด้าน | สถานะ |
 |---|---|
 | หน้าจอ/ฟีเจอร์ UI | ✅ ครบทั้ง 7 โมดูล รวม 14 หน้าย่อย |
@@ -124,7 +142,9 @@
 | ฐานข้อมูล / การคงข้อมูลถาวร | ❌ ยังไม่มีฐานข้อมูล — State ส่วนใหญ่หายเมื่อรีเฟรช ยกเว้นคลังผัง Topology ที่เก็บใน `localStorage` ของเบราว์เซอร์ |
 | การยืนยันตัวตน (Authentication) | ❌ ยังไม่มี — RBAC เป็น Role Switcher สำหรับสาธิต |
 | Export PDF / Excel | ❌ เป็นปุ่ม Stub (`alert()`) ยกเว้นปุ่ม Print ที่ใช้ `window.print()` ได้ |
-| Unit Test / CI | ❌ ยังไม่มี |
+| CI (ตรวจ Type / Lint / Build อัตโนมัติ) | ✅ GitHub Actions — `ci.yml` ทุก Pull Request และ `deploy.yml` ตรวจซ้ำก่อนปล่อยขึ้นเซิร์ฟเวอร์ |
+| Deploy ขึ้นเซิร์ฟเวอร์ Linux (Self-hosted Runner + systemd) | 🟡 Workflow เขียนครบแล้วรวมการย้อนเวอร์ชันอัตโนมัติ แต่ยังไม่ได้รันกับเซิร์ฟเวอร์จริง |
+| Unit Test | ❌ ยังไม่มี — ไม่มี Test Runner หรือไฟล์ทดสอบในโปรเจกต์ |
 
 ---
 
@@ -139,7 +159,7 @@
 | Animation | motion (ตั้ง `transpilePackages`) |
 | AI | `@google/genai` v2 — โมเดล `gemini-3.6-flash` |
 | ฟอนต์ | Inter + Prompt (`next/font/google`, รองรับ subset ภาษาไทย) |
-| Build Output | `standalone` (พร้อม Deploy บน Cloud Run / Docker) |
+| Build Output | `standalone` (Deploy บนเซิร์ฟเวอร์ Linux + systemd ได้ตามคู่มือใน `deploy/` หรือบน Cloud Run / Docker) |
 
 ---
 
@@ -406,6 +426,11 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
     Component ใดอ้างอิงถึง ส่วน `NetworkDevice` ถูกนำมาใช้จริงแล้ว (ข้อมูลพอร์ตของอุปกรณ์ SNMP
     ในแท็บ Interfaces และการตรวจสถานะพอร์ตใน `lib/link-verification.ts`)
     อนึ่ง ตัวเลข "Total Devices" ในหน้า Dashboard ยังเป็นค่าคงที่ที่ไม่มีข้อมูลต้นทางรองรับ
+13. **Workflow Deploy ยังไม่ได้รันกับเซิร์ฟเวอร์จริง** — ตรวจแล้วว่า YAML ถูกต้อง สคริปต์ทุกบล็อก
+    ผ่าน `bash -n` และตรรกะเก็บเวอร์ชันย้อนหลังทดสอบแยกแล้ว แต่ส่วนที่ต้องมี Linux จริง
+    (สลับ Symlink, `systemctl`, `sudo -n`) ยังไม่ได้ทดสอบ นอกจากนี้การ Build เกิดบนเครื่อง
+    ปลายทางเอง จึงกิน CPU/RAM ของเครื่องที่ให้บริการอยู่ และถ้ากดยกเลิก Workflow หลังสลับ
+    Symlink แล้ว ระบบจะไม่ย้อนกลับให้ (เงื่อนไขย้อนกลับผูกกับสถานะล้มเหลว ไม่ใช่การยกเลิก)
 
 ---
 
@@ -420,7 +445,8 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 - [ ] เพิ่ม Authentication และบังคับสิทธิ์ RBAC ที่ฝั่ง Server
 - [ ] ทำ Export รายงาน PDF/Excel ให้ใช้งานได้จริง
 - [ ] เชื่อม Notification Gateway (LINE / Webhook) เข้ากับเหตุการณ์จริง
-- [ ] เพิ่มชุดทดสอบและ CI Pipeline
+- [ ] เพิ่มชุดทดสอบ (Unit / E2E) เข้าไปใน CI ที่มีอยู่ — ตอนนี้ `ci.yml` ตรวจแค่ Type/Lint/Build
+- [ ] รัน Workflow Deploy กับเซิร์ฟเวอร์ Linux จริง แล้วปรับค่า `APP_DIR` / `HEALTH_URL` ให้ตรงเครื่อง
 - [ ] ทดสอบ Device Discovery กับ Zabbix / vCenter / Proxmox เครื่องจริง
 - [ ] ยืนยันชื่อคีย์ Item ของ LLDP/CDP กับ Zabbix เครื่องจริง แล้วตั้ง `ZABBIX_NEIGHBOR_KEYS` ให้ตรง
       (ชื่อคีย์ขึ้นกับ Template ที่ใช้ จึงไม่มีค่ามาตรฐาน)
