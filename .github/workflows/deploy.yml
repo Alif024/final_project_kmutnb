@@ -64,16 +64,6 @@ jobs:
       - name: "Build (output: standalone)"
         run: npm run build
 
-      # standalone แยก static asset ออกมา ต้องคัดลอกกลับเข้าไปเองตามที่ Next.js กำหนด
-      - name: ประกอบชุดไฟล์สำหรับปล่อยขึ้นเซิร์ฟเวอร์
-        run: |
-          set -euo pipefail
-          rm -rf release
-          cp -r .next/standalone release
-          mkdir -p release/.next
-          cp -r .next/static release/.next/static
-          if [ -d public ]; then cp -r public release/public; fi
-
       - name: ปล่อยเวอร์ชันใหม่และสลับ Symlink
         run: |
           set -euo pipefail
@@ -86,8 +76,15 @@ jobs:
             echo "PREVIOUS_RELEASE=$(readlink -f "$APP_DIR/current")" >> "$GITHUB_ENV"
           fi
 
+          # standalone แยก static asset ออกมา ต้องคัดลอกกลับเข้าไปเองตามที่ Next.js กำหนด
+          # ประกอบลงโฟลเดอร์ปลายทางตรง ๆ ไม่สร้างโฟลเดอร์ชั่วคราวไว้ใน Workspace
+          # เพราะถ้าวันหนึ่งตั้ง clean: false ให้ checkout โฟลเดอร์นั้นจะค้างข้ามรอบ
+          # แล้ว eslint จะเดินไปตรวจผลลัพธ์ของ build จนล้ม
           mkdir -p "$RELEASE_DIR"
-          cp -r release/. "$RELEASE_DIR/"
+          cp -r .next/standalone/. "$RELEASE_DIR/"
+          mkdir -p "$RELEASE_DIR/.next"
+          cp -r .next/static "$RELEASE_DIR/.next/static"
+          if [ -d public ]; then cp -r public "$RELEASE_DIR/public"; fi
 
           # สลับแบบ Atomic — สร้าง Symlink ชั่วคราวแล้ว mv -T ทับ ไม่มีจังหวะที่ current หายไป
           ln -sfn "$RELEASE_DIR" "$APP_DIR/current.tmp"

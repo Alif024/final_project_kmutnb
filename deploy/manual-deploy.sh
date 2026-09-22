@@ -27,6 +27,10 @@ die() { printf '!!! %s\n' "$*" >&2; exit 1; }
 
 cd "$SRC"
 
+# สคริปต์รุ่นเก่าเคยประกอบชุดไฟล์ไว้ที่ release/ ในโฟลเดอร์ซอร์ส ทำให้รอบถัดไป
+# `eslint .` เดินไปตรวจโค้ดที่ build แล้วจนขึ้น error — ลบทิ้งถ้ายังค้างอยู่
+rm -rf release
+
 log "ติดตั้ง Dependencies"
 npm ci --include=dev
 
@@ -39,13 +43,6 @@ npm run lint
 log "Build (output: standalone)"
 npm run build
 
-log "ประกอบชุดไฟล์สำหรับปล่อยขึ้นเซิร์ฟเวอร์"
-rm -rf release
-cp -r .next/standalone release
-mkdir -p release/.next
-cp -r .next/static release/.next/static
-if [ -d public ]; then cp -r public release/public; fi
-
 log "ปล่อยเวอร์ชันใหม่และสลับ Symlink"
 STAMP="$(date -u +%Y%m%d-%H%M%S)"
 REV="$(git -C "$SRC" rev-parse --short=7 HEAD 2>/dev/null || echo manual)"
@@ -57,8 +54,15 @@ if [ -L "$APP_DIR/current" ]; then
   echo "เวอร์ชันเดิม: $PREVIOUS_RELEASE"
 fi
 
+# ประกอบลงโฟลเดอร์ปลายทางตรง ๆ — ห้ามสร้างโฟลเดอร์ชั่วคราวไว้ในซอร์ส
+# ไม่งั้นรอบถัดไป eslint จะไปตรวจผลลัพธ์ของ build แล้วล้ม
+# (Symlink current ยังไม่ขยับจนกว่าจะคัดลอกครบ ของที่ให้บริการอยู่จึงไม่กระทบ)
 mkdir -p "$RELEASE_DIR"
-cp -r release/. "$RELEASE_DIR/"
+cp -r .next/standalone/. "$RELEASE_DIR/"
+mkdir -p "$RELEASE_DIR/.next"
+cp -r .next/static "$RELEASE_DIR/.next/static"
+if [ -d public ]; then cp -r public "$RELEASE_DIR/public"; fi
+
 ln -sfn "$RELEASE_DIR" "$APP_DIR/current.tmp"
 mv -T "$APP_DIR/current.tmp" "$APP_DIR/current"
 echo "เวอร์ชันใหม่: $RELEASE_DIR"
