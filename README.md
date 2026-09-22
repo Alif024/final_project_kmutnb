@@ -426,14 +426,17 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
     Component ใดอ้างอิงถึง ส่วน `NetworkDevice` ถูกนำมาใช้จริงแล้ว (ข้อมูลพอร์ตของอุปกรณ์ SNMP
     ในแท็บ Interfaces และการตรวจสถานะพอร์ตใน `lib/link-verification.ts`)
     อนึ่ง ตัวเลข "Total Devices" ในหน้า Dashboard ยังเป็นค่าคงที่ที่ไม่มีข้อมูลต้นทางรองรับ
-13. **ยังไม่ได้ยืนยันว่า GitHub สั่งงาน Runner ได้จริง** — ทุกคำสั่งในขั้นตอน Deploy ทดสอบบน
-    เซิร์ฟเวอร์จริงแล้วผ่านหมด (build บนเครื่อง 2 vCPU/3 GB ใช้ ~2 นาที, สลับ Symlink,
-    `sudo -n systemctl restart` และ Health Check) แต่ตอน push ขึ้น branch ทดสอบ
-    Runner ไม่ได้รับงานเลย ทั้งที่เชื่อมต่อ GitHub อยู่ — จุดที่ต้องตรวจคือหน้า Actions ของ
-    Repository และบรรทัด `environment: production` ซึ่งใช้ไม่ได้กับ Repository ส่วนตัว
-    บนแพ็กเกจ Free นอกจากนี้การ Build เกิดบนเครื่องปลายทางเอง จึงกิน CPU/RAM ของเครื่อง
-    ที่ให้บริการอยู่ และ `actions/checkout` ล้าง `node_modules`/`.next` ทุกรอบ
-    ทำให้ทุกครั้งเป็นการ Build แบบเย็น (ช้าแต่ผลลัพธ์แน่นอนกว่า)
+13. **บัญชี GitHub ถูกล็อกการเรียกเก็บเงิน จึงยังรัน Workflow ไม่ได้** — หน้า Actions ขึ้นว่า
+    *"GitHub Actions workflows can't be executed on this repository. Your account's billing is
+    currently locked."* Workflow ที่ push ขึ้นไปถูกสร้างเป็น Run จริงทุกครั้งแต่ตายที่
+    **Startup failure** ก่อนจับคู่ Runner ทำให้ Runner ไม่เคยได้รับงานเลย
+    **ข้อนี้ไม่เกี่ยวกับโค้ด แพ็กเกจ Free หรือ Self-hosted Runner** (งานที่รันบนเครื่องตัวเอง
+    ไม่กินโควตานาที) ต้องไปแก้ที่ **Settings → Billing and licensing** ของบัญชีก่อน
+    จากนั้น Workflow จะทำงานได้ทันทีโดยไม่ต้องแก้อะไรในโปรเจกต์
+    ระหว่างนี้ Deploy ด้วยมือบนเซิร์ฟเวอร์ได้ (ทดสอบแล้วใช้เวลา ~2 นาที)
+14. **การ Build เกิดบนเครื่องปลายทางเอง** จึงกิน CPU/RAM ของเครื่องที่ให้บริการอยู่
+    และ `actions/checkout` ล้าง `node_modules`/`.next` ทุกรอบ ทำให้ทุกครั้งเป็นการ Build
+    แบบเย็น (ช้าแต่ผลลัพธ์แน่นอนกว่า) บนเครื่องจริงวัดได้ ~2 นาทีต่อรอบ
 
 ---
 

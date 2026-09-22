@@ -19,9 +19,8 @@ permissions:
 jobs:
   deploy:
     name: Build และ Restart Service
-    # ใช้รูปแบบเต็มตามที่ GitHub แนะนำ — Runner ต้องมี Label ครบทุกตัว
-    # (self-hosted/Linux/X64 GitHub ติดให้เอง ส่วน ai-noc ตั้งตอน config.sh --labels ai-noc)
-    runs-on: [self-hosted, linux, ai-noc]
+    # จับเฉพาะ Runner ที่มี Label `ai-noc` (ตั้งตอน config.sh --labels ai-noc)
+    runs-on: ai-noc
     # ไม่ผูกกับ Environment ของ GitHub — Repository ส่วนตัวบนแพ็กเกจ Free ใช้ Environment ไม่ได้
     # ถ้าต้องการให้มีคนกดอนุมัติก่อน Deploy โดยไม่ต้องอัปเกรดแพ็กเกจ ให้ตัด trigger push ออก
     # เหลือแค่ workflow_dispatch แล้วสั่ง Run workflow เองจากแท็บ Actions
