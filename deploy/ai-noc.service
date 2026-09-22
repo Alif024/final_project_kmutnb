@@ -29,6 +29,9 @@ Environment=HOSTNAME=127.0.0.1
 
 Restart=always
 RestartSec=3
+# ถ้าโปรเซสไม่ยอมจบเอง systemd จะรอถึง 90 วินาทีตามค่าเริ่มต้นก่อนบังคับปิด
+# ซึ่งทำให้ `systemctl restart` ใน workflow ค้างนานเกินจำเป็น — ตัดเหลือ 20 วินาที
+TimeoutStopSec=20
 
 # ความปลอดภัยพื้นฐาน — ProtectHome=true ทำให้อ่าน /home ไม่ได้
 # จึงต้องวางแอปไว้ที่ /opt หรือ /srv เท่านั้น
