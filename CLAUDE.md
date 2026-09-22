@@ -27,8 +27,9 @@ npx tsc --noEmit       # type check
 `output: 'standalone'`. To serve a build, run `node .next/standalone/server.js` after copying
 `.next/static` and `public` next to it, or just use `npm run dev`.
 
-There is **no test framework** in this repo — no test runner, no test files, no CI.
-Do not invent an `npm test` invocation. Verification is `npx tsc --noEmit` + `npm run lint`
+There is **no test framework** in this repo — no test runner and no test files.
+Do not invent an `npm test` invocation. CI exists but runs only the three checks below
+(`.github/workflows/ci.yml`), so a green PR still means nothing was executed. Verification is `npx tsc --noEmit` + `npm run lint`
 + `npm run build`, plus manual browser checks. Past browser verification was driven ad hoc
 with `puppeteer-core`; it is intentionally *not* a project dependency.
 
@@ -223,6 +224,52 @@ mode, a real bug that had to be fixed across `InfrastructureView`.
 whether the card gets Sync Now) shared by `AddIntegrationModal` and `SettingsView`, so the
 wizard and the card can never drift apart. Connection tests are simulated by
 `hooks/use-connection-test.ts` and always succeed; nothing is actually dialed.
+
+### Deployment — self-hosted runner on the target box, not a hosted platform
+
+`.github/workflows/deploy.yml` runs on a self-hosted GitHub Actions runner installed **on the
+Linux server itself** (`runs-on: ai-noc` — a custom label; `self-hosted`/`Linux`/`X64` come for
+free and add nothing here). It builds in place, swaps a symlink, and restarts a systemd unit.
+Nothing is copied over SSH, so there are no deploy secrets in GitHub at all.
+
+Server layout: each build lands in `/opt/ai-noc/releases/<utc-timestamp>-<sha7>/`, and
+`/opt/ai-noc/current` is a symlink swapped atomically (`ln -sfn` into `.tmp` then `mv -T`).
+The unit's `WorkingDirectory` is that symlink, so `systemctl restart` is the step that makes a
+release live. Only two commands need `sudo` (`systemctl restart`/`status`), granted through
+`deploy/ai-noc-deploy.sudoers`.
+
+Rules that are load-bearing:
+
+- **Release dirs are named by timestamp, never by sha alone.** Re-deploying the same commit
+  would otherwise `rm -rf` the directory the running process is reading from, and would make
+  `PREVIOUS_RELEASE` point at itself.
+- **The rollback step keys off `env.RELEASE_DIR`**, which is written to `$GITHUB_ENV` *after*
+  the swap succeeds — so a failure before the swap leaves `current` alone and never restarts a
+  healthy service. `PREVIOUS_RELEASE` is captured *before* the copy. Keep that ordering when
+  adding steps.
+- Health check is `curl` against `/` in a 30×2s loop; on failure the previous release is
+  re-linked and restarted. The rollback step also fires on `cancelled()`, since `failure()`
+  alone is false for a cancelled job and would leave `current` on an unvalidated release.
+  GitHub kills the runner shortly after a cancellation, so keep that step short.
+- `npm ci --include=dev` is deliberate: the build needs typescript/tailwind from
+  `devDependencies`, and a runner with `NODE_ENV=production` in its environment would have
+  `npm ci` skip them silently.
+- `EnvironmentFile=-/etc/ai-noc/ai-noc.env` carries a leading dash on purpose: the box must
+  start the app with no config file at all, which is the same mock-first contract as
+  `/api/ai/chat` and `lib/device-discovery.ts`. Only `GEMINI_API_KEY` is worth setting today;
+  Zabbix/vCenter/Proxmox vars are left for later and each falls back on its own.
+- The unit runs `node server.js` inside the standalone folder — never `npm run start`, which
+  `next start` refuses under `output: 'standalone'`.
+- `next build` does not copy `.next/static` or `public` into `.next/standalone`; the workflow
+  does it by hand. There is no `public/` dir in this repo, hence the `[ -d public ]` guard.
+- `actions/checkout` cleans the workspace (`git clean -ffdx`), so every deploy is a cold
+  `npm ci` and a cold build. Fine on a normal VM; if it ever hits `timeout-minutes: 30`, pass
+  `clean: false` to keep the `.next` cache rather than trimming the checks.
+
+`ci.yml` runs the same three checks on pull requests only — `deploy.yml` re-runs them before
+every release, so CI deliberately has no `push` trigger. Server-side setup (runner install,
+systemd unit, sudoers, env file, reverse proxy, manual rollback) is documented in
+`deploy/README.md` next to the templates it installs.
 
 ## Conventions
 

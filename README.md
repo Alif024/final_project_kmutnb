@@ -105,6 +105,24 @@
 > `setPointerCapture` ตอน pointerdown ทำให้ `click` ไปตกที่กล่องแทนปุ่ม — สคริปต์ทดสอบเดิม
 > ใช้ `element.click()` ซึ่งข้าม pointer events จึงผ่านตลอด ต้องคลิกตามพิกัดเมาส์จริงถึงจะเจอ
 
+**อัปเดตล่าสุด (22 กันยายน 2569):** เพิ่มการนำขึ้นเซิร์ฟเวอร์แบบอัตโนมัติ — พัฒนาบน branch
+`feature/deploy-workflow`
+
+- `.github/workflows/deploy.yml` — Deploy ขึ้นเซิร์ฟเวอร์ Linux ผ่าน **Self-hosted Runner
+  ที่ติดตั้งบนเครื่องปลายทางเอง** Build ที่นั่นแล้วสลับ Symlink `current` ไปเวอร์ชันใหม่
+  ก่อนสั่ง `systemctl restart` ตรวจสุขภาพด้วย HTTP และ **ย้อนกลับเวอร์ชันเดิมอัตโนมัติ**
+  เมื่อแอปไม่ตอบใน 60 วินาที ไม่ต้องใช้ SSH Key หรือ Secret ใด ๆ ใน GitHub
+- `.github/workflows/ci.yml` — ตรวจ `tsc --noEmit`, `eslint` และ `build` ทุก Pull Request
+- `deploy/` — แม่แบบ systemd unit, ไฟล์สิทธิ์ sudo เฉพาะคำสั่งที่ต้องใช้
+  และคู่มือตั้งค่าเครื่อง Linux กับ Self-hosted Runner ทีละขั้น
+- **เครื่องปลายทางไม่ต้องตั้งค่าอะไรเลยก็รันได้** ตามสถานะปัจจุบันที่ยังใช้ข้อมูลจำลอง
+  (unit ใช้ `EnvironmentFile=-` จึงสตาร์ตได้แม้ไม่มีไฟล์ค่าลับ) ใส่เฉพาะ `GEMINI_API_KEY`
+  เมื่อต้องการให้ AI Chat เรียกโมเดลจริง ส่วนตัวแปรของ Zabbix/vCenter/Proxmox เติมทีหลังได้
+  ทีละต้นทางโดยไม่ต้องแก้ Workflow
+
+ไม่มีการแก้โค้ดแอปในรอบนี้ — ทั้ง `/api/ai/chat` และ `lib/device-discovery.ts`
+กลับไปใช้ข้อมูลจำลองรายต้นทางอยู่แล้วเมื่อไม่มีค่าใน env
+
 | ด้าน | สถานะ |
 |---|---|
 | หน้าจอ/ฟีเจอร์ UI | ✅ ครบทั้ง 7 โมดูล รวม 14 หน้าย่อย |
@@ -124,7 +142,9 @@
 | ฐานข้อมูล / การคงข้อมูลถาวร | ❌ ยังไม่มีฐานข้อมูล — State ส่วนใหญ่หายเมื่อรีเฟรช ยกเว้นคลังผัง Topology ที่เก็บใน `localStorage` ของเบราว์เซอร์ |
 | การยืนยันตัวตน (Authentication) | ❌ ยังไม่มี — RBAC เป็น Role Switcher สำหรับสาธิต |
 | Export PDF / Excel | ❌ เป็นปุ่ม Stub (`alert()`) ยกเว้นปุ่ม Print ที่ใช้ `window.print()` ได้ |
-| Unit Test / CI | ❌ ยังไม่มี |
+| CI (ตรวจ Type / Lint / Build อัตโนมัติ) | ✅ GitHub Actions — `ci.yml` ทุก Pull Request และ `deploy.yml` ตรวจซ้ำก่อนปล่อยขึ้นเซิร์ฟเวอร์ |
+| Deploy ขึ้นเซิร์ฟเวอร์ Linux (Self-hosted Runner + systemd) | 🟡 ทดสอบทุกคำสั่งบนเซิร์ฟเวอร์จริงแล้วผ่านหมด (`npm ci` → `tsc` → `lint` → `build` → วาง release → สลับ symlink → restart → health check รวม ~2 นาที) และย้ายระบบที่ให้บริการอยู่มาใช้โครงนี้แล้ว เหลือยืนยันการสั่งงานอัตโนมัติจากฝั่ง GitHub Actions |
+| Unit Test | ❌ ยังไม่มี — ไม่มี Test Runner หรือไฟล์ทดสอบในโปรเจกต์ |
 
 ---
 
@@ -139,7 +159,7 @@
 | Animation | motion (ตั้ง `transpilePackages`) |
 | AI | `@google/genai` v2 — โมเดล `gemini-3.6-flash` |
 | ฟอนต์ | Inter + Prompt (`next/font/google`, รองรับ subset ภาษาไทย) |
-| Build Output | `standalone` (พร้อม Deploy บน Cloud Run / Docker) |
+| Build Output | `standalone` (Deploy บนเซิร์ฟเวอร์ Linux + systemd ได้ตามคู่มือใน `deploy/` หรือบน Cloud Run / Docker) |
 
 ---
 
@@ -187,10 +207,43 @@ npm run dev          # เปิดที่ http://localhost:3000
 
 ---
 
+## การนำขึ้นเซิร์ฟเวอร์ (CI/CD)
+
+| Workflow | ทำงานเมื่อ | หน้าที่ |
+|---|---|---|
+| `.github/workflows/ci.yml` | เปิด/อัปเดต Pull Request | `npm ci` → `tsc --noEmit` → `npm run lint` → `npm run build` บน Runner ของ GitHub |
+| `.github/workflows/deploy.yml` | push เข้า `main` หรือสั่งเองจากแท็บ Actions | Build บน **Self-hosted Runner ที่ติดตั้งบนเซิร์ฟเวอร์ Linux ปลายทาง** แล้วสลับ Symlink และ restart systemd service |
+
+การ Deploy วางไฟล์ไว้ที่ `/opt/ai-noc/releases/<วันเวลา>-<sha ย่อ>` แล้วชี้ Symlink `current`
+ไปยังเวอร์ชันใหม่แบบ Atomic ก่อนสั่ง `systemctl restart` จากนั้นตรวจสุขภาพแอปด้วย HTTP
+**ถ้าแอปไม่ตอบภายใน 60 วินาที ระบบจะย้อน Symlink กลับเวอร์ชันเดิมและ restart ให้อัตโนมัติ**
+และเก็บเวอร์ชันย้อนหลังไว้ 5 ชุด
+
+Build เกิดบนเครื่องปลายทางทั้งหมด จึงไม่ต้องใช้ SSH Key หรือ Secret ใด ๆ ใน GitHub
+
+**เครื่องที่ Deploy ไม่ต้องตั้งค่าอะไรเลยก็รันได้** เพราะระบบยังเดินด้วยข้อมูลจำลองตาม
+สถานะปัจจุบันของโปรเจกต์ ยังไม่ต้องเชื่อม Proxmox / Zabbix / Syslog Server จริง
+ค่าที่ควรใส่มีเพียง `GEMINI_API_KEY` — ใส่แล้ว AI Chat จะเรียกโมเดลจริง ไม่ใส่ก็ตอบด้วยข้อความจำลอง
+ค่าลับทั้งหมดอยู่ในไฟล์ `/etc/ai-noc/ai-noc.env` ของเครื่อง ซึ่ง systemd อ่านผ่าน
+`EnvironmentFile=-` (ไม่มีไฟล์ก็สตาร์ตได้) จึงไม่ติดไปกับชุดไฟล์ที่ Deploy
+เมื่ออนาคตพร้อมต่อของจริง ให้เติมตัวแปรของต้นทางนั้นในไฟล์เดียวกันแล้ว restart service — ไม่ต้องแก้ workflow
+
+> unit ของ systemd รัน `node server.js` ในโฟลเดอร์ standalone โดยตรง ไม่ใช้ `npm run start`
+> เพราะ `next start` ไม่รองรับ `output: 'standalone'`
+
+ขั้นตอนตั้งค่าเครื่อง Linux, การติดตั้ง Self-hosted Runner, systemd unit, สิทธิ์ sudo,
+ตัวแปรที่ตั้งได้ (`APP_DIR`, `SERVICE_NAME`, `HEALTH_URL`, `KEEP_RELEASES`)
+และวิธีย้อนเวอร์ชันด้วยมือ — อ่านได้ที่ [`deploy/README.md`](deploy/README.md)
+
+---
+
 ## โครงสร้างโปรเจกต์
 
 ```
 final_project_kmutnb/
+├── .github/workflows/
+│   ├── ci.yml                   # ตรวจ Type/Lint/Build ทุก Pull Request
+│   └── deploy.yml               # Deploy ขึ้นเซิร์ฟเวอร์ Linux ผ่าน Self-hosted Runner
 ├── app/
 │   ├── api/ai/chat/route.ts     # API Route — เรียก Gemini
 │   ├── api/discovery/route.ts   # API Route — ค้นหาอุปกรณ์จาก Zabbix/vCenter/Proxmox
@@ -226,6 +279,10 @@ final_project_kmutnb/
 │   ├── use-mobile.ts            # Media Query Hook (ยังไม่มีการเรียกใช้งานจริง)
 │   ├── use-connection-test.ts   # จำลองการทดสอบการเชื่อมต่อแบบไล่ log ทีละบรรทัด
 │   └── use-topology-layout.ts   # คลังผังหลายใบที่ผู้ใช้วาดเอง (useSyncExternalStore + localStorage)
+├── deploy/
+│   ├── README.md                # ขั้นตอนตั้งค่าเครื่อง Linux + Self-hosted Runner
+│   ├── ai-noc.service           # แม่แบบ systemd unit ของเซิร์ฟเวอร์ปลายทาง
+│   └── ai-noc-deploy.sudoers    # สิทธิ์ sudo เฉพาะคำสั่ง restart/status ของ service
 ├── metadata.json                # Manifest สำหรับ Google AI Studio
 └── bugs.txt                     # บันทึกผลตรวจสอบบั๊กทั้งแอป (รายการที่แก้แล้ว/ยังไม่แก้)
 ```
@@ -369,6 +426,17 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
     Component ใดอ้างอิงถึง ส่วน `NetworkDevice` ถูกนำมาใช้จริงแล้ว (ข้อมูลพอร์ตของอุปกรณ์ SNMP
     ในแท็บ Interfaces และการตรวจสถานะพอร์ตใน `lib/link-verification.ts`)
     อนึ่ง ตัวเลข "Total Devices" ในหน้า Dashboard ยังเป็นค่าคงที่ที่ไม่มีข้อมูลต้นทางรองรับ
+13. **บัญชี GitHub ถูกล็อกการเรียกเก็บเงิน จึงยังรัน Workflow ไม่ได้** — หน้า Actions ขึ้นว่า
+    *"GitHub Actions workflows can't be executed on this repository. Your account's billing is
+    currently locked."* Workflow ที่ push ขึ้นไปถูกสร้างเป็น Run จริงทุกครั้งแต่ตายที่
+    **Startup failure** ก่อนจับคู่ Runner ทำให้ Runner ไม่เคยได้รับงานเลย
+    **ข้อนี้ไม่เกี่ยวกับโค้ด แพ็กเกจ Free หรือ Self-hosted Runner** (งานที่รันบนเครื่องตัวเอง
+    ไม่กินโควตานาที) ต้องไปแก้ที่ **Settings → Billing and licensing** ของบัญชีก่อน
+    จากนั้น Workflow จะทำงานได้ทันทีโดยไม่ต้องแก้อะไรในโปรเจกต์
+    ระหว่างนี้ Deploy ด้วยมือบนเซิร์ฟเวอร์ได้ (ทดสอบแล้วใช้เวลา ~2 นาที)
+14. **การ Build เกิดบนเครื่องปลายทางเอง** จึงกิน CPU/RAM ของเครื่องที่ให้บริการอยู่
+    และ `actions/checkout` ล้าง `node_modules`/`.next` ทุกรอบ ทำให้ทุกครั้งเป็นการ Build
+    แบบเย็น (ช้าแต่ผลลัพธ์แน่นอนกว่า) บนเครื่องจริงวัดได้ ~2 นาทีต่อรอบ
 
 ---
 
@@ -383,7 +451,8 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 - [ ] เพิ่ม Authentication และบังคับสิทธิ์ RBAC ที่ฝั่ง Server
 - [ ] ทำ Export รายงาน PDF/Excel ให้ใช้งานได้จริง
 - [ ] เชื่อม Notification Gateway (LINE / Webhook) เข้ากับเหตุการณ์จริง
-- [ ] เพิ่มชุดทดสอบและ CI Pipeline
+- [ ] เพิ่มชุดทดสอบ (Unit / E2E) เข้าไปใน CI ที่มีอยู่ — ตอนนี้ `ci.yml` ตรวจแค่ Type/Lint/Build
+- [ ] รัน Workflow Deploy กับเซิร์ฟเวอร์ Linux จริง แล้วปรับค่า `APP_DIR` / `HEALTH_URL` ให้ตรงเครื่อง
 - [ ] ทดสอบ Device Discovery กับ Zabbix / vCenter / Proxmox เครื่องจริง
 - [ ] ยืนยันชื่อคีย์ Item ของ LLDP/CDP กับ Zabbix เครื่องจริง แล้วตั้ง `ZABBIX_NEIGHBOR_KEYS` ให้ตรง
       (ชื่อคีย์ขึ้นกับ Template ที่ใช้ จึงไม่มีค่ามาตรฐาน)
