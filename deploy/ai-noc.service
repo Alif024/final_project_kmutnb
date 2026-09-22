@@ -17,9 +17,11 @@ Group=ainoc
 WorkingDirectory=/opt/ai-noc/current
 ExecStart=/usr/bin/node server.js
 
-# ไฟล์ค่าลับของเครื่อง (GEMINI_API_KEY, ZABBIX_*, VCENTER_*, PROXMOX_*)
-# เก็บไว้นอกโฟลเดอร์ Release เพื่อไม่ให้ถูกทับตอน Deploy — ดูรายการตัวแปรใน .env.example
-EnvironmentFile=/etc/ai-noc/ai-noc.env
+# ไฟล์ค่าลับของเครื่อง — ขีดหน้า path แปลว่า "ไม่มีไฟล์นี้ก็สตาร์ตได้"
+# ตอนนี้ระบบใช้ข้อมูลจำลอง จึงยังไม่จำเป็นต้องมี ใส่เฉพาะ GEMINI_API_KEY ก็พอ
+# ตัวแปรของ Zabbix/vCenter/Proxmox ค่อยเติมทีหลังได้ (ดู .env.example)
+# เก็บไว้นอกโฟลเดอร์ Release เพื่อไม่ให้ถูกทับตอน Deploy
+EnvironmentFile=-/etc/ai-noc/ai-noc.env
 Environment=NODE_ENV=production
 Environment=PORT=3000
 # ผูกกับ 127.0.0.1 เมื่อมี Reverse Proxy (Nginx/Caddy) อยู่หน้า — ถ้าเปิดตรงให้ใช้ 0.0.0.0

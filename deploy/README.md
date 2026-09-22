@@ -53,15 +53,36 @@ sudo apt-get install -y nodejs
 command -v node        # ต้องได้ /usr/bin/node ให้ตรงกับ ExecStart ใน unit
 ```
 
-## 2. ไฟล์ค่าลับของเครื่อง
+## 2. ไฟล์ค่าลับของเครื่อง (ไม่บังคับ)
 
-ค่าลับทั้งหมดอยู่นอก Repository และไม่ถูกทับตอน Deploy
-(รายชื่อตัวแปรทั้งหมดดูได้ที่ [`.env.example`](../.env.example))
+ตอนนี้ระบบ **เดินด้วยข้อมูลจำลองทั้งหมด** ยังไม่ต้องเชื่อม Proxmox / Zabbix / Syslog Server จริง
+ถ้าไม่สร้างไฟล์นี้เลย แอปก็ขึ้นได้ตามปกติ — unit ตั้ง `EnvironmentFile=-` (มีขีดนำหน้า)
+ไว้แล้ว systemd จึงข้ามไปเมื่อไม่มีไฟล์ ไม่ถือเป็น Error
+
+สิ่งเดียวที่ควรใส่ตอนนี้คือ **คีย์ AI** — ใส่แล้ว `/api/ai/chat` จะเรียกโมเดลจริง
+ไม่ใส่ก็ตอบด้วยข้อความจำลอง (Mock Mode) ส่วนหน้าจออื่นไม่ต่างกัน
 
 ```bash
 sudo mkdir -p /etc/ai-noc
 sudo tee /etc/ai-noc/ai-noc.env >/dev/null <<'EOF'
 GEMINI_API_KEY=...
+EOF
+sudo chown root:ainoc /etc/ai-noc/ai-noc.env
+sudo chmod 640 /etc/ai-noc/ai-noc.env
+sudo systemctl restart ai-noc    # ค่าใน EnvironmentFile อ่านตอนเริ่มโปรเซสเท่านั้น
+```
+
+> ไฟล์นี้ใช้รูปแบบของ systemd (`KEY=value` ล้วน ๆ ไม่มี `export` และไม่มีเครื่องหมายคำพูดครอบ
+> เว้นแต่ต้องการให้เป็นส่วนหนึ่งของค่า)
+
+### เผื่อไว้ในอนาคต — เชื่อมต้นทางจริง
+
+เมื่อพร้อมต่อของจริง ให้เติมตัวแปรของต้นทางนั้นลงในไฟล์เดิมแล้ว `systemctl restart ai-noc`
+ไม่ต้องแก้ workflow หรือ Deploy ใหม่ **ต้นทางใดยังไม่ได้ตั้งค่า ระบบจะใช้ข้อมูลจำลองของต้นทางนั้นต่อไป
+และแจ้งบนหน้า Infrastructure ว่าอุปกรณ์ชุดนั้นยังไม่ใช่ของจริง** จึงเติมทีละต้นทางได้
+
+```bash
+# ตัวอย่าง — ยังไม่ต้องใส่ตอนนี้ (รายละเอียดทุกตัวอยู่ใน .env.example)
 ZABBIX_URL=http://10.0.2.10/zabbix
 ZABBIX_TOKEN=...
 VCENTER_URL=https://10.0.0.100
@@ -69,13 +90,10 @@ VCENTER_USERNAME=administrator@vsphere.local
 VCENTER_PASSWORD=...
 PROXMOX_URL=https://10.0.0.201:8006
 PROXMOX_TOKEN=root@pam!ainoc=...
-EOF
-sudo chown root:ainoc /etc/ai-noc/ai-noc.env
-sudo chmod 640 /etc/ai-noc/ai-noc.env
 ```
 
-> ไฟล์นี้ใช้รูปแบบของ systemd (`KEY=value` ล้วน ๆ ไม่มี `export` และไม่มีเครื่องหมายคำพูดครอบ
-> เว้นแต่ต้องการให้เป็นส่วนหนึ่งของค่า) ถ้าไม่ตั้งค่าใด แอปจะกลับไปใช้ข้อมูลจำลองของส่วนนั้นเอง
+ส่วน Syslog ยังไม่มีตัวแปรให้ตั้งค่า — `lib/log-source.ts` เตรียมไว้เป็นจุดต่อ Graylog REST API
+แต่ยังอ่านจาก `lib/mock-data.json` อยู่ ต้องแก้โค้ดในไฟล์นั้นก่อนจึงจะมีค่าให้ตั้งใน env
 
 ## 3. ติดตั้ง systemd Service
 

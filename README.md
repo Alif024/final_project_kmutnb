@@ -200,8 +200,13 @@ npm run dev          # เปิดที่ http://localhost:3000
 และเก็บเวอร์ชันย้อนหลังไว้ 5 ชุด
 
 Build เกิดบนเครื่องปลายทางทั้งหมด จึงไม่ต้องใช้ SSH Key หรือ Secret ใด ๆ ใน GitHub
-และค่าลับทุกตัว (`GEMINI_API_KEY`, `ZABBIX_*`, `VCENTER_*`, `PROXMOX_*`) อยู่ในไฟล์
-`/etc/ai-noc/ai-noc.env` ของเครื่อง ซึ่ง systemd อ่านผ่าน `EnvironmentFile` ไม่ติดไปกับชุดไฟล์ที่ Deploy
+
+**เครื่องที่ Deploy ไม่ต้องตั้งค่าอะไรเลยก็รันได้** เพราะระบบยังเดินด้วยข้อมูลจำลองตาม
+สถานะปัจจุบันของโปรเจกต์ ยังไม่ต้องเชื่อม Proxmox / Zabbix / Syslog Server จริง
+ค่าที่ควรใส่มีเพียง `GEMINI_API_KEY` — ใส่แล้ว AI Chat จะเรียกโมเดลจริง ไม่ใส่ก็ตอบด้วยข้อความจำลอง
+ค่าลับทั้งหมดอยู่ในไฟล์ `/etc/ai-noc/ai-noc.env` ของเครื่อง ซึ่ง systemd อ่านผ่าน
+`EnvironmentFile=-` (ไม่มีไฟล์ก็สตาร์ตได้) จึงไม่ติดไปกับชุดไฟล์ที่ Deploy
+เมื่ออนาคตพร้อมต่อของจริง ให้เติมตัวแปรของต้นทางนั้นในไฟล์เดียวกันแล้ว restart service — ไม่ต้องแก้ workflow
 
 > unit ของ systemd รัน `node server.js` ในโฟลเดอร์ standalone โดยตรง ไม่ใช้ `npm run start`
 > เพราะ `next start` ไม่รองรับ `output: 'standalone'`
