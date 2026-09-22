@@ -42,8 +42,10 @@ jobs:
           node-version: '22'
           cache: npm
 
+      # --include=dev เพราะ build ต้องใช้ typescript/tailwind ซึ่งอยู่ใน devDependencies
+      # ถ้า Runner เผลอมี NODE_ENV=production ใน environment npm ci จะข้ามชุด dev ไปเงียบ ๆ
       - name: ติดตั้ง Dependencies
-        run: npm ci
+        run: npm ci --include=dev
 
       # ตรวจให้ครบตามที่ CLAUDE.md กำหนด — build ไม่ตรวจ lint ให้ (ignoreDuringBuilds)
       - name: ตรวจ Type
@@ -104,8 +106,10 @@ jobs:
 
       # RELEASE_DIR ถูกเขียนลง GITHUB_ENV หลังสลับ Symlink สำเร็จเท่านั้น จึงใช้เป็นเงื่อนไขได้ว่า
       # "ของใหม่ขึ้นไปแล้วจริง" — ถ้าพังตอนคัดลอกไฟล์ Symlink ยังไม่ขยับ ไม่ต้อง restart ให้แอปดับฟรี
-      - name: ย้อนกลับเวอร์ชันก่อนหน้าเมื่อ Deploy ล้มเหลว
-        if: failure() && env.RELEASE_DIR != '' && env.PREVIOUS_RELEASE != ''
+      # รวม cancelled() ด้วย เพราะกดยกเลิกหลังสลับ Symlink แล้วก็ต้องย้อน ไม่ทิ้ง current ค้างอยู่ที่
+      # เวอร์ชันที่ยังไม่ผ่าน Health Check (GitHub ให้เวลาเก็บงานหลังยกเลิกไม่นาน สคริปต์จึงต้องสั้น)
+      - name: ย้อนกลับเวอร์ชันก่อนหน้าเมื่อ Deploy ล้มเหลวหรือถูกยกเลิก
+        if: (failure() || cancelled()) && env.RELEASE_DIR != '' && env.PREVIOUS_RELEASE != ''
         run: |
           set -euo pipefail
           echo "::warning::ย้อนกลับไปที่ $PREVIOUS_RELEASE"

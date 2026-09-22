@@ -248,8 +248,12 @@ Rules that are load-bearing:
   healthy service. `PREVIOUS_RELEASE` is captured *before* the copy. Keep that ordering when
   adding steps.
 - Health check is `curl` against `/` in a 30×2s loop; on failure the previous release is
-  re-linked and restarted. A **cancelled** job does not roll back — `failure()` is false for
-  cancellations.
+  re-linked and restarted. The rollback step also fires on `cancelled()`, since `failure()`
+  alone is false for a cancelled job and would leave `current` on an unvalidated release.
+  GitHub kills the runner shortly after a cancellation, so keep that step short.
+- `npm ci --include=dev` is deliberate: the build needs typescript/tailwind from
+  `devDependencies`, and a runner with `NODE_ENV=production` in its environment would have
+  `npm ci` skip them silently.
 - `EnvironmentFile=-/etc/ai-noc/ai-noc.env` carries a leading dash on purpose: the box must
   start the app with no config file at all, which is the same mock-first contract as
   `/api/ai/chat` and `lib/device-discovery.ts`. Only `GEMINI_API_KEY` is worth setting today;

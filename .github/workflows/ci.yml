@@ -27,8 +27,10 @@ jobs:
           node-version: '22'
           cache: npm
 
+      # --include=dev เพราะ build ต้องใช้ typescript/tailwind ซึ่งอยู่ใน devDependencies
+      # ถ้า Runner เผลอมี NODE_ENV=production ใน environment npm ci จะข้ามชุด dev ไปเงียบ ๆ
       - name: ติดตั้ง Dependencies
-        run: npm ci
+        run: npm ci --include=dev
 
       - name: ตรวจ Type
         run: npx tsc --noEmit
