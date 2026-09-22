@@ -198,6 +198,22 @@ exit
 
 workflow นี้ **ไม่ใช้ Secret ใด ๆ** — ค่าลับทั้งหมดอยู่ในไฟล์ของเครื่องตามข้อ 2
 
+### สถานะปัจจุบัน — บัญชีถูกล็อกการเรียกเก็บเงิน
+
+หน้า Actions ขึ้นว่า *"GitHub Actions workflows can't be executed on this repository.
+Your account's billing is currently locked."* ผลคือ **ทุก Workflow ของบัญชีนี้รันไม่ได้**
+Run ถูกสร้างจริงทุกครั้งที่ push แต่ตายที่ **Startup failure** ก่อนถึง Runner
+ไม่เกี่ยวกับโค้ด แพ็กเกจ Free หรือ Self-hosted Runner (งานที่รันบนเครื่องตัวเองไม่กินโควตานาที)
+
+ต้องไปแก้ที่ **Settings ของบัญชี → Billing and licensing** เมื่อปลดล็อกแล้ว Workflow
+จะทำงานได้ทันทีโดยไม่ต้องแก้อะไรในโปรเจกต์ ระหว่างนี้ให้ใช้
+[Deploy ด้วยมือ](#deploy-ด้วยมือ-เมื่อสั่งผ่าน-github-actions-ไม่ได้) แทน
+
+> ระหว่างที่ยังถูกล็อก ทุก push เข้า `main` จะทิ้ง Run สีแดง (Startup failure) ไว้ในแท็บ Actions
+> เป็นเรื่องปกติของสถานะนี้ ไม่ใช่ความผิดพลาดของ Workflow ถ้าไม่อยากเห็น Run แดง
+> ให้ตัด `push` ออกจาก `deploy.yml` ชั่วคราว เหลือแค่ `workflow_dispatch`
+> แล้วค่อยใส่กลับเมื่อปลดล็อกเรียบร้อย
+
 ### ข้อจำกัดของแพ็กเกจ Free
 
 Repository นี้เป็นแบบส่วนตัวบนแพ็กเกจ Free — **Environment ของ GitHub ใช้ไม่ได้**

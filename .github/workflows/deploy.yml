@@ -4,8 +4,7 @@ name: Deploy to Linux server
 
 on:
   push:
-    # feature/deploy-workflow อยู่ชั่วคราวเพื่อทดสอบกับเครื่องจริงก่อน merge — ถอดออกหลังทดสอบเสร็จ
-    branches: [main, feature/deploy-workflow]
+    branches: [main]
   workflow_dispatch:
 
 # ห้าม Deploy ซ้อนกัน แต่ห้ามยกเลิกงานที่กำลังทำอยู่กลางคัน (ไฟล์อาจค้างครึ่ง ๆ กลาง ๆ)
