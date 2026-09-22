@@ -2,21 +2,21 @@
 #   sudo install -m 0440 -o root -g root deploy/ai-noc-deploy.sudoers /etc/sudoers.d/ai-noc-deploy
 #   sudo visudo -c        # ต้องขึ้นว่า parsed OK ก่อนถึงจะใช้ได้
 #
-# `ainoc` คือผู้ใช้ที่รัน GitHub Actions Runner ตามคู่มือใน deploy/README.md
+# `ghrunner` คือผู้ใช้ที่รัน GitHub Actions Runner บนเครื่องของโปรเจกต์นี้
 # ถ้าตั้งชื่อผู้ใช้เป็นอย่างอื่น ต้องแก้ทุกบรรทัดด้านล่างให้ตรงกัน
 # ให้เฉพาะสองคำสั่งนี้เท่านั้น ไม่เปิด sudo แบบกว้าง
 
 # บาง distro ตั้ง requiretty ไว้ ทำให้ sudo ที่ไม่มี terminal (แบบที่ Runner เรียก) ใช้ไม่ได้
 # บรรทัดนี้ปิดเฉพาะผู้ใช้นี้ — ถ้าเครื่องไม่ได้ตั้ง requiretty ไว้ก็ไม่มีผลอะไร
-Defaults:ainoc !requiretty
+Defaults:ghrunner !requiretty
 
 # ระบุไว้ทั้ง /usr/bin และ /bin เพราะบางเครื่อง PATH ชี้ไปที่ /bin
 # และ sudo เทียบพาธแบบตรงตัว ไม่ได้ตามลิงก์ให้
-ainoc ALL=(root) NOPASSWD: /usr/bin/systemctl restart ai-noc, /bin/systemctl restart ai-noc
+ghrunner ALL=(root) NOPASSWD: /usr/bin/systemctl restart ai-noc, /bin/systemctl restart ai-noc
 
 # ต้องมีทั้งแบบมีและไม่มี * ต่อท้าย เพราะ workflow เรียก
 #   systemctl status ai-noc --no-pager --lines=40
 # ซึ่ง sudo จะเทียบอาร์กิวเมนต์ทั้งชุด ถ้าไม่ได้อนุญาตไว้จะถูกปฏิเสธเงียบ ๆ
 # แล้วเราจะไม่ได้เห็น log ตอน Health Check ไม่ผ่าน
-ainoc ALL=(root) NOPASSWD: /usr/bin/systemctl status ai-noc, /bin/systemctl status ai-noc
-ainoc ALL=(root) NOPASSWD: /usr/bin/systemctl status ai-noc *, /bin/systemctl status ai-noc *
+ghrunner ALL=(root) NOPASSWD: /usr/bin/systemctl status ai-noc, /bin/systemctl status ai-noc
+ghrunner ALL=(root) NOPASSWD: /usr/bin/systemctl status ai-noc *, /bin/systemctl status ai-noc *

@@ -9,8 +9,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 # ต้องเป็นผู้ใช้ที่อ่านไฟล์ใน /opt/ai-noc ได้ (ง่ายสุดคือผู้ใช้เดียวกับที่รัน GitHub Runner)
-User=ainoc
-Group=ainoc
+User=ghrunner
+Group=ghrunner
 
 # ชี้ไปที่ Symlink — workflow สลับ Symlink ก่อนแล้วค่อยสั่ง restart
 # systemd อ่านค่าปลายทางของ Symlink ตอนเริ่มโปรเซส เวอร์ชันใหม่จึงมีผลทันทีที่ restart
@@ -23,7 +23,8 @@ ExecStart=/usr/bin/node server.js
 # เก็บไว้นอกโฟลเดอร์ Release เพื่อไม่ให้ถูกทับตอน Deploy
 EnvironmentFile=-/etc/ai-noc/ai-noc.env
 Environment=NODE_ENV=production
-Environment=PORT=3000
+# ต้องตรงกับ proxy_pass ใน nginx — เครื่องของโปรเจกต์นี้ใช้ 3001
+Environment=PORT=3001
 # ผูกกับ 127.0.0.1 เมื่อมี Reverse Proxy (Nginx/Caddy) อยู่หน้า — ถ้าเปิดตรงให้ใช้ 0.0.0.0
 Environment=HOSTNAME=127.0.0.1
 

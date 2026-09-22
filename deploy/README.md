@@ -22,6 +22,24 @@ sudo systemctl restart ai-noc  →  ตรวจสุขภาพ  →  ไม�
 Build เกิดบนเครื่องปลายทางทั้งหมด จึง **ไม่ต้องใช้ SSH Key หรือ Secret ใด ๆ ใน GitHub**
 ตัว Runner เป็นฝ่ายเชื่อมออกไปหา GitHub เอง เซิร์ฟเวอร์จึงไม่ต้องเปิดพอร์ตขาเข้าเพิ่ม
 
+## เครื่องจริงของโปรเจกต์นี้
+
+ค่าทั้งหมดในเอกสารนี้ตั้งให้ตรงกับเครื่องที่ใช้งานอยู่แล้ว ถ้านำไปใช้กับเครื่องอื่นต้องไล่แก้ตามตาราง
+
+| รายการ | ค่าบนเครื่องจริง |
+|---|---|
+| ระบบปฏิบัติการ | Ubuntu 24.04 LTS (x86_64, 2 vCPU, RAM 2.9 GB) |
+| ผู้ใช้ที่รัน Runner และ Service | `ghrunner` |
+| ชื่อ Runner บน GitHub | `ai-noc-vm` (Label: `ai-noc`) |
+| โฟลเดอร์ปลายทาง | `/opt/ai-noc` (`releases/` + Symlink `current`) |
+| systemd unit | `ai-noc.service` |
+| พอร์ตของแอป | `127.0.0.1:3001` |
+| Reverse Proxy | Nginx site `ai-noc.n8n-lifrpi.uk` → `proxy_pass http://127.0.0.1:3001` |
+| ไฟล์ค่าลับ | `/etc/ai-noc/ai-noc.env` (ยังไม่มี `GEMINI_API_KEY` — AI Chat จึงอยู่ในโหมดจำลอง) |
+
+> ก่อนย้ายมาใช้ Workflow นี้ แอปถูก Deploy ด้วยมือไว้ที่ `/root/project_app` และรันเป็น root
+> โฟลเดอร์นั้นยังอยู่ (ไม่ได้ลบ) ใช้เป็นทางถอยได้ถ้าโครงใหม่มีปัญหา
+
 ## ข้อกำหนดเครื่อง
 
 | รายการ | ค่า |
@@ -38,11 +56,13 @@ Build เกิดบนเครื่องปลายทางทั้ง�
 
 ```bash
 # ผู้ใช้สำหรับรันแอปและรัน Runner (ใช้คนเดียวกันเพื่อลดปัญหาสิทธิ์ไฟล์)
-sudo useradd --system --create-home --shell /bin/bash ainoc
+# เครื่องของโปรเจกต์นี้มี ghrunner อยู่แล้ว — ข้ามบรรทัดนี้ได้
+sudo useradd --system --create-home --shell /bin/bash ghrunner
 
 # โฟลเดอร์ปลายทาง — ต้องอยู่นอก /home เพราะ unit ตั้ง ProtectHome=true
+# และต้องเป็นของผู้ใช้ที่รัน Runner เพราะ Workflow เขียนไฟล์ลงที่นี่โดยไม่ใช้ sudo
 sudo mkdir -p /opt/ai-noc/releases
-sudo chown -R ainoc:ainoc /opt/ai-noc
+sudo chown -R ghrunner:ghrunner /opt/ai-noc
 ```
 
 ติดตั้ง Node.js 22 (ตัวอย่าง Ubuntu/Debian):
@@ -67,7 +87,7 @@ sudo mkdir -p /etc/ai-noc
 sudo tee /etc/ai-noc/ai-noc.env >/dev/null <<'EOF'
 GEMINI_API_KEY=...
 EOF
-sudo chown root:ainoc /etc/ai-noc/ai-noc.env
+sudo chown root:ghrunner /etc/ai-noc/ai-noc.env
 sudo chmod 640 /etc/ai-noc/ai-noc.env
 ```
 
@@ -120,11 +140,11 @@ sudo systemctl enable ai-noc                   # ให้สตาร์ตเ�
 ## 4. ติดตั้ง Self-hosted Runner
 
 ไปที่ **Settings → Actions → Runners → New self-hosted runner** ของ Repository
-แล้วทำตามคำสั่งที่หน้านั้นให้ — ช่วงดาวน์โหลดและ `config.sh` ต้องรันในฐานะผู้ใช้ `ainoc`
+แล้วทำตามคำสั่งที่หน้านั้นให้ — ช่วงดาวน์โหลดและ `config.sh` ต้องรันในฐานะผู้ใช้ `ghrunner`
 (`config.sh` ปฏิเสธถ้ารันด้วย root) ส่วน `svc.sh install` ต้องใช้ sudo เพราะไปสร้าง systemd unit
 
 ```bash
-sudo -iu ainoc
+sudo -iu ghrunner
 mkdir -p ~/actions-runner && cd ~/actions-runner
 # curl ... && tar xzf ...   (คัดลอกจากหน้า GitHub เพราะเลขเวอร์ชันเปลี่ยนบ่อย)
 
@@ -133,8 +153,8 @@ mkdir -p ~/actions-runner && cd ~/actions-runner
 exit
 
 # ติดตั้งเป็น service ให้ Runner ขึ้นเองตอนบูต
-cd /home/ainoc/actions-runner
-sudo ./svc.sh install ainoc
+cd /home/ghrunner/actions-runner
+sudo ./svc.sh install ghrunner
 sudo ./svc.sh start
 ```
 
@@ -154,11 +174,11 @@ sudo install -m 0440 -o root -g root \
 sudo visudo -c              # ต้องขึ้นว่า parsed OK ถ้าไม่ผ่านให้ลบไฟล์นี้ทิ้งทันที
 ```
 
-แม่แบบตั้งชื่อผู้ใช้เป็น `ainoc` ไว้แล้ว ถ้าใช้ชื่ออื่นต้องแก้ทุกบรรทัดในไฟล์ให้ตรงกัน
+แม่แบบตั้งชื่อผู้ใช้เป็น `ghrunner` ไว้แล้ว ถ้าใช้ชื่ออื่นต้องแก้ทุกบรรทัดในไฟล์ให้ตรงกัน
 จากนั้นทดสอบในฐานะผู้ใช้นั้นว่าใช้ได้จริง — ต้องไม่ถามรหัสผ่านและไม่ขึ้น `a password is required`
 
 ```bash
-sudo -iu ainoc
+sudo -iu ghrunner
 sudo -n systemctl status ai-noc --no-pager --lines=5
 exit
 ```
@@ -171,7 +191,7 @@ exit
 |---|---|---|
 | `APP_DIR` | `/opt/ai-noc` | โฟลเดอร์ปลายทางบนเซิร์ฟเวอร์ |
 | `SERVICE_NAME` | `ai-noc` | ชื่อ systemd unit |
-| `HEALTH_URL` | `http://127.0.0.1:3000/` | URL ที่ใช้ตรวจว่าแอปฟื้นแล้วหลัง restart |
+| `HEALTH_URL` | `http://127.0.0.1:3001/` | URL ที่ใช้ตรวจว่าแอปฟื้นแล้วหลัง restart |
 | `KEEP_RELEASES` | `5` | จำนวนเวอร์ชันเก่าที่เก็บไว้เพื่อย้อนกลับ |
 
 workflow นี้ **ไม่ใช้ Secret ใด ๆ** — ค่าลับทั้งหมดอยู่ในไฟล์ของเครื่องตามข้อ 2
@@ -191,7 +211,7 @@ journalctl -u ai-noc -f       # ดู log ของแอปแบบต่อ�
 
 ## Reverse Proxy (ตัวเลือก)
 
-unit ตัวอย่างผูกแอปไว้ที่ `127.0.0.1:3000` เพื่อให้มี Nginx อยู่ด้านหน้า
+unit ตัวอย่างผูกแอปไว้ที่ `127.0.0.1:3001` เพื่อให้มี Nginx อยู่ด้านหน้า
 
 ```nginx
 server {
@@ -199,7 +219,7 @@ server {
     server_name ai-noc.example.ac.th;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -209,7 +229,7 @@ server {
 }
 ```
 
-ถ้าไม่ใช้ Reverse Proxy ให้แก้ `Environment=HOSTNAME=0.0.0.0` ใน unit แล้วเปิดพอร์ต 3000
+ถ้าไม่ใช้ Reverse Proxy ให้แก้ `Environment=HOSTNAME=0.0.0.0` ใน unit แล้วเปิดพอร์ต 3001
 
 ## คำสั่งที่ใช้บ่อย
 
@@ -221,8 +241,8 @@ readlink -f /opt/ai-noc/current
 ls -1dt /opt/ai-noc/releases/*/
 
 # ย้อนกลับด้วยมือ
-sudo -u ainoc ln -sfn /opt/ai-noc/releases/<ชื่อโฟลเดอร์เก่า> /opt/ai-noc/current.tmp
-sudo -u ainoc mv -T /opt/ai-noc/current.tmp /opt/ai-noc/current
+sudo -u ghrunner ln -sfn /opt/ai-noc/releases/<ชื่อโฟลเดอร์เก่า> /opt/ai-noc/current.tmp
+sudo -u ghrunner mv -T /opt/ai-noc/current.tmp /opt/ai-noc/current
 sudo systemctl restart ai-noc
 ```
 
