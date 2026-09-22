@@ -211,8 +211,13 @@ npm run dev          # เปิดที่ http://localhost:3000
 
 | Workflow | ทำงานเมื่อ | หน้าที่ |
 |---|---|---|
-| `.github/workflows/ci.yml` | เปิด/อัปเดต Pull Request | `npm ci` → `tsc --noEmit` → `npm run lint` → `npm run build` บน Runner ของ GitHub |
-| `.github/workflows/deploy.yml` | push เข้า `main` หรือสั่งเองจากแท็บ Actions | Build บน **Self-hosted Runner ที่ติดตั้งบนเซิร์ฟเวอร์ Linux ปลายทาง** แล้วสลับ Symlink และ restart systemd service |
+| `.github/workflows/ci.yml` | สั่งเองจากแท็บ Actions (เดิมคือทุก Pull Request — ดูหมายเหตุใต้ตาราง) | `npm ci` → `tsc --noEmit` → `npm run lint` → `npm run build` บน Runner ของ GitHub |
+| `.github/workflows/deploy.yml` | สั่งเองจากแท็บ Actions (เดิมคือ push เข้า `main` — ดูหมายเหตุใต้ตาราง) | Build บน **Self-hosted Runner ที่ติดตั้งบนเซิร์ฟเวอร์ Linux ปลายทาง** แล้วสลับ Symlink และ restart systemd service |
+
+> **หมายเหตุ:** ทั้งสอง Workflow ถูกพัก trigger อัตโนมัติไว้ชั่วคราว (เหลือ `workflow_dispatch`)
+> เพราะบัญชี GitHub ถูกล็อกการเรียกเก็บเงิน ทุก Run จึงตายที่ Startup failure แล้วส่งเมลแจ้ง
+> เมื่อปลดล็อกแล้วต้องใส่ trigger กลับตามคอมเมนต์ที่กำกับไว้หัวไฟล์ทั้งสอง
+> ระหว่างนี้ปล่อยเวอร์ชันด้วย [`deploy/manual-deploy.sh`](deploy/manual-deploy.sh) ซึ่งใช้ขั้นตอนเดียวกัน
 
 การ Deploy วางไฟล์ไว้ที่ `/opt/ai-noc/releases/<วันเวลา>-<sha ย่อ>` แล้วชี้ Symlink `current`
 ไปยังเวอร์ชันใหม่แบบ Atomic ก่อนสั่ง `systemctl restart` จากนั้นตรวจสุขภาพแอปด้วย HTTP

@@ -2,8 +2,9 @@
 # ไม่ผูกกับ push branch main เพราะ deploy.yml ตรวจซ้ำให้อยู่แล้ว
 name: CI
 
+# พักการสั่งงานอัตโนมัติไว้ชั่วคราวด้วยเหตุผลเดียวกับ deploy.yml
+# เมื่อปลดล็อก billing แล้วให้ใส่ `pull_request:` กลับเข้ามาเหนือ workflow_dispatch
 on:
-  pull_request:
   workflow_dispatch:
 
 permissions:

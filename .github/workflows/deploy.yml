@@ -2,9 +2,15 @@
 # ขั้นตอนตั้งค่าเครื่องปลายทางทั้งหมดอยู่ใน deploy/README.md
 name: Deploy to Linux server
 
+# พักการสั่งงานอัตโนมัติไว้ชั่วคราว — บัญชี GitHub ถูกล็อกการเรียกเก็บเงิน ทุก Run จึงตาย
+# ที่ Startup failure แล้วส่งเมลแจ้งทุกครั้ง จึงตัด trigger push ออกให้เหลือสั่งเองอย่างเดียว
+#
+# เมื่อปลดล็อก billing แล้วให้ใส่กลับเป็น:
+#   on:
+#     push:
+#       branches: [main]
+#     workflow_dispatch:
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 # ห้าม Deploy ซ้อนกัน แต่ห้ามยกเลิกงานที่กำลังทำอยู่กลางคัน (ไฟล์อาจค้างครึ่ง ๆ กลาง ๆ)

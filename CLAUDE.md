@@ -266,8 +266,12 @@ Rules that are load-bearing:
   `npm ci` and a cold build. Fine on a normal VM; if it ever hits `timeout-minutes: 30`, pass
   `clean: false` to keep the `.next` cache rather than trimming the checks.
 
-`ci.yml` runs the same three checks on pull requests only — `deploy.yml` re-runs them before
-every release, so CI deliberately has no `push` trigger. Server-side setup (runner install,
+`ci.yml` runs the same three checks on pull requests; `deploy.yml` re-runs them before every
+release, so CI deliberately has no `push` trigger. **Both are currently paused to
+`workflow_dispatch` only** — the account's GitHub billing is locked, so every run dies at
+startup and emails a failure. The header of each file says what to put back once it is
+unlocked; until then, releases go out through `deploy/manual-deploy.sh`, which runs the same
+steps by hand on the box. Server-side setup (runner install,
 systemd unit, sudoers, env file, reverse proxy, manual rollback) is documented in
 `deploy/README.md` next to the templates it installs.
 
