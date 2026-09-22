@@ -1,0 +1,41 @@
+# ตรวจโค้ดก่อน Merge — ชุดเดียวกับที่ deploy.yml รันก่อนปล่อยขึ้นเซิร์ฟเวอร์
+# ไม่ผูกกับ push branch main เพราะ deploy.yml ตรวจซ้ำให้อยู่แล้ว
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Type / Lint / Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - name: เช็กเอาต์โค้ด
+        uses: actions/checkout@v4
+
+      - name: ติดตั้ง Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: ติดตั้ง Dependencies
+        run: npm ci
+
+      - name: ตรวจ Type
+        run: npx tsc --noEmit
+
+      # ต้องรันแยกจาก build เพราะ next.config.ts ตั้ง eslint.ignoreDuringBuilds: true
+      - name: ตรวจ Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

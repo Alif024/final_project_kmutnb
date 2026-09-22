@@ -1,0 +1,6 @@
+# สิทธิ์ที่ workflow ต้องใช้ — ติดตั้งด้วย:
+#   sudo install -m 0440 -o root -g root deploy/ai-noc-deploy.sudoers /etc/sudoers.d/ai-noc-deploy
+#   sudo visudo -c
+# แก้ `github-runner` ให้เป็นชื่อผู้ใช้ที่รัน GitHub Actions Runner จริง
+# ให้เฉพาะสองคำสั่งนี้เท่านั้น ไม่ให้ sudo แบบเปิดกว้าง
+github-runner ALL=(root) NOPASSWD: /usr/bin/systemctl restart ai-noc, /usr/bin/systemctl status ai-noc

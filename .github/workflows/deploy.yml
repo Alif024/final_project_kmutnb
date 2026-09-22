@@ -1,0 +1,132 @@
+# นำแอปขึ้นเซิร์ฟเวอร์ Linux ผ่าน Self-hosted Runner ที่ติดตั้งบนเครื่องปลายทาง
+# ขั้นตอนตั้งค่าเครื่องปลายทางทั้งหมดอยู่ใน deploy/README.md
+name: Deploy to Linux server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# ห้าม Deploy ซ้อนกัน แต่ห้ามยกเลิกงานที่กำลังทำอยู่กลางคัน (ไฟล์อาจค้างครึ่ง ๆ กลาง ๆ)
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build และ Restart Service
+    # Runner ต้องมี Label ครบทั้งสามตัว — ตั้ง Label `ai-noc` ตอนติดตั้ง Runner
+    runs-on: [self-hosted, linux, ai-noc]
+    # ใช้ Environment เพื่อกำหนดสิทธิ์อนุมัติก่อน Deploy ได้ (Settings -> Environments)
+    environment: production
+    timeout-minutes: 30
+
+    env:
+      # ตั้งค่าจริงได้ที่ Settings -> Secrets and variables -> Actions -> Variables
+      APP_DIR: ${{ vars.APP_DIR || '/opt/ai-noc' }}
+      SERVICE_NAME: ${{ vars.SERVICE_NAME || 'ai-noc' }}
+      HEALTH_URL: ${{ vars.HEALTH_URL || 'http://127.0.0.1:3000/' }}
+      KEEP_RELEASES: ${{ vars.KEEP_RELEASES || '5' }}
+      NEXT_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - name: เช็กเอาต์โค้ด
+        uses: actions/checkout@v4
+
+      - name: ติดตั้ง Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: ติดตั้ง Dependencies
+        run: npm ci
+
+      # ตรวจให้ครบตามที่ CLAUDE.md กำหนด — build ไม่ตรวจ lint ให้ (ignoreDuringBuilds)
+      - name: ตรวจ Type
+        run: npx tsc --noEmit
+
+      - name: ตรวจ Lint
+        run: npm run lint
+
+      - name: "Build (output: standalone)"
+        run: npm run build
+
+      # standalone แยก static asset ออกมา ต้องคัดลอกกลับเข้าไปเองตามที่ Next.js กำหนด
+      - name: ประกอบชุดไฟล์สำหรับปล่อยขึ้นเซิร์ฟเวอร์
+        run: |
+          set -euo pipefail
+          rm -rf release
+          cp -r .next/standalone release
+          mkdir -p release/.next
+          cp -r .next/static release/.next/static
+          if [ -d public ]; then cp -r public release/public; fi
+
+      - name: ปล่อยเวอร์ชันใหม่และสลับ Symlink
+        run: |
+          set -euo pipefail
+          # ชื่อโฟลเดอร์ไม่ซ้ำเดิมเสมอ แม้ Deploy commit เดิมซ้ำ — ถ้าใช้ชื่อเดียวกับที่รันอยู่
+          # การลบทิ้งเพื่อเขียนใหม่จะไปดึงไฟล์ออกจากใต้โปรเซสที่ยังทำงาน และย้อนกลับไม่ได้ด้วย
+          RELEASE_DIR="$APP_DIR/releases/$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA:0:7}"
+
+          # จำเวอร์ชันเดิมไว้ก่อน เผื่อต้องย้อนกลับเมื่อ Health Check ไม่ผ่าน
+          if [ -L "$APP_DIR/current" ]; then
+            echo "PREVIOUS_RELEASE=$(readlink -f "$APP_DIR/current")" >> "$GITHUB_ENV"
+          fi
+
+          mkdir -p "$RELEASE_DIR"
+          cp -r release/. "$RELEASE_DIR/"
+
+          # สลับแบบ Atomic — สร้าง Symlink ชั่วคราวแล้ว mv -T ทับ ไม่มีจังหวะที่ current หายไป
+          ln -sfn "$RELEASE_DIR" "$APP_DIR/current.tmp"
+          mv -T "$APP_DIR/current.tmp" "$APP_DIR/current"
+          echo "RELEASE_DIR=$RELEASE_DIR" >> "$GITHUB_ENV"
+
+      - name: Restart Service
+        run: sudo -n systemctl restart "$SERVICE_NAME"
+
+      - name: ตรวจสุขภาพแอป
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            if curl -fsS --max-time 5 "$HEALTH_URL" -o /dev/null; then
+              echo "แอปตอบสนองแล้วในครั้งที่ $attempt"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::แอปไม่ตอบสนองภายใน 60 วินาที ($HEALTH_URL)"
+          sudo -n systemctl status "$SERVICE_NAME" --no-pager --lines=40 || true
+          exit 1
+
+      - name: ย้อนกลับเวอร์ชันก่อนหน้าเมื่อ Deploy ล้มเหลว
+        if: failure() && env.PREVIOUS_RELEASE != ''
+        run: |
+          set -euo pipefail
+          echo "::warning::ย้อนกลับไปที่ $PREVIOUS_RELEASE"
+          ln -sfn "$PREVIOUS_RELEASE" "$APP_DIR/current.tmp"
+          mv -T "$APP_DIR/current.tmp" "$APP_DIR/current"
+          sudo -n systemctl restart "$SERVICE_NAME"
+
+      - name: ลบเวอร์ชันเก่าที่เกินโควตา
+        run: |
+          set -euo pipefail
+          cd "$APP_DIR/releases"
+          # เรียงใหม่ไปเก่า แล้วลบทุกอันที่เกิน KEEP_RELEASES (อันที่ใช้อยู่เป็นอันใหม่สุดเสมอ)
+          ls -1dt -- */ 2>/dev/null | tail -n "+$((KEEP_RELEASES + 1))" | xargs -r rm -rf || true
+
+      - name: สรุปผล
+        run: |
+          {
+            echo "### Deploy สำเร็จ"
+            echo ""
+            echo "| หัวข้อ | ค่า |"
+            echo "|---|---|"
+            echo "| Commit | \`$GITHUB_SHA\` |"
+            echo "| โฟลเดอร์ | \`$RELEASE_DIR\` |"
+            echo "| Service | \`$SERVICE_NAME\` |"
+            echo "| Health URL | $HEALTH_URL |"
+          } >> "$GITHUB_STEP_SUMMARY"

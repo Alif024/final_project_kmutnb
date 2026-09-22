@@ -187,10 +187,38 @@ npm run dev          # เปิดที่ http://localhost:3000
 
 ---
 
+## การนำขึ้นเซิร์ฟเวอร์ (CI/CD)
+
+| Workflow | ทำงานเมื่อ | หน้าที่ |
+|---|---|---|
+| `.github/workflows/ci.yml` | เปิด/อัปเดต Pull Request | `npm ci` → `tsc --noEmit` → `npm run lint` → `npm run build` บน Runner ของ GitHub |
+| `.github/workflows/deploy.yml` | push เข้า `main` หรือสั่งเองจากแท็บ Actions | Build บน **Self-hosted Runner ที่ติดตั้งบนเซิร์ฟเวอร์ Linux ปลายทาง** แล้วสลับ Symlink และ restart systemd service |
+
+การ Deploy วางไฟล์ไว้ที่ `/opt/ai-noc/releases/<วันเวลา>-<sha ย่อ>` แล้วชี้ Symlink `current`
+ไปยังเวอร์ชันใหม่แบบ Atomic ก่อนสั่ง `systemctl restart` จากนั้นตรวจสุขภาพแอปด้วย HTTP
+**ถ้าแอปไม่ตอบภายใน 60 วินาที ระบบจะย้อน Symlink กลับเวอร์ชันเดิมและ restart ให้อัตโนมัติ**
+และเก็บเวอร์ชันย้อนหลังไว้ 5 ชุด
+
+Build เกิดบนเครื่องปลายทางทั้งหมด จึงไม่ต้องใช้ SSH Key หรือ Secret ใด ๆ ใน GitHub
+และค่าลับทุกตัว (`GEMINI_API_KEY`, `ZABBIX_*`, `VCENTER_*`, `PROXMOX_*`) อยู่ในไฟล์
+`/etc/ai-noc/ai-noc.env` ของเครื่อง ซึ่ง systemd อ่านผ่าน `EnvironmentFile` ไม่ติดไปกับชุดไฟล์ที่ Deploy
+
+> unit ของ systemd รัน `node server.js` ในโฟลเดอร์ standalone โดยตรง ไม่ใช้ `npm run start`
+> เพราะ `next start` ไม่รองรับ `output: 'standalone'`
+
+ขั้นตอนตั้งค่าเครื่อง Linux, การติดตั้ง Self-hosted Runner, systemd unit, สิทธิ์ sudo,
+ตัวแปรที่ตั้งได้ (`APP_DIR`, `SERVICE_NAME`, `HEALTH_URL`, `KEEP_RELEASES`)
+และวิธีย้อนเวอร์ชันด้วยมือ — อ่านได้ที่ [`deploy/README.md`](deploy/README.md)
+
+---
+
 ## โครงสร้างโปรเจกต์
 
 ```
 final_project_kmutnb/
+├── .github/workflows/
+│   ├── ci.yml                   # ตรวจ Type/Lint/Build ทุก Pull Request
+│   └── deploy.yml               # Deploy ขึ้นเซิร์ฟเวอร์ Linux ผ่าน Self-hosted Runner
 ├── app/
 │   ├── api/ai/chat/route.ts     # API Route — เรียก Gemini
 │   ├── api/discovery/route.ts   # API Route — ค้นหาอุปกรณ์จาก Zabbix/vCenter/Proxmox
@@ -226,6 +254,10 @@ final_project_kmutnb/
 │   ├── use-mobile.ts            # Media Query Hook (ยังไม่มีการเรียกใช้งานจริง)
 │   ├── use-connection-test.ts   # จำลองการทดสอบการเชื่อมต่อแบบไล่ log ทีละบรรทัด
 │   └── use-topology-layout.ts   # คลังผังหลายใบที่ผู้ใช้วาดเอง (useSyncExternalStore + localStorage)
+├── deploy/
+│   ├── README.md                # ขั้นตอนตั้งค่าเครื่อง Linux + Self-hosted Runner
+│   ├── ai-noc.service           # แม่แบบ systemd unit ของเซิร์ฟเวอร์ปลายทาง
+│   └── ai-noc-deploy.sudoers    # สิทธิ์ sudo เฉพาะคำสั่ง restart/status ของ service
 ├── metadata.json                # Manifest สำหรับ Google AI Studio
 └── bugs.txt                     # บันทึกผลตรวจสอบบั๊กทั้งแอป (รายการที่แก้แล้ว/ยังไม่แก้)
 ```
