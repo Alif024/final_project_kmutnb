@@ -243,14 +243,17 @@ Build เกิดบนเครื่องปลายทางทั้ง�
 
 ```bash
 # ── ขั้นที่ 1: บนเครื่องพัฒนา — ส่งซอร์สจาก main ขึ้นเซิร์ฟเวอร์ ──────────────
-git checkout main && git pull
+# ทุกคำสั่งเป็นบรรทัดเดียว ใช้ได้ทั้ง Git Bash, PowerShell และ cmd
+git checkout main
+git pull
 
 # ธง -c สองตัวนี้จำเป็นบน Windows ไม่งั้น git archive จะแปลงไฟล์เป็น CRLF
 # แล้ว bash บนเซิร์ฟเวอร์จะรันสคริปต์ไม่ได้ (syntax error near unexpected token)
-git -c core.autocrlf=false -c core.eol=lf archive --format=tar HEAD | gzip > src.tgz
+# ใช้ --format=tar.gz ให้ git บีบอัดเอง จะได้ไม่ต้องพึ่ง gzip ซึ่งไม่มีใน PATH ของ cmd/PowerShell
+git -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o src.tgz HEAD
 
 scp src.tgz root@<server>:/tmp/
-ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz   && rm -f /tmp/src.tgz   && sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
+ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz && rm -f /tmp/src.tgz && sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
 
 # ── ขั้นที่ 2: บนเซิร์ฟเวอร์ — สั่ง Deploy ────────────────────────────────────
 ssh root@<server>

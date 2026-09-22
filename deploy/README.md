@@ -338,7 +338,9 @@ sudo systemctl restart ai-noc
 - **ห้ามใช้ `npm run start`** เพราะ `next start` ไม่รองรับ `output: 'standalone'`
   ต้องรัน `node server.js` ในโฟลเดอร์ Release ตามที่ unit ตั้งไว้
 do'`)
-git -c core.autocrlf=false -c core.eol=lf archive --format=tar HEAD | gzip > src.tgz
+# และใช้ --format=tar.gz ให้ git บีบอัดเอง เพราะ gzip มีเฉพาะใน Git Bash
+# ไม่มีใน PATH ของ cmd/PowerShell วิธีนี้จึงใช้ได้กับทุก shell บน Windows
+git -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o src.tgz HEAD
 scp src.tgz root@<server>:/tmp/
 ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz"
 ssh root@<server> "sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
