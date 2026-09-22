@@ -248,6 +248,40 @@ server {
 
 ถ้าไม่ใช้ Reverse Proxy ให้แก้ `Environment=HOSTNAME=0.0.0.0` ใน unit แล้วเปิดพอร์ต 3001
 
+## Deploy ด้วยมือ (เมื่อสั่งผ่าน GitHub Actions ไม่ได้)
+
+[`manual-deploy.sh`](manual-deploy.sh) ใช้ขั้นตอนเดียวกับ `deploy.yml` ทุกคำสั่ง
+ตั้งแต่ `npm ci` ไปจนถึงย้อนเวอร์ชันอัตโนมัติเมื่อ Health Check ไม่ผ่าน
+ใช้ตอนที่ Workflow รันไม่ได้ (เช่นบัญชี GitHub ถูกล็อกการเรียกเก็บเงิน) หรืออยากปล่อยเวอร์ชันด่วน
+
+**ขั้นที่ 1 — เอาซอร์สขึ้นเครื่องให้ `ghrunner` อ่านได้** (เลือกทางใดทางหนึ่ง)
+
+```bash
+# ก) จากเครื่องพัฒนา — ไม่ต้องใช้สิทธิ์เข้าถึง repo บนเซิร์ฟเวอร์
+git archive --format=tar HEAD | gzip > src.tgz
+scp src.tgz root@<server>:/tmp/
+ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz"
+ssh root@<server> "sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
+
+# ข) บนเซิร์ฟเวอร์ — ต้องมีสิทธิ์ clone repo จากเครื่องนั้นได้
+sudo -u ghrunner git clone https://github.com/Alif024/final_project_kmutnb.git /home/ghrunner/src
+```
+
+**ขั้นที่ 2 — สั่ง Deploy**
+
+```bash
+sudo -iu ghrunner
+./manual-deploy.sh ~/src
+```
+
+สคริปต์จะ Build → ประกอบชุดไฟล์ → วาง Release ใหม่ → สลับ Symlink → `sudo -n systemctl restart`
+→ ตรวจสุขภาพ 30 ครั้ง (60 วินาที) → ถ้าไม่ผ่านจะย้อน Symlink กลับและ restart ให้เอง
+→ ลบ Release เก่าที่เกินโควตา ปรับค่าได้ด้วยตัวแปรเดียวกับ Workflow เช่น
+`HEALTH_URL=http://127.0.0.1:3001/ KEEP_RELEASES=5 ./manual-deploy.sh ~/src`
+
+> ชื่อโฟลเดอร์ Release จะลงท้ายด้วย `-manual` เมื่อซอร์สไม่ได้มาจาก git clone
+> (ไฟล์จาก `git archive` ไม่มีโฟลเดอร์ `.git` ติดมาด้วย)
+
 ## คำสั่งที่ใช้บ่อย
 
 ```bash
