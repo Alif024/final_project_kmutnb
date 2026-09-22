@@ -37,8 +37,10 @@ Build เกิดบนเครื่องปลายทางทั้ง�
 | Reverse Proxy | Nginx site `ai-noc.n8n-lifrpi.uk` → `proxy_pass http://127.0.0.1:3001` |
 | ไฟล์ค่าลับ | `/etc/ai-noc/ai-noc.env` (ยังไม่มี `GEMINI_API_KEY` — AI Chat จึงอยู่ในโหมดจำลอง) |
 
-> ก่อนย้ายมาใช้ Workflow นี้ แอปถูก Deploy ด้วยมือไว้ที่ `/root/project_app` และรันเป็น root
-> โฟลเดอร์นั้นยังอยู่ (ไม่ได้ลบ) ใช้เป็นทางถอยได้ถ้าโครงใหม่มีปัญหา
+> **ย้ายมาใช้โครงนี้แล้วเมื่อ 22 กันยายน 2569** — ก่อนหน้านั้นแอปถูก Deploy ด้วยมือไว้ที่
+> `/root/project_app` และรันเป็น root ตอนนี้ service รันเป็น `ghrunner` จาก `/opt/ai-noc/current`
+> ส่วน `/root/project_app` (1.1 GB) และ unit เดิมที่สำรองไว้ที่
+> `/root/ai-noc.service.bak-before-migration` ยังอยู่ ใช้เป็นทางถอยได้ถ้าโครงใหม่มีปัญหา
 
 ## ข้อกำหนดเครื่อง
 

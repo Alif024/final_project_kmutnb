@@ -143,7 +143,7 @@
 | การยืนยันตัวตน (Authentication) | ❌ ยังไม่มี — RBAC เป็น Role Switcher สำหรับสาธิต |
 | Export PDF / Excel | ❌ เป็นปุ่ม Stub (`alert()`) ยกเว้นปุ่ม Print ที่ใช้ `window.print()` ได้ |
 | CI (ตรวจ Type / Lint / Build อัตโนมัติ) | ✅ GitHub Actions — `ci.yml` ทุก Pull Request และ `deploy.yml` ตรวจซ้ำก่อนปล่อยขึ้นเซิร์ฟเวอร์ |
-| Deploy ขึ้นเซิร์ฟเวอร์ Linux (Self-hosted Runner + systemd) | 🟡 Workflow เขียนครบแล้วรวมการย้อนเวอร์ชันอัตโนมัติ แต่ยังไม่ได้รันกับเซิร์ฟเวอร์จริง |
+| Deploy ขึ้นเซิร์ฟเวอร์ Linux (Self-hosted Runner + systemd) | 🟡 ทดสอบทุกคำสั่งบนเซิร์ฟเวอร์จริงแล้วผ่านหมด (`npm ci` → `tsc` → `lint` → `build` → วาง release → สลับ symlink → restart → health check รวม ~2 นาที) และย้ายระบบที่ให้บริการอยู่มาใช้โครงนี้แล้ว เหลือยืนยันการสั่งงานอัตโนมัติจากฝั่ง GitHub Actions |
 | Unit Test | ❌ ยังไม่มี — ไม่มี Test Runner หรือไฟล์ทดสอบในโปรเจกต์ |
 
 ---
@@ -426,11 +426,14 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
     Component ใดอ้างอิงถึง ส่วน `NetworkDevice` ถูกนำมาใช้จริงแล้ว (ข้อมูลพอร์ตของอุปกรณ์ SNMP
     ในแท็บ Interfaces และการตรวจสถานะพอร์ตใน `lib/link-verification.ts`)
     อนึ่ง ตัวเลข "Total Devices" ในหน้า Dashboard ยังเป็นค่าคงที่ที่ไม่มีข้อมูลต้นทางรองรับ
-13. **Workflow Deploy ยังไม่ได้รันกับเซิร์ฟเวอร์จริง** — ตรวจแล้วว่า YAML ถูกต้อง สคริปต์ทุกบล็อก
-    ผ่าน `bash -n` และตรรกะเก็บเวอร์ชันย้อนหลังทดสอบแยกแล้ว แต่ส่วนที่ต้องมี Linux จริง
-    (สลับ Symlink, `systemctl`, `sudo -n`) ยังไม่ได้ทดสอบ นอกจากนี้การ Build เกิดบนเครื่อง
-    ปลายทางเอง จึงกิน CPU/RAM ของเครื่องที่ให้บริการอยู่ และ `actions/checkout` ล้าง
-    `node_modules`/`.next` ทุกรอบ ทำให้ทุกครั้งเป็นการ Build แบบเย็น (ช้าแต่ผลลัพธ์แน่นอนกว่า)
+13. **ยังไม่ได้ยืนยันว่า GitHub สั่งงาน Runner ได้จริง** — ทุกคำสั่งในขั้นตอน Deploy ทดสอบบน
+    เซิร์ฟเวอร์จริงแล้วผ่านหมด (build บนเครื่อง 2 vCPU/3 GB ใช้ ~2 นาที, สลับ Symlink,
+    `sudo -n systemctl restart` และ Health Check) แต่ตอน push ขึ้น branch ทดสอบ
+    Runner ไม่ได้รับงานเลย ทั้งที่เชื่อมต่อ GitHub อยู่ — จุดที่ต้องตรวจคือหน้า Actions ของ
+    Repository และบรรทัด `environment: production` ซึ่งใช้ไม่ได้กับ Repository ส่วนตัว
+    บนแพ็กเกจ Free นอกจากนี้การ Build เกิดบนเครื่องปลายทางเอง จึงกิน CPU/RAM ของเครื่อง
+    ที่ให้บริการอยู่ และ `actions/checkout` ล้าง `node_modules`/`.next` ทุกรอบ
+    ทำให้ทุกครั้งเป็นการ Build แบบเย็น (ช้าแต่ผลลัพธ์แน่นอนกว่า)
 
 ---
 
