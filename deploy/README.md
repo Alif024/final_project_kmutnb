@@ -37,6 +37,7 @@ Build เกิดบนเครื่องปลายทางทั้ง�
 | Reverse Proxy | Nginx site `ai-noc.n8n-lifrpi.uk` → `proxy_pass http://127.0.0.1:3001` |
 | ไฟล์ค่าลับ | `/etc/ai-noc/ai-noc.env` (ยังไม่มี `GEMINI_API_KEY` — AI Chat จึงอยู่ในโหมดจำลอง) |
 | SFTP | ❌ `Subsystem sftp` ถูกคอมเมนต์ไว้ใน `/etc/ssh/sshd_config` บรรทัด 115 — `scp` ต้องใส่ `-O` เสมอ |
+| ซอร์สบนเครื่อง | `/home/ghrunner/src` — git clone ของ `main` ดึงผ่าน Deploy Key (อ่านอย่างเดียว) |
 
 > **ย้ายมาใช้โครงนี้แล้วเมื่อ 22 กันยายน 2569** — ก่อนหน้านั้นแอปถูก Deploy ด้วยมือไว้ที่
 > `/root/project_app` และรันเป็น root ตอนนี้ service รันเป็น `ghrunner` จาก `/opt/ai-noc/current`
@@ -274,36 +275,68 @@ server {
 ตั้งแต่ `npm ci` ไปจนถึงย้อนเวอร์ชันอัตโนมัติเมื่อ Health Check ไม่ผ่าน
 ใช้ตอนที่ Workflow รันไม่ได้ (เช่นบัญชี GitHub ถูกล็อกการเรียกเก็บเงิน) หรืออยากปล่อยเวอร์ชันด่วน
 
-**ขั้นที่ 1 — เอาซอร์สขึ้นเครื่องให้ `ghrunner` อ่านได้** (เลือกทางใดทางหนึ่ง)
+### ตั้งค่าครั้งเดียว — Deploy Key ให้เซิร์ฟเวอร์ดึงโค้ดเองได้
+
+Repository เป็นแบบส่วนตัว เซิร์ฟเวอร์จึงต้องมีกุญแจของตัวเองถึงจะ `git clone` ได้
+ใช้ **Deploy Key** ไม่ใช่ Personal Access Token เพราะผูกกับ Repository นี้ Repository เดียว
+อ่านได้อย่างเดียว ไม่มีวันหมดอายุ และถอนได้ทันทีจากหน้า Settings ของ Repository
 
 ```bash
-# ก) จากเครื่องพัฒนา — ไม่ต้องใช้สิทธิ์เข้าถึง repo บนเซิร์ฟเวอร์
-# บน Windows ต้องใส่ -c core.autocrlf=false -c core.eol=lf ด้วย ไม่งั้น git archive
-# จะแปลงทุกไฟล์เป็น CRLF ติดขึ้นไปกับเซิร์ฟเวอร์ แล้ว bash จะรันสคริปต์ไม่ได้
-# (ขึ้น error แบบ syntax error near unexpected token `
-# -O บังคับใช้โปรโตคอลเดิมแทน SFTP เพราะ sshd ของเครื่องนี้ปิด Subsystem sftp ไว้
+# 1) สร้างกุญแจในฐานะผู้ใช้ที่รัน Runner แล้วพิมพ์ Public Key ออกมา
+sudo -iu ghrunner
+ssh-keygen -t ed25519 -N "" -C "ai-noc-vm deploy key" -f ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519.pub
+
+# 2) จำ Host Key ของ GitHub ไว้ก่อน กัน clone ครั้งแรกค้างเพราะถามยืนยัน
+ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts
+```
+
+นำ Public Key ที่ได้ไปใส่ที่ **Settings → Deploy keys → Add deploy key** ของ Repository
+ตั้งชื่อว่า `ai-noc-vm` และ **ห้ามติ๊ก** *Allow write access* เซิร์ฟเวอร์ต้องการแค่สิทธิ์อ่าน
+
+```bash
+# 3) ทดสอบแล้ว clone (ต้องขึ้นว่า successfully authenticated)
+ssh -T git@github.com
+git clone git@github.com:Alif024/final_project_kmutnb.git ~/src
+```
+
+### อัปเดตและ Deploy (ใช้ประจำ)
+
+```bash
+sudo -iu ghrunner
+cd ~/src
+git fetch --prune
+git reset --hard origin/main        # ให้ตรงกับ main เป๊ะ ทิ้งของค้างในโฟลเดอร์
+
+./deploy/manual-deploy.sh ~/src     # ใช้เวลาประมาณ 2 นาที
+```
+
+สคริปต์จะ Build → ประกอบชุดไฟล์ → วาง Release ใหม่ → สลับ Symlink → `sudo -n systemctl restart`
+→ ตรวจสุขภาพ 30 ครั้ง (60 วินาที) → ถ้าไม่ผ่านจะย้อน Symlink กลับและ restart ให้เอง
+→ ลบ Release เก่าที่เกินโควตา ปรับค่าได้ด้วยตัวแปรเดียวกับ Workflow เช่น
+`HEALTH_URL=http://127.0.0.1:3001/ KEEP_RELEASES=5 ./deploy/manual-deploy.sh ~/src`
+
+> ชื่อโฟลเดอร์ Release จะลงท้ายด้วย sha ย่อของคอมมิต เช่น `20260922-051456-3f0d94d`
+> ทำให้ย้อนดูได้ว่าเวอร์ชันไหนคือโค้ดตัวใด
+
+### ทางสำรอง — ส่งไฟล์จากเครื่องพัฒนาเอง
+
+ใช้เมื่อไม่อยากตั้ง Deploy Key หรืออยาก Deploy โค้ดที่ยังไม่ได้ push ขึ้น GitHub
+
+```bash
+# บนเครื่องพัฒนา — ธง -c สองตัวจำเป็นบน Windows ไม่งั้น git archive จะแปลงไฟล์เป็น CRLF
+# แล้ว bash บนเซิร์ฟเวอร์จะรันสคริปต์ไม่ได้ ส่วน --format=tar.gz ทำให้ไม่ต้องพึ่ง gzip
+# ซึ่งมีเฉพาะใน Git Bash ไม่มีใน PATH ของ cmd/PowerShell
+git -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o src.tgz HEAD
+
+# -O บังคับให้ scp ใช้โปรโตคอลเดิมแทน SFTP เพราะ sshd ของเครื่องนี้ปิด Subsystem sftp ไว้
 scp -O src.tgz root@<server>:/tmp/
 ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz"
 ssh root@<server> "sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
-
-# ข) บนเซิร์ฟเวอร์ — ต้องมีสิทธิ์ clone repo จากเครื่องนั้นได้
-sudo -u ghrunner git clone https://github.com/Alif024/final_project_kmutnb.git /home/ghrunner/src
 ```
 
-**ขั้นที่ 2 — สั่ง Deploy**
-
-```bash
-sudo -iu ghrunner
-./manual-deploy.sh ~/src
-```
-
-สคริปต์จะ Build → ประกอบชุดไฟล์ → วาง Release ใหม่ → สลับ Symlink → `sudo -n systemctl restart`
-→ ตรวจสุขภาพ 30 ครั้ง (60 วินาที) → ถ้าไม่ผ่านจะย้อน Symlink กลับและ restart ให้เอง
-→ ลบ Release เก่าที่เกินโควตา ปรับค่าได้ด้วยตัวแปรเดียวกับ Workflow เช่น
-`HEALTH_URL=http://127.0.0.1:3001/ KEEP_RELEASES=5 ./manual-deploy.sh ~/src`
-
-> ชื่อโฟลเดอร์ Release จะลงท้ายด้วย `-manual` เมื่อซอร์สไม่ได้มาจาก git clone
-> (ไฟล์จาก `git archive` ไม่มีโฟลเดอร์ `.git` ติดมาด้วย)
+> วิธีนี้ไฟล์ที่ได้ไม่มีโฟลเดอร์ `.git` ติดมาด้วย ชื่อโฟลเดอร์ Release จึงลงท้ายด้วย `-manual`
+> แทน sha ของคอมมิต และต้องเรียกสคริปต์ว่า `~/manual-deploy.sh` ถ้าเคยติดตั้งสำเนาไว้ที่ Home
 
 ## คำสั่งที่ใช้บ่อย
 
@@ -326,70 +359,10 @@ sudo systemctl restart ai-noc
   ต้องย้อนเองด้วยคำสั่งด้านบน
 - **Build กินแรงเครื่อง** `next build` ใช้ CPU/RAM พอสมควรบนเครื่องเดียวกับที่แอปรัน
   ถ้าเซิร์ฟเวอร์เล็ก ให้ตั้งเวลา Deploy นอกเวลาทำการ หรือย้ายไป Build บนเครื่องอื่นแล้วส่งไฟล์มาแทน
-- **ทุกครั้งเป็นการ Build แบบเย็น** `actions/checkout` ล้าง Workspace ด้วย `git clean -ffdx`
+- **Workflow Build แบบเย็นทุกรอบ** `actions/checkout` ล้าง Workspace ด้วย `git clean -ffdx`
   ทั้ง `node_modules` และ `.next` จึงหายทุกรอบ ผลลัพธ์แน่นอนกว่าแต่ช้ากว่า ถ้าช้าจนชน
   `timeout-minutes: 30` ค่อยเพิ่ม `with: clean: false` ให้ `actions/checkout` เพื่อเก็บแคช `.next` ไว้
-- **`npm ci` ดึง `firebase-tools` มาด้วยทุกรอบ** ทั้งที่ `next build` ไม่ได้ใช้ เพราะอยู่ใน
-  `devDependencies` ซึ่งจำเป็นต่อ build ตัวอื่น (typescript/tailwind) จึงตัดทิ้งทั้งชุดไม่ได้
-  ถ้าต้องการให้เร็วขึ้นจริง ๆ ต้องถอด `firebase-tools` ออกจาก `package.json` ซึ่งเป็นการแก้โปรเจกต์
-  ไม่ใช่แก้ Workflow (แพ็กเกจ `re2` ที่พ่วงมาเป็น optional — คอมไพล์ไม่ผ่านก็ข้ามไป ไม่ทำให้ `npm ci` ล้ม)
-- **ฐานข้อมูลผังเครือข่ายอยู่ที่ `localStorage` ของเบราว์เซอร์** (`ai-noc:topology-workspace`)
-  การ Deploy จึงไม่กระทบผังที่ผู้ใช้วาดไว้ และการย้ายเครื่องก็ไม่ได้พาผังไปด้วย
-- **ไฟล์ `.env*` ถูก `.gitignore` ไว้** ชุดไฟล์ที่ปล่อยขึ้นเซิร์ฟเวอร์จึงไม่มีค่าลับติดไปด้วย
-  ค่าทุกตัวมาจาก `EnvironmentFile` ของ systemd เท่านั้น
-- **ห้ามใช้ `npm run start`** เพราะ `next start` ไม่รองรับ `output: 'standalone'`
-  ต้องรัน `node server.js` ในโฟลเดอร์ Release ตามที่ unit ตั้งไว้
-do'`)
-# และใช้ --format=tar.gz ให้ git บีบอัดเอง เพราะ gzip มีเฉพาะใน Git Bash
-# ไม่มีใน PATH ของ cmd/PowerShell วิธีนี้จึงใช้ได้กับทุก shell บน Windows
-git -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o src.tgz HEAD
-scp src.tgz root@<server>:/tmp/
-ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz"
-ssh root@<server> "sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
-
-# ข) บนเซิร์ฟเวอร์ — ต้องมีสิทธิ์ clone repo จากเครื่องนั้นได้
-sudo -u ghrunner git clone https://github.com/Alif024/final_project_kmutnb.git /home/ghrunner/src
-```
-
-**ขั้นที่ 2 — สั่ง Deploy**
-
-```bash
-sudo -iu ghrunner
-./manual-deploy.sh ~/src
-```
-
-สคริปต์จะ Build → ประกอบชุดไฟล์ → วาง Release ใหม่ → สลับ Symlink → `sudo -n systemctl restart`
-→ ตรวจสุขภาพ 30 ครั้ง (60 วินาที) → ถ้าไม่ผ่านจะย้อน Symlink กลับและ restart ให้เอง
-→ ลบ Release เก่าที่เกินโควตา ปรับค่าได้ด้วยตัวแปรเดียวกับ Workflow เช่น
-`HEALTH_URL=http://127.0.0.1:3001/ KEEP_RELEASES=5 ./manual-deploy.sh ~/src`
-
-> ชื่อโฟลเดอร์ Release จะลงท้ายด้วย `-manual` เมื่อซอร์สไม่ได้มาจาก git clone
-> (ไฟล์จาก `git archive` ไม่มีโฟลเดอร์ `.git` ติดมาด้วย)
-
-## คำสั่งที่ใช้บ่อย
-
-```bash
-# ดูว่าตอนนี้รันเวอร์ชันไหน
-readlink -f /opt/ai-noc/current
-
-# รายการเวอร์ชันที่ยังเก็บไว้ (ใหม่ไปเก่า)
-ls -1dt /opt/ai-noc/releases/*/
-
-# ย้อนกลับด้วยมือ
-sudo -u ghrunner ln -sfn /opt/ai-noc/releases/<ชื่อโฟลเดอร์เก่า> /opt/ai-noc/current.tmp
-sudo -u ghrunner mv -T /opt/ai-noc/current.tmp /opt/ai-noc/current
-sudo systemctl restart ai-noc
-```
-
-## ข้อควรรู้
-
-- **ย้อนกลับอัตโนมัติมีเฉพาะกรณี Health Check ไม่ผ่าน** ถ้าแอปขึ้นได้แต่ทำงานผิด
-  ต้องย้อนเองด้วยคำสั่งด้านบน
-- **Build กินแรงเครื่อง** `next build` ใช้ CPU/RAM พอสมควรบนเครื่องเดียวกับที่แอปรัน
-  ถ้าเซิร์ฟเวอร์เล็ก ให้ตั้งเวลา Deploy นอกเวลาทำการ หรือย้ายไป Build บนเครื่องอื่นแล้วส่งไฟล์มาแทน
-- **ทุกครั้งเป็นการ Build แบบเย็น** `actions/checkout` ล้าง Workspace ด้วย `git clean -ffdx`
-  ทั้ง `node_modules` และ `.next` จึงหายทุกรอบ ผลลัพธ์แน่นอนกว่าแต่ช้ากว่า ถ้าช้าจนชน
-  `timeout-minutes: 30` ค่อยเพิ่ม `with: clean: false` ให้ `actions/checkout` เพื่อเก็บแคช `.next` ไว้
+  (ส่วน `manual-deploy.sh` ไม่ได้ล้าง จึง Build เร็วกว่าเพราะยังมีแคชเดิมอยู่)
 - **`npm ci` ดึง `firebase-tools` มาด้วยทุกรอบ** ทั้งที่ `next build` ไม่ได้ใช้ เพราะอยู่ใน
   `devDependencies` ซึ่งจำเป็นต่อ build ตัวอื่น (typescript/tailwind) จึงตัดทิ้งทั้งชุดไม่ได้
   ถ้าต้องการให้เร็วขึ้นจริง ๆ ต้องถอด `firebase-tools` ออกจาก `package.json` ซึ่งเป็นการแก้โปรเจกต์

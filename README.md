@@ -252,29 +252,27 @@ Build เกิดบนเครื่องปลายทางทั้ง�
 ### อัปเดตแอปบนเซิร์ฟเวอร์หลัง `main` เปลี่ยน
 
 **ตอนนี้ต้องสั่งเอง** เพราะ Workflow ถูกพัก trigger ไว้ (ดูหมายเหตุด้านบน)
-ใช้ `deploy/manual-deploy.sh` ซึ่งรันขั้นตอนเดียวกับ `deploy.yml` ทุกคำสั่ง
+เซิร์ฟเวอร์ดึงโค้ดจาก GitHub เองผ่าน **Deploy Key** (กุญแจอ่านอย่างเดียว ผูกกับ Repository นี้
+เท่านั้น) แล้วสั่ง `deploy/manual-deploy.sh` ซึ่งรันขั้นตอนเดียวกับ `deploy.yml` ทุกคำสั่ง
 
 ```bash
-# ── ขั้นที่ 1: บนเครื่องพัฒนา — ส่งซอร์สจาก main ขึ้นเซิร์ฟเวอร์ ──────────────
-# ทุกคำสั่งเป็นบรรทัดเดียว ใช้ได้ทั้ง Git Bash, PowerShell และ cmd
-git checkout main
-git pull
-
-# ธง -c สองตัวนี้จำเป็นบน Windows ไม่งั้น git archive จะแปลงไฟล์เป็น CRLF
-# แล้ว bash บนเซิร์ฟเวอร์จะรันสคริปต์ไม่ได้ (syntax error near unexpected token)
-# ใช้ --format=tar.gz ให้ git บีบอัดเอง จะได้ไม่ต้องพึ่ง gzip ซึ่งไม่มีใน PATH ของ cmd/PowerShell
-git -c core.autocrlf=false -c core.eol=lf archive --format=tar.gz -o src.tgz HEAD
-
-# -O บังคับให้ scp ใช้โปรโตคอลเดิมแทน SFTP เพราะ sshd ของเครื่องนี้ปิด Subsystem sftp ไว้
-# ถ้าไม่ใส่จะขึ้น "subsystem request failed on channel 0"
-scp -O src.tgz root@<server>:/tmp/
-ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz && rm -f /tmp/src.tgz && sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
-
-# ── ขั้นที่ 2: บนเซิร์ฟเวอร์ — สั่ง Deploy ────────────────────────────────────
 ssh root@<server>
 sudo -iu ghrunner
-./manual-deploy.sh ~/src          # ใช้เวลาประมาณ 2 นาที
+
+cd ~/src
+git fetch --prune
+git reset --hard origin/main        # ให้ตรงกับ main เป๊ะ ทิ้งของค้างในโฟลเดอร์
+
+./deploy/manual-deploy.sh ~/src     # ใช้เวลาประมาณ 2 นาที
 ```
+
+> **ทั้งหมดทำบนเซิร์ฟเวอร์** ไม่ต้องส่งไฟล์จากเครื่องพัฒนา จึงไม่ต้องยุ่งกับ `git archive`,
+> `scp` หรือปัญหา CRLF ของ Windows อีก — git บน Linux เช็กเอาต์เป็น LF อยู่แล้ว
+> ชื่อโฟลเดอร์ Release จะลงท้ายด้วย sha จริงของคอมมิต เช่น `20260922-051456-3f0d94d`
+> ทำให้ย้อนดูได้ว่าเวอร์ชันไหนคือโค้ดตัวใด
+>
+> การตั้งค่า Deploy Key ทำครั้งเดียวจบ — ขั้นตอนอยู่ใน
+> [`deploy/README.md`](deploy/README.md) พร้อมวิธีสำรองแบบส่งไฟล์เองถ้าไม่อยากใช้ Deploy Key
 
 สคริปต์จะ `npm ci` → `tsc --noEmit` → `npm run lint` → `npm run build` → ประกอบชุดไฟล์
 → วาง Release ใหม่ → สลับ Symlink → `systemctl restart` → ตรวจสุขภาพ 60 วินาที
