@@ -236,6 +236,57 @@ Build เกิดบนเครื่องปลายทางทั้ง�
 > unit ของ systemd รัน `node server.js` ในโฟลเดอร์ standalone โดยตรง ไม่ใช้ `npm run start`
 > เพราะ `next start` ไม่รองรับ `output: 'standalone'`
 
+### อัปเดตแอปบนเซิร์ฟเวอร์หลัง `main` เปลี่ยน
+
+**ตอนนี้ต้องสั่งเอง** เพราะ Workflow ถูกพัก trigger ไว้ (ดูหมายเหตุด้านบน)
+ใช้ `deploy/manual-deploy.sh` ซึ่งรันขั้นตอนเดียวกับ `deploy.yml` ทุกคำสั่ง
+
+```bash
+# ── ขั้นที่ 1: บนเครื่องพัฒนา — ส่งซอร์สจาก main ขึ้นเซิร์ฟเวอร์ ──────────────
+git checkout main && git pull
+
+# ธง -c สองตัวนี้จำเป็นบน Windows ไม่งั้น git archive จะแปลงไฟล์เป็น CRLF
+# แล้ว bash บนเซิร์ฟเวอร์จะรันสคริปต์ไม่ได้ (syntax error near unexpected token)
+git -c core.autocrlf=false -c core.eol=lf archive --format=tar HEAD | gzip > src.tgz
+
+scp src.tgz root@<server>:/tmp/
+ssh root@<server> "install -o ghrunner -g ghrunner -m 644 /tmp/src.tgz /home/ghrunner/src.tgz   && rm -f /tmp/src.tgz   && sudo -u ghrunner bash -lc 'rm -rf ~/src && mkdir ~/src && cd ~/src && tar xzf ~/src.tgz'"
+
+# ── ขั้นที่ 2: บนเซิร์ฟเวอร์ — สั่ง Deploy ────────────────────────────────────
+ssh root@<server>
+sudo -iu ghrunner
+./manual-deploy.sh ~/src          # ใช้เวลาประมาณ 2 นาที
+```
+
+สคริปต์จะ `npm ci` → `tsc --noEmit` → `npm run lint` → `npm run build` → ประกอบชุดไฟล์
+→ วาง Release ใหม่ → สลับ Symlink → `systemctl restart` → ตรวจสุขภาพ 60 วินาที
+**ถ้าแอปไม่ตอบ จะย้อน Symlink กลับเวอร์ชันเดิมและ restart ให้เอง** แล้วจบด้วยรหัสข้อผิดพลาด
+ถ้าขั้นใดขั้นหนึ่ง (เช่น Type Error หรือ Lint ไม่ผ่าน) ล้มเหลว สคริปต์จะหยุดก่อนแตะของจริง
+ระบบที่ให้บริการอยู่จึงไม่ได้รับผลกระทบ
+
+**ตรวจผลหลัง Deploy**
+
+```bash
+readlink -f /opt/ai-noc/current                      # รันเวอร์ชันไหนอยู่
+systemctl status ai-noc --no-pager --lines=10        # สถานะ service
+journalctl -u ai-noc -f                              # ดู log แบบต่อเนื่อง
+curl -I http://127.0.0.1:3001/                       # ต้องได้ HTTP 200
+```
+
+**ย้อนเวอร์ชันด้วยมือ** (กรณีแอปขึ้นได้แต่ทำงานผิด ซึ่ง Health Check จับไม่ได้)
+
+```bash
+ls -1dt /opt/ai-noc/releases/*/                      # รายการเวอร์ชัน ใหม่ไปเก่า
+sudo -u ghrunner ln -sfn /opt/ai-noc/releases/<ชื่อเก่า> /opt/ai-noc/current.tmp
+sudo -u ghrunner mv -T /opt/ai-noc/current.tmp /opt/ai-noc/current
+sudo systemctl restart ai-noc
+```
+
+**เมื่อปลดล็อก billing ของบัญชี GitHub แล้ว** ให้ใส่ trigger กลับตามคอมเมนต์หัวไฟล์
+`deploy.yml` (`push: branches: [main]`) จากนั้นแค่ push เข้า `main` ระบบจะ Build และ
+Deploy ให้เองทั้งหมด ไม่ต้องทำสองขั้นข้างบนอีก หรือจะกด **Run workflow** จากแท็บ Actions
+เมื่อต้องการปล่อยเวอร์ชันแบบเลือกจังหวะเองก็ได้
+
 ขั้นตอนตั้งค่าเครื่อง Linux, การติดตั้ง Self-hosted Runner, systemd unit, สิทธิ์ sudo,
 ตัวแปรที่ตั้งได้ (`APP_DIR`, `SERVICE_NAME`, `HEALTH_URL`, `KEEP_RELEASES`)
 และวิธีย้อนเวอร์ชันด้วยมือ — อ่านได้ที่ [`deploy/README.md`](deploy/README.md)
