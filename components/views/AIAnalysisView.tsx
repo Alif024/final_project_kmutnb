@@ -1,5 +1,7 @@
 'use client';
 
+import AIHealthSummary from '@/components/AIHealthSummary';
+import MarkdownContent from '@/components/MarkdownContent';
 import React, { useMemo, useState } from 'react';
 import {
   Brain,
@@ -162,6 +164,8 @@ export default function AIAnalysisView({
       </div>
 
       {/* SUBTAB 1: AI DIAGNOSIS (RCA) */}
+      <AIHealthSummary />
+
       {subTab === 'diagnosis' && (
         <div className="space-y-6">
           {/* Incident Header */}
@@ -503,8 +507,8 @@ export default function AIAnalysisView({
                       </div>
                     )}
 
-                    <div className="whitespace-pre-wrap leading-relaxed">
-                      {msg.content}
+                    <div className="leading-relaxed">
+                      {msg.role === 'assistant' ? <MarkdownContent content={msg.content} /> : <p className="whitespace-pre-wrap">{msg.content}</p>}
                     </div>
 
                     {msg.role === 'assistant' && (

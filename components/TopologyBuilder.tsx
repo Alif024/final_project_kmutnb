@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Cable,
   Check,
@@ -17,6 +17,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { DiscoveredDevice, TopologyDiagram, TopologyLayout } from '@/types/ai-noc';
+import { arrangeTopology } from '@/lib/topology-layout';
 import ClearTopologyModal from './ClearTopologyModal';
 import { InterfacePeer } from '@/lib/interface-map';
 import { LinkVerification, VERDICT_COLOR, VERDICT_LABEL } from '@/lib/link-verification';
@@ -58,6 +59,8 @@ interface TopologyBuilderProps {
   linkVerifications: Map<string, LinkVerification>;
   /** พอร์ตของแต่ละอุปกรณ์ว่าต่อกับเครื่องไหน ใช้แสดงตอนชี้เมาส์ที่กล่อง */
   interfacePeers: Map<string, InterfacePeer[]>;
+  onSetLayoutMode: (mode: 'auto' | 'manual') => void;
+  onSaveLayout: () => boolean;
   onSelectDiagram: (id: string) => void;
   onCreateDiagram: () => void;
   onDuplicateDiagram: (id: string) => void;
@@ -78,9 +81,8 @@ interface TopologyBuilderProps {
 /**
  * พื้นที่วาดผัง Topology ที่ผู้ใช้สร้างเอง
  *
- * ไม่มีการจัดวางอัตโนมัติใด ๆ — ตำแหน่งทุกจุดและเส้นเชื่อมทุกเส้นมาจากการกระทำ
- * ของผู้ใช้เท่านั้น (ลากจากคลังอุปกรณ์มาวาง แล้วสลับเป็นโหมดเชื่อมต่อเพื่อคลิก
- * อุปกรณ์สองตัวให้เกิดเส้น)
+ * Auto จัดตำแหน่งอุปกรณ์บนผังเดิม ส่วน Manual เก็บตำแหน่งที่ลากไว้แยกกัน
+ * เส้นเชื่อมยังคงมาจากผู้ใช้หรือคู่พอร์ตที่ตรวจพบเท่านั้น
  */
 export default function TopologyBuilder({
   devices,
@@ -89,6 +91,8 @@ export default function TopologyBuilder({
   activeDiagram,
   linkVerifications,
   interfacePeers,
+  onSetLayoutMode,
+  onSaveLayout,
   onSelectDiagram,
   onCreateDiagram,
   onDuplicateDiagram,
@@ -116,6 +120,17 @@ export default function TopologyBuilder({
     startY: number;
     moved: boolean;
   } | null>(null);
+  /** ลากพื้นหลังเพื่อเลื่อนมุมมอง โดยไม่เปลี่ยนตำแหน่งอุปกรณ์ที่บันทึกไว้ */
+  const panRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    scrollLeft: number;
+    scrollTop: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressPanClickRef = useRef(false);
+  const [isPanning, setIsPanning] = useState(false);
 
   const [scale, setScale] = useState(1);
   const [connectMode, setConnectMode] = useState(false);
@@ -130,6 +145,12 @@ export default function TopologyBuilder({
   /** เปิดหน้าต่างยืนยันก่อนล้างอุปกรณ์ทั้งผัง เพราะกดพลาดแล้วย้อนไม่ได้ */
   const [confirmClear, setConfirmClear] = useState(false);
 
+  const [hoveredLink, setHoveredLink] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState('');
+  const autoLayout = layout.layoutMode === 'auto';
+  const visibleNodes = useMemo(() => autoLayout ? arrangeTopology(layout.nodes, layout.links) : layout.nodes, [autoLayout, layout.nodes, layout.links]);
+  const canvasHeight = Math.max(CANVAS_H, ...visibleNodes.map((n) => n.y + NODE_H + 80));
+  const canvasWidth = Math.max(CANVAS_W, ...visibleNodes.map((n) => n.x + NODE_W + 80));
   const deviceMap = new Map(devices.map((d) => [d.id, d]));
 
   /** แปลงพิกัดบนหน้าจอเป็นพิกัดภายในผัง (หักผลของการซูมและการเลื่อนออกแล้ว) */
@@ -140,6 +161,7 @@ export default function TopologyBuilder({
   }
 
   function handleDrop(e: React.DragEvent) {
+    if (autoLayout) return;
     const deviceId = e.dataTransfer.getData(DEVICE_DRAG_TYPE);
     if (!deviceId) return;
     e.preventDefault();
@@ -147,8 +169,8 @@ export default function TopologyBuilder({
     // วางให้จุดที่ปล่อยเมาส์อยู่กึ่งกลางกล่อง
     onAddNode(
       deviceId,
-      clamp(snap(p.x - NODE_W / 2), 0, CANVAS_W - NODE_W),
-      clamp(snap(p.y - NODE_H / 2), 0, CANVAS_H - NODE_H)
+      clamp(snap(p.x - NODE_W / 2), 0, canvasWidth - NODE_W),
+      clamp(snap(p.y - NODE_H / 2), 0, canvasHeight - NODE_H)
     );
   }
 
@@ -172,19 +194,63 @@ export default function TopologyBuilder({
     setPendingLinkFrom(null);
   }
 
+  function startPan(e: React.PointerEvent<HTMLDivElement>) {
+    // ให้การลากโหนด คลิกเส้นเชื่อม และการเลื่อนด้วยจอสัมผัสใช้พฤติกรรมเดิม
+    if (e.pointerType !== 'mouse' || e.button !== 0 || !e.isPrimary || panRef.current) return;
+    if ((e.target as Element).closest('[data-topology-node], [data-topology-link], button')) return;
+    const viewport = e.currentTarget;
+    const rect = viewport.getBoundingClientRect();
+    // ไม่แย่งการลาก scrollbar ของเบราว์เซอร์
+    if (e.clientX - rect.left >= viewport.clientWidth || e.clientY - rect.top >= viewport.clientHeight) return;
+    panRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      scrollLeft: viewport.scrollLeft,
+      scrollTop: viewport.scrollTop,
+      moved: false,
+    };
+    viewport.setPointerCapture(e.pointerId);
+    setIsPanning(true);
+    e.preventDefault();
+  }
+
+  function movePan(e: React.PointerEvent<HTMLDivElement>) {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== e.pointerId) return;
+    const dx = e.clientX - pan.startX;
+    const dy = e.clientY - pan.startY;
+    if (!pan.moved && Math.hypot(dx, dy) < 4) return;
+    pan.moved = true;
+    suppressPanClickRef.current = true;
+    // scroll ใช้พิกเซลหน้าจออยู่แล้ว จึงไม่หารด้วย scale ของผัง
+    e.currentTarget.scrollLeft = pan.scrollLeft - dx;
+    e.currentTarget.scrollTop = pan.scrollTop - dy;
+  }
+
+  function endPan(e: React.PointerEvent<HTMLDivElement>) {
+    if (panRef.current?.pointerId !== e.pointerId) return;
+    panRef.current = null;
+    setIsPanning(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  }
+
   /** ข้อความบอกปลายทางทั้งสองฝั่ง พร้อมผลตรวจสอบกับ LLDP/CDP */
   const linkTitle = (link: TopologyLayout['links'][number]) => {
     const name = (id: string) => deviceMap.get(id)?.name ?? id;
     const side = (id: string, port?: string) => (port ? `${name(id)} (${port})` : name(id));
     const check = linkVerifications.get(link.id) ?? PENDING_VERIFICATION;
     return (
-      `${side(link.source, link.sourceInterface)} ←→ ${side(link.target, link.targetInterface)}` +
+      `${side(link.source, check.sourcePort ?? 'ไม่ทราบพอร์ต')} ←→ ${side(link.target, check.targetPort ?? 'ไม่ทราบพอร์ต')}` +
+      `\nสถานะ: ${check.connectionStatus ?? 'unknown'}${check.speedMbps ? ' · ' + (check.speedMbps >= 1000 ? check.speedMbps / 1000 + 'G' : check.speedMbps + 'M') : ''}` +
       `\n[${VERDICT_LABEL[check.verdict]}] ${check.reason}`
     );
   };
 
   const nodeCenter = (deviceId: string) => {
-    const n = layout.nodes.find((node) => node.deviceId === deviceId);
+    const n = visibleNodes.find((node) => node.deviceId === deviceId);
     if (!n) return null;
     return { x: n.x + NODE_W / 2, y: n.y + NODE_H / 2 };
   };
@@ -313,6 +379,18 @@ export default function TopologyBuilder({
         )}
       </div>
 
+      <div className="px-3 py-2 flex flex-wrap items-center gap-3 border-b border-slate-200 dark:border-white/10">
+        <label className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
+          การจัดผัง
+          <select aria-label="Topology Layout" value={autoLayout ? 'auto' : 'manual'} onChange={(e) => { onSetLayoutMode(e.target.value as 'auto' | 'manual'); exitConnectMode(); setSaveMessage(''); }} className="rounded-lg px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white">
+            <option value="auto">Auto — จัดตำแหน่งอัตโนมัติ</option>
+            <option value="manual">Manual — ลากวางเอง</option>
+          </select>
+        </label>
+        <button onClick={() => setSaveMessage(onSaveLayout() ? 'บันทึกผังแล้ว' : 'บันทึกไม่ได้ กรุณา Export เพื่อสำรองผัง')} className="px-3 py-2 rounded-lg text-xs bg-blue-600 text-white">บันทึกผัง</button>
+        <span role="status" className="text-xs text-slate-500 dark:text-slate-400">{saveMessage}</span>
+        <p className="w-full text-[11px] text-slate-500 dark:text-slate-400">{autoLayout ? 'จัดตำแหน่งอุปกรณ์บนผังให้โดยอัตโนมัติ เพิ่มอุปกรณ์ได้ด้วยปุ่ม + ในคลัง และสลับ Manual เมื่อต้องการลากย้าย' : 'ลากวางและย้ายอุปกรณ์ได้ ตำแหน่งบันทึกอัตโนมัติในเบราว์เซอร์'}</p>
+      </div>
       {/* แถบเครื่องมือของผัง */}
       <div className="p-3 border-b border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-2">
         <button
@@ -403,12 +481,49 @@ export default function TopologyBuilder({
         </button>
       </div>
 
+      {/* คำอธิบายการใช้งาน */}
+      <div className="px-3 py-2 border-b border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
+        <span>คลิกซ้ายค้างบนพื้นที่ว่างแล้วลากเพื่อเลื่อนผัง</span>
+        <span>ลากกล่องเพื่อย้ายตำแหน่ง</span>
+        <span>คลิกกล่องเพื่อดูรายละเอียดด้านล่าง</span>
+        <span>คลิกเส้นเชื่อมเพื่อลบเส้นนั้น</span>
+        <span className="flex items-center gap-1" title="LLDP/CDP ยืนยันว่าปลายสายถูกต้อง">
+          <span className="w-4 h-0.5 bg-emerald-500 inline-block" /> ยืนยันแล้ว
+        </span>
+        <span className="flex items-center gap-1" title="พอร์ตที่ผูกกับเส้นนี้มีสถานะ down">
+          <span className="w-4 h-0.5 bg-rose-500 inline-block" /> พอร์ตดับ
+        </span>
+        <span className="flex items-center gap-1" title="ข้อมูล LLDP/CDP ขัดแย้งกับเส้นที่วาดไว้">
+          <span className="w-4 h-0.5 bg-slate-400 inline-block" /> ต่อผิด
+        </span>
+        <span
+          className="flex items-center gap-1"
+          title="ไม่มีข้อมูล LLDP/CDP ให้ตรวจสอบ — ไม่ได้แปลว่าต่อผิด"
+        >
+          <span className="w-4 border-t-2 border-dashed border-slate-500 inline-block" /> ยังไม่ยืนยัน
+        </span>
+      </div>
+
       {/* พื้นที่วาด */}
       <div
-        className={`relative overflow-auto bg-slate-50 dark:bg-slate-950/40 ${
-          connectMode ? 'cursor-crosshair' : ''
+        className={`relative overflow-auto select-none bg-slate-50 dark:bg-slate-950/40 ${
+          isPanning ? 'cursor-grabbing' : connectMode ? 'cursor-crosshair' : 'cursor-grab'
         }`}
         style={{ height: 560 }}
+        onPointerDownCapture={() => { suppressPanClickRef.current = false; }}
+        onPointerDown={startPan}
+        onPointerMove={movePan}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+        onLostPointerCapture={endPan}
+        onClickCapture={(e) => {
+          // click ที่ตามหลังการลากต้องไม่ล้างโหนดที่เลือกหรือจุดเริ่มเชื่อมเส้น
+          if (suppressPanClickRef.current && e.detail !== 0) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          suppressPanClickRef.current = false;
+        }}
         onDragOver={(e) => {
           // ต้อง preventDefault ที่ dragover ไม่งั้นเบราว์เซอร์จะไม่ยิง drop
           e.preventDefault();
@@ -424,8 +539,8 @@ export default function TopologyBuilder({
           ref={contentRef}
           className="relative origin-top-left"
           style={{
-            width: CANVAS_W,
-            height: CANVAS_H,
+            width: canvasWidth,
+            height: canvasHeight,
             transform: `scale(${scale})`,
             // ลายกริดช่วยให้เห็นว่าตำแหน่งถูกดูดเข้าเส้นกริด
             backgroundImage:
@@ -434,7 +549,7 @@ export default function TopologyBuilder({
           }}
         >
           {/* ชั้นเส้นเชื่อม */}
-          <svg className="absolute inset-0 pointer-events-none" width={CANVAS_W} height={CANVAS_H}>
+          <svg className="absolute inset-0 pointer-events-none" width={canvasWidth} height={canvasHeight}>
             {layout.links.map((link) => {
               const a = nodeCenter(link.source);
               const b = nodeCenter(link.target);
@@ -442,6 +557,7 @@ export default function TopologyBuilder({
               const check = linkVerifications.get(link.id) ?? PENDING_VERIFICATION;
               return (
                 <g key={link.id}>
+                  {check.speedMbps && <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 8} textAnchor="middle" className="fill-slate-700 dark:fill-slate-200 text-[11px] font-bold">{check.speedMbps >= 1000 ? check.speedMbps / 1000 + 'G' : check.speedMbps + 'M'}</text>}
                   <line
                     x1={a.x}
                     y1={a.y}
@@ -460,7 +576,16 @@ export default function TopologyBuilder({
                     x2={b.x}
                     y2={b.y}
                     stroke="transparent"
+                    data-topology-link
                     strokeWidth={14}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={linkTitle(link)}
+                    onMouseEnter={() => setHoveredLink(link.id)}
+                    onMouseLeave={() => setHoveredLink(null)}
+                    onFocus={() => setHoveredLink(link.id)}
+                    onBlur={() => setHoveredLink(null)}
+                    onKeyDown={(e) => { if (e.key === 'Escape') setHoveredLink(null); }}
                     style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -477,8 +602,16 @@ export default function TopologyBuilder({
             })}
           </svg>
 
+          {hoveredLink && (() => {
+            const link = layout.links.find((l) => l.id === hoveredLink);
+            if (!link) return null;
+            const a = nodeCenter(link.source), b = nodeCenter(link.target);
+            if (!a || !b) return null;
+            return <div role="tooltip" style={{ left: clamp((a.x + b.x) / 2 - 160, 8, canvasWidth - 330), top: clamp((a.y + b.y) / 2 + 12, 8, canvasHeight - 130) }} className="absolute z-40 pointer-events-none w-80 whitespace-pre-line rounded-xl border border-slate-200 dark:border-white/20 bg-white dark:bg-slate-900 p-3 shadow-xl text-xs leading-6 text-slate-800 dark:text-slate-100">{linkTitle(link)}</div>;
+          })()}
+
           {/* กล่องอุปกรณ์ */}
-          {layout.nodes.map((node) => {
+          {visibleNodes.map((node) => {
             const device = deviceMap.get(node.deviceId);
             const Icon = deviceIcon(device?.kind ?? 'unknown');
             const isSelected = selectedDeviceId === node.deviceId;
@@ -487,9 +620,10 @@ export default function TopologyBuilder({
             return (
               <div
                 key={node.deviceId}
+                data-topology-node
                 style={{ left: node.x, top: node.y, width: NODE_W, height: NODE_H }}
                 className={`group absolute rounded-xl border-2 px-2.5 py-2 flex items-center gap-2 select-none transition-colors ${
-                  connectMode ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'
+                  connectMode || autoLayout ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing'
                 } ${
                   isPending
                     ? 'border-blue-500 ring-4 ring-blue-500/20 bg-blue-500/10'
@@ -504,7 +638,7 @@ export default function TopologyBuilder({
                   handleNodeClick(node.deviceId);
                 }}
                 onPointerDown={(e) => {
-                  if (connectMode || e.button !== 0) return;
+                  if (connectMode || autoLayout || e.button !== 0) return;
                   e.stopPropagation();
                   e.currentTarget.setPointerCapture(e.pointerId);
                   const p = toCanvasPoint(e.clientX, e.clientY);
@@ -532,8 +666,8 @@ export default function TopologyBuilder({
                   const p = toCanvasPoint(e.clientX, e.clientY);
                   onMoveNode(
                     node.deviceId,
-                    clamp(snap(p.x - drag.offsetX), 0, CANVAS_W - NODE_W),
-                    clamp(snap(p.y - drag.offsetY), 0, CANVAS_H - NODE_H)
+                    clamp(snap(p.x - drag.offsetX), 0, canvasWidth - NODE_W),
+                    clamp(snap(p.y - drag.offsetY), 0, canvasHeight - NODE_H)
                   );
                 }}
                 onPointerUp={(e) => {
@@ -627,8 +761,7 @@ export default function TopologyBuilder({
                   ยังไม่มีอุปกรณ์บนผัง
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  ลากอุปกรณ์จากคลังทางซ้ายมาวางที่นี่ ระบบจะไม่สร้างผังให้อัตโนมัติ
-                  เพื่อให้ผังสะท้อนการเชื่อมต่อจริงตามที่คุณกำหนดเอง
+                  เพิ่มอุปกรณ์จากคลังทางซ้าย แล้วเลือก Auto เพื่อจัดตำแหน่ง หรือ Manual เพื่อลากวางเอง
                 </p>
               </div>
             </div>
@@ -646,27 +779,6 @@ export default function TopologyBuilder({
         />
       )}
 
-      {/* คำอธิบายการใช้งาน */}
-      <div className="px-3 py-2 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-500 dark:text-slate-400">
-        <span>ลากกล่องเพื่อย้ายตำแหน่ง</span>
-        <span>คลิกกล่องเพื่อดูรายละเอียดด้านล่าง</span>
-        <span>คลิกเส้นเชื่อมเพื่อลบเส้นนั้น</span>
-        <span className="flex items-center gap-1" title="LLDP/CDP ยืนยันว่าปลายสายถูกต้อง">
-          <span className="w-4 h-0.5 bg-emerald-500 inline-block" /> ยืนยันแล้ว
-        </span>
-        <span className="flex items-center gap-1" title="พอร์ตที่ผูกกับเส้นนี้มีสถานะ down">
-          <span className="w-4 h-0.5 bg-rose-500 inline-block" /> พอร์ตดับ
-        </span>
-        <span className="flex items-center gap-1" title="ข้อมูล LLDP/CDP ขัดแย้งกับเส้นที่วาดไว้">
-          <span className="w-4 h-0.5 bg-slate-400 inline-block" /> ต่อผิด
-        </span>
-        <span
-          className="flex items-center gap-1"
-          title="ไม่มีข้อมูล LLDP/CDP ให้ตรวจสอบ — ไม่ได้แปลว่าต่อผิด"
-        >
-          <span className="w-4 border-t-2 border-dashed border-slate-500 inline-block" /> ยังไม่ยืนยัน
-        </span>
-      </div>
     </div>
   );
 }

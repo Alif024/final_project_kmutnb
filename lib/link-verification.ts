@@ -27,6 +27,10 @@ export interface LinkVerification {
   verdict: LinkVerdict;
   /** คำอธิบายสำหรับแสดงตอนชี้เมาส์ที่เส้น */
   reason: string;
+  sourcePort?: string;
+  targetPort?: string;
+  speedMbps?: number;
+  connectionStatus?: 'up' | 'down' | 'degraded' | 'unknown';
 }
 
 export const VERDICT_COLOR: Record<LinkVerdict, string> = {
@@ -100,7 +104,8 @@ export function verifyLink(link: TopologyLayoutLink, ctx: VerifyContext): LinkVe
    * ชื่อพอร์ตติดมา แต่ยังควรตรวจสถานะพอร์ตให้ได้
    */
   const portOf = (self: DiscoveredDevice, other: DiscoveredDevice, stored?: string) =>
-    stored ?? neighborsOf(self).find((n) => neighborIsDevice(n, other))?.localInterface;
+    stored ?? neighborsOf(self).find((n) => neighborIsDevice(n, other))?.localInterface ??
+    neighborsOf(other).find((n) => neighborIsDevice(n, self))?.remotePortId;
 
   const sides = [
     { device: source, port: portOf(source, target, link.sourceInterface) },
@@ -122,12 +127,25 @@ export function verifyLink(link: TopologyLayoutLink, ctx: VerifyContext): LinkVe
     }
   }
 
+  // พอร์ตที่บันทึกไว้ต้องตรงกับปลายทาง แม้พอร์ตอื่นของเครื่องจะพบเพื่อนบ้านตัวนั้น
+  for (const side of sides) {
+    const other = side.device.id === source.id ? target : source;
+    const onPort = side.port && neighborsOf(side.device).find((n) => sameName(n.localInterface, side.port!));
+    if (onPort && !neighborIsDevice(onPort, other)) {
+      return { verdict: 'mismatch', reason: `พอร์ต ${side.port} ของ ${side.device.name} ต่อกับ ${onPort.remoteSysName} ไม่ตรงกับเส้นบนผัง` };
+    }
+  }
+
   // 2) ฝั่งใดฝั่งหนึ่งประกาศว่าเห็นอีกฝั่งอยู่จริง ถือว่ายืนยันแล้ว
   for (const [self, other] of [
     [source, target],
     [target, source],
   ] as const) {
-    const match = neighborsOf(self).find((n) => neighborIsDevice(n, other));
+    const localPort = self.id === source.id ? link.sourceInterface : link.targetInterface;
+    const remotePort = self.id === source.id ? link.targetInterface : link.sourceInterface;
+    const match = neighborsOf(self).find((n) => neighborIsDevice(n, other) &&
+      (!localPort || sameName(localPort, n.localInterface)) &&
+      (!remotePort || !n.remotePortId || sameName(remotePort, n.remotePortId)));
     if (match) {
       return {
         verdict: 'verified',
@@ -171,5 +189,19 @@ export function verifyLinks(
   links: TopologyLayoutLink[],
   ctx: VerifyContext
 ): Map<string, LinkVerification> {
-  return new Map(links.map((link) => [link.id, verifyLink(link, ctx)]));
+  return new Map(links.map((link) => {
+    const source = ctx.devices.find((d) => d.id === link.source);
+    const target = ctx.devices.find((d) => d.id === link.target);
+    const forward = target && ctx.neighbors.find((n) => n.localDeviceId === link.source && neighborIsDevice(n, target) && (!link.sourceInterface || sameName(n.localInterface, link.sourceInterface)));
+    const reverse = source && ctx.neighbors.find((n) => n.localDeviceId === link.target && neighborIsDevice(n, source) && (!link.targetInterface || sameName(n.localInterface, link.targetInterface)));
+    const sourcePort = link.sourceInterface ?? forward?.localInterface ?? reverse?.remotePortId;
+    const targetPort = link.targetInterface ?? reverse?.localInterface ?? forward?.remotePortId;
+    const interfaces = [source && sourcePort ? findInterface(ctx, source, sourcePort) : undefined,
+      target && targetPort ? findInterface(ctx, target, targetPort) : undefined].filter((i) => i !== undefined);
+    const check = verifyLink(link, ctx);
+    const speeds = interfaces.map((i) => i.speedMbps).filter((s): s is number => typeof s === 'number' && s > 0);
+    const connectionStatus = check.verdict === 'down' ? 'down' : check.verdict !== 'verified' || !interfaces.length ? 'unknown'
+      : interfaces.some((i) => i.packetLossPercent > 0 || i.errorRate > 0) ? 'degraded' : 'up';
+    return [link.id, { ...check, sourcePort, targetPort, speedMbps: speeds.length ? Math.min(...speeds) : undefined, connectionStatus }];
+  }));
 }

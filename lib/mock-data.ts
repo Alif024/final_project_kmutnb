@@ -12,6 +12,7 @@ import {
   TopologyNode,
   TopologyEdge,
   Alert,
+  AlertDiagnosis,
   Incident,
   Diagnosis,
   Recommendation,
@@ -32,6 +33,7 @@ export interface MockData {
   topologyNodes: TopologyNode[];
   topologyEdges: TopologyEdge[];
   alerts: Alert[];
+  alertDiagnoses: AlertDiagnosis[];
   incident: Incident;
   diagnosis: Diagnosis;
   recommendations: Recommendation[];
@@ -55,6 +57,7 @@ export const initialVMs: VirtualMachine[] = data.virtualMachines;
 export const initialTopologyNodes: TopologyNode[] = data.topologyNodes;
 export const initialTopologyEdges: TopologyEdge[] = data.topologyEdges;
 export const initialRecentAlerts: Alert[] = data.alerts;
+export const initialAlertDiagnoses: AlertDiagnosis[] = data.alertDiagnoses;
 export const sampleIncident: Incident = data.incident;
 export const sampleDiagnosis: Diagnosis = data.diagnosis;
 export const initialRecommendations: Recommendation[] = data.recommendations;
@@ -73,6 +76,7 @@ export const MOCK_VMS = initialVMs;
 export const MOCK_TOPOLOGY_NODES = initialTopologyNodes;
 export const MOCK_TOPOLOGY_EDGES = initialTopologyEdges;
 export const MOCK_ALERTS = initialRecentAlerts;
+export const MOCK_ALERT_DIAGNOSES = initialAlertDiagnoses;
 export const MOCK_INCIDENT_01 = sampleIncident;
 export const MOCK_DIAGNOSIS_01 = sampleDiagnosis;
 export const MOCK_RECOMMENDATIONS = initialRecommendations;

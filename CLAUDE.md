@@ -44,7 +44,7 @@ with `puppeteer-core`; it is intentionally *not* a project dependency.
 `app/page.tsx` is the entire application. There is no router-based navigation and no state
 management library. It owns all mutable state (`activeTab`, `activeSubTab`, `userRole`,
 `approvals`, `recommendations`, `auditLogs`, `integrations`, modal targets) and renders one
-of seven views by `activeTab` string: `dashboard`, `infrastructure`, `logs`, `ai-analysis`,
+of eight navigation destinations by `activeTab` string: `dashboard`, `infrastructure`, `monitoring`, `logs`, `ai-analysis`,
 `action-center`, `reports`, `settings` (ids defined in `components/Sidebar.tsx`).
 
 Consequences to respect when adding features:
@@ -55,8 +55,10 @@ Consequences to respect when adding features:
 - **Deep links use the `(tab, subtab)` pair.** Views call `onNavigateTab(tab, subtab?)`;
   `page.tsx` stores `activeSubTab` and passes it down as `initialSubTab`, which each view uses
   only as the *initial value* of its own sub-tab `useState`. It is not a controlled prop.
-- **Modals are keyed by record id** (`key={approveModalReq?.id}`) to force a fresh instance per
-  request, so `isExecuting` state or a typed rejection reason never bleeds across requests.
+  ยกเว้น Infrastructure ซึ่งใช้ controlled `mode`; ลิงก์เดิม `(infrastructure, monitoring)`
+  ถูกแปลงเป็นเมนู `monitoring` ใน `page.tsx` เพื่อคงปุ่มลัดเดิมทั้งหมด
+- **Modals are keyed by record id** (`key={rejectModalReq?.id}`) to force a fresh instance per
+  request, so a typed rejection reason never bleeds across requests.
   Keep that pattern for any new per-record modal.
 
 ### Device discovery — go through `lib/device-discovery.ts`
@@ -84,12 +86,13 @@ Note that vCenter and Proxmox do not return guest IPs in their list endpoints (t
 VMware Tools / QEMU Guest Agent and a per-VM call), so `ipAddress` is often `''`; code that
 matches devices to records falls back to matching by name.
 
-### Topology is user-drawn, never generated
+### การจัดตำแหน่ง Topology แบบ Auto / Manual
 
 `TopologyBuilder` + `DeviceInventoryPanel` replace what used to be a hand-written SVG tree.
-**Do not add auto-layout or auto-generated topology** — this was an explicit product decision so
-the diagram reflects real cabling as the operator knows it, not a guess. Discovered devices sit
-in the inventory until dragged onto the canvas.
+ข้อกำหนดวันที่ 25 กันยายน 2569 เพิ่ม Auto สำหรับจัดตำแหน่งโหนดบนผังเดิมตามเส้นเชื่อม
+และ Manual สำหรับลากวาง เก็บโหมดในแต่ละผังโดยไม่ทับตำแหน่ง Manual เมื่อแสดง Auto
+ใช้ `lib/topology-layout.ts` จัดตำแหน่งเท่านั้น ไม่เดาหรือสร้างสายเชื่อมใหม่
+Topology และ Monitoring เป็นเมนูหลักแยกกัน โดยใช้ `InfrastructureView` แบบ controlled `mode`.
 
 A modal rendered from inside the builder must be portaled to `document.body`
 (`ClearTopologyModal` does this). The builder's own container uses `backdrop-blur-xl`, and an
@@ -171,8 +174,9 @@ Non-obvious rules encoded there:
 - Mock timestamps are `HH:mm:ss` only and all fall on the same simulated day. Time math is
   seconds-from-midnight, and "now" is the constant `TELEMETRY_NOW = '15:42:18'`, not
   `Date.now()`. Anything time-based must use these helpers or it will silently disagree.
-- `buildGraylogQuery()` already emits real Graylog query syntax; it drives both the on-screen
-  Query Echo and the future API call. Extend it when adding a filter dimension.
+- `buildGraylogQuery()` remains the seam for a future API call. หน้า Log Explorer ไม่แสดง Query ดิบหรือกราฟแล้ว
+  และ Sidebar เหลือ Severity; ปฏิทินใช้วันเวลาท้องถิ่นไทย UTC+7 กับ `TELEMETRY_DATE` ของข้อมูลจำลอง
+  แหล่ง Ticket ถูกกรองออกก่อนนับยอดและสร้าง facet.
 - Facet counts mimic Graylog's Fields sidebar: each facet is counted from results filtered by
   *the other* dimensions but not by its own, so picking one option does not zero out its
   siblings. The histogram is likewise built from `beforeBuckets` — results **before** the
@@ -181,6 +185,17 @@ Non-obvious rules encoded there:
 - Severity is RFC 5424 numeric (`severityLevel <= 3` means error-or-worse); `SEVERITY_META`
   maps the numbers to names and tones.
 
+### การอนุมัติคำสั่ง
+
+Dashboard ใช้ดีไซน์ล่าสุดจาก `ai_noc_dashboard.html`: KPI 6 ใบและแถวล่าง 3 คอลัมน์
+(Alert Summary / Recent Alerts / Top 5 Issues) แทนแบบ Alert เต็มแถวในรอบก่อน
+สถานะรับทราบ Alert เก็บที่ `page.tsx` และส่งร่วมกันไป Dashboard/Infrastructure; Viewer แก้สถานะไม่ได้
+
+`CommandPreview` กางในบัตรของ Action Center แทน Modal ทุกคำสั่งเป็น Manual เท่านั้น
+ตรวจสิทธิ์ด้วย `lib/execution-policy.ts` ทั้ง UI และ handler ใน `page.tsx`
+Engineer ทำได้เฉพาะคำขอระดับ operator; Admin ทำได้ทุกระดับ; Viewer อ่านได้อย่างเดียว
+การรันยังเป็นการจำลอง ห้ามเขียนข้อความว่าได้ส่ง SSH/API จริง
+
 ### AI integration
 
 `app/api/ai/chat/route.ts` runs server-side, reads `GEMINI_API_KEY`,
@@ -188,7 +203,9 @@ and returns a canned Thai mock reply when the key is missing — the app must ke
 no key set. The Thai system prompt hard-codes hypervisor/VM telemetry inline but pulls real log
 lines via `getCriticalLogsForContext()` / `formatLogsForPrompt()`, and instructs the model not
 to invent log lines outside that context. `citedEntities` in the response is currently a
-constant. AI Diagnosis (RCA) does **not** call a model — it renders `MOCK_DIAGNOSIS_01`.
+constant. คำตอบแชตใช้ `MarkdownContent` (`react-markdown` + `remark-gfm`, ไม่เปิด HTML ดิบ)
+และ `AIHealthSummary` แสดง Network Health/AI Confidence ที่ย้ายมาจาก Dashboard.
+AI Diagnosis (RCA) does **not** call a model — it renders `MOCK_DIAGNOSIS_01`.
 
 ### Layout / scrolling contract
 

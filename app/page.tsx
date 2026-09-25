@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
 import StatusBar from '@/components/StatusBar';
-import CommandPreviewModal from '@/components/CommandPreviewModal';
 import RejectReasonModal from '@/components/RejectReasonModal';
 
 // Views
@@ -24,7 +23,6 @@ import {
   MOCK_DIAGNOSIS_01,
   MOCK_RECOMMENDATIONS,
   MOCK_APPROVALS,
-  MOCK_SYSLOGS,
   MOCK_ALERTS,
   MOCK_CHAT_SESSIONS,
   MOCK_CHAT_MESSAGES,
@@ -32,7 +30,9 @@ import {
   MOCK_INTEGRATIONS,
   MOCK_NETWORK_DEVICES,
 } from '@/lib/mock-data';
-import { UserRole, ApprovalRequest, AuditLogEntry, Recommendation, Integration } from '@/types/ai-noc';
+import { UserRole, ApprovalRequest, AuditLogEntry, Recommendation, Integration, Alert } from '@/types/ai-noc';
+import { canManuallyExecute } from '@/lib/execution-policy';
+import { getAllLogs } from '@/lib/log-source';
 import { getIntegrationMeta } from '@/lib/integrations';
 
 export default function Page() {
@@ -45,11 +45,18 @@ export default function Page() {
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(MOCK_APPROVALS);
   const [recommendations, setRecommendations] = useState<Recommendation[]>(MOCK_RECOMMENDATIONS);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(MOCK_AUDIT_LOGS);
+  // สถานะรับทราบต้องอยู่ต่อเมื่อสลับไปหน้าอื่นแล้วกลับ Dashboard
+  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
+  const handleAcknowledgeAlert = (id: string) => {
+    if (userRole === 'viewer') return;
+    setAlerts((previous) => previous.map((alert) =>
+      alert.id === id && alert.status === 'active' ? { ...alert, status: 'acknowledged' } : alert
+    ));
+  };
   // เก็บไว้ที่นี่แทนภายใน SettingsView เพราะ View ถูก unmount ทุกครั้งที่สลับแท็บ
   const [integrations, setIntegrations] = useState<Integration[]>(MOCK_INTEGRATIONS);
 
   // Modals state
-  const [approveModalReq, setApproveModalReq] = useState<ApprovalRequest | null>(null);
   const [rejectModalReq, setRejectModalReq] = useState<ApprovalRequest | null>(null);
 
   // Telemetry refresh timestamp (mock — no real collector to poll yet)
@@ -60,15 +67,15 @@ export default function Page() {
 
   // Handle Tab Navigation
   const handleNavigateTab = (tab: string, subtab: string = 'default') => {
-    setActiveTab(tab);
+    setActiveTab(tab === 'infrastructure' && subtab === 'monitoring' ? 'monitoring' : tab);
     setActiveSubTab(subtab);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Handle Approve Confirmation
-  const handleConfirmApprove = (id: string, commandExecuted: string) => {
+  const handleConfirmApprove = (id: string) => {
     const targetReq = approvals.find((a) => a.id === id);
-    if (!targetReq) return;
+    if (!targetReq || !canManuallyExecute(targetReq, userRole)) return;
 
     // Update approval item
     setApprovals((prev) =>
@@ -88,8 +95,8 @@ export default function Page() {
         userRole: userRole,
         actionTitle: targetReq.actionTitle,
         decision: 'Approved & Executed',
-        commandExecuted: commandExecuted,
-        detailsReason: `อนุมัติและรันคำสั่งสำเร็จ โดยวิศวกรประจำศูนย์ NOC (Role: ${userRole.toUpperCase()})`,
+        commandExecuted: targetReq.commandPreview,
+        detailsReason: `อนุมัติแบบ Manual และจำลองการรันสำเร็จ (Role: ${userRole.toUpperCase()})`,
       };
       return [newLog, ...prev];
     });
@@ -98,7 +105,7 @@ export default function Page() {
   // Handle Reject Confirmation
   const handleConfirmReject = (id: string, rejectionReason: string) => {
     const targetReq = approvals.find((a) => a.id === id);
-    if (!targetReq) return;
+    if (!targetReq || !canManuallyExecute(targetReq, userRole)) return;
 
     // Update approval item
     setApprovals((prev) =>
@@ -160,7 +167,7 @@ export default function Page() {
     // จึงไม่มีทางทับเนื้อหา และ View ที่อยากเต็มจอก็รับความสูงที่แน่นอนไปใช้ได้
     <div className="h-screen bg-slate-50 dark:bg-[#020617] text-[#F8FAFC] font-sans flex flex-col selection:bg-blue-600 selection:text-white relative overflow-hidden">
       {/* Frosted Glass Ambient Glow Background Lights */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      <div className={`fixed inset-0 overflow-hidden pointer-events-none z-0 ${activeTab === 'dashboard' ? 'hidden' : ''}`}>
         <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-blue-400/10 dark:bg-blue-600/20 rounded-full blur-[130px]"></div>
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-400/10 dark:bg-emerald-600/10 rounded-full blur-[160px]"></div>
         <div className="absolute top-[25%] right-[15%] w-[35%] h-[35%] bg-indigo-400/10 dark:bg-indigo-600/15 rounded-full blur-[120px]"></div>
@@ -187,13 +194,15 @@ export default function Page() {
           {/* TopBar */}
           <TopBar
             collapsed={collapsed}
-            activeAlertCount={MOCK_ALERTS.length}
+            activeAlertCount={alerts.filter((alert) => alert.status !== 'resolved').length}
             onRefresh={handleRefresh}
             title={
               activeTab === 'dashboard'
                 ? 'NOC Dashboard'
                 : activeTab === 'infrastructure'
-                ? 'Infrastructure View'
+                ? 'Infrastructure Topology'
+                : activeTab === 'monitoring'
+                ? 'Device & Hypervisor Monitoring'
                 : activeTab === 'logs'
                 ? 'Log Explorer'
                 : activeTab === 'ai-analysis'
@@ -213,7 +222,7 @@ export default function Page() {
               • View ที่อยากเต็มจอ (Log Explorer) ใส่ `lg:flex-1 lg:min-h-0`
                 ที่ตัวเอง แล้วจัดการเลื่อนภายในคอลัมน์ของตัวเอง */}
           <main
-            className={`flex-1 min-h-0 overflow-y-auto flex flex-col p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto ${
+            className={`flex-1 min-h-0 overflow-y-auto flex flex-col p-4 sm:p-6 w-full mx-auto ${activeTab === 'dashboard' ? 'max-w-[1600px]' : 'lg:p-8 max-w-7xl'} ${
               // Log Explorer เป็น View เต็มจอที่จัดขอบเอง — ตัด padding ล่างออก
               // เพื่อให้ก้นคอลัมน์ชิดขอบบนของ StatusBar พอดี
               activeTab === 'logs' ? 'lg:pb-0' : ''
@@ -222,21 +231,24 @@ export default function Page() {
             {activeTab === 'dashboard' && (
               <DashboardView
                 hypervisors={MOCK_HYPERVISORS}
-                recentAlerts={MOCK_ALERTS}
+                recentAlerts={alerts}
+                onAcknowledgeAlert={handleAcknowledgeAlert}
+                canAcknowledge={userRole !== 'viewer'}
                 onNavigateTab={handleNavigateTab}
                 onSelectIncident={() => handleNavigateTab('ai-analysis', 'diagnosis')}
                 onRefresh={handleRefresh}
               />
             )}
 
-            {activeTab === 'infrastructure' && (
+            {(activeTab === 'infrastructure' || activeTab === 'monitoring') && (
               <InfrastructureView
+                key={activeTab}
+                mode={activeTab === 'monitoring' ? 'monitoring' : 'topology'}
                 hypervisors={MOCK_HYPERVISORS}
                 vms={MOCK_VMS}
                 networkDevices={MOCK_NETWORK_DEVICES}
-                syslogs={MOCK_SYSLOGS}
-                recentAlerts={MOCK_ALERTS}
-                initialSubTab={activeSubTab}
+                syslogs={getAllLogs()}
+                recentAlerts={alerts}
                 onNavigateTab={handleNavigateTab}
               />
             )}
@@ -269,7 +281,7 @@ export default function Page() {
                 approvals={approvals}
                 userRole={userRole}
                 initialSubTab={activeSubTab}
-                onOpenApproveModal={(req) => setApproveModalReq(req)}
+                onConfirmApprove={handleConfirmApprove}
                 onOpenRejectModal={(req) => setRejectModalReq(req)}
                 onNavigateTab={handleNavigateTab}
               />
@@ -307,16 +319,6 @@ export default function Page() {
           />
         </div>
       </div>
-
-      {/* Human-in-the-Loop Command Execution Preview Modal */}
-      {/* key={approveModalReq?.id} forces a fresh instance per request, so
-          isExecuting/executionSuccess never bleed over from a previous one */}
-      <CommandPreviewModal
-        key={approveModalReq?.id}
-        request={approveModalReq}
-        onClose={() => setApproveModalReq(null)}
-        onConfirmApprove={handleConfirmApprove}
-      />
 
       {/* Human-in-the-Loop Rejection Reason Modal */}
       {/* key={rejectModalReq?.id} forces a fresh instance per request, so a
