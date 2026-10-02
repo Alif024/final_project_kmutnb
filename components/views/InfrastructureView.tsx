@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Network,
   Server,
   Layers,
   Cpu,
@@ -47,7 +46,7 @@ interface InfrastructureViewProps {
   networkDevices: NetworkDevice[];
   syslogs: SyslogEntry[];
   recentAlerts: Alert[];
-  initialSubTab?: string;
+  mode?: 'topology' | 'monitoring';
   onNavigateTab?: (tab: string, subtab?: string) => void;
 }
 
@@ -82,12 +81,9 @@ export default function InfrastructureView({
   networkDevices,
   syslogs,
   recentAlerts,
-  initialSubTab = 'topology',
+  mode: subTab = 'topology',
   onNavigateTab,
 }: InfrastructureViewProps) {
-  const [subTab, setSubTab] = useState<'topology' | 'monitoring'>(
-    initialSubTab === 'monitoring' ? 'monitoring' : 'topology'
-  );
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [selectedHypervisorId, setSelectedHypervisorId] = useState<string>('hyp-01');
   const [nodeDetailTab, setNodeDetailTab] = useState<'overview' | 'interfaces' | 'performance' | 'logs' | 'alerts' | 'vm-info'>('overview');
@@ -271,38 +267,14 @@ export default function InfrastructureView({
       {/* SubTab Navigation Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/10 pb-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Infrastructure</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">{subTab === 'topology' ? 'Infrastructure Topology' : 'Device & Hypervisor Monitoring'}</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {subTab === 'topology'
-              ? 'อุปกรณ์ที่ตรวจพบจาก Zabbix / vCenter / Proxmox — ลากวางเพื่อสร้างผังเอง (Manual Topology Builder)'
+              ? 'อุปกรณ์ที่ตรวจพบจาก Zabbix / vCenter / Proxmox — จัดตำแหน่งแบบ Auto หรือวางเองแบบ Manual'
               : 'ติดตามสถานะอุปกรณ์เครือข่าย และ Hypervisor (Device & Hypervisor Monitoring)'}
           </p>
         </div>
 
-        <div className="flex items-center gap-1 bg-white dark:bg-slate-950/60 backdrop-blur-md p-1 rounded-xl border border-slate-200 dark:border-white/10">
-          <button
-            onClick={() => setSubTab('topology')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              subTab === 'topology'
-                ? 'bg-blue-600/80 text-white shadow-lg shadow-blue-500/20 border border-blue-400/30'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
-            }`}
-          >
-            <Network className="w-4 h-4" />
-            Infrastructure Topology
-          </button>
-          <button
-            onClick={() => setSubTab('monitoring')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-              subTab === 'monitoring'
-                ? 'bg-blue-600/80 text-white shadow-lg shadow-blue-500/20 border border-blue-400/30'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
-            }`}
-          >
-            <Server className="w-4 h-4" />
-            Device & Hypervisor Monitoring
-          </button>
-        </div>
       </div>
 
       {/* SUBTAB 1: TOPOLOGY */}
@@ -334,6 +306,9 @@ export default function InfrastructureView({
             </div>
 
             <TopologyBuilder
+              key={topology.activeDiagram.id}
+              onSetLayoutMode={topology.setLayoutMode}
+              onSaveLayout={topology.saveLayout}
               devices={discoveredDevices}
               layout={topology.layout}
               diagrams={topology.diagrams}

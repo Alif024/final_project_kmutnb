@@ -567,6 +567,58 @@
       "lastSeen": "20 นาทีที่แล้ว"
     }
   ],
+  "alertDiagnoses": [
+    {
+      "alertId": "alt-01",
+      "summary": "พบ **Datastore Latency 38.6 ms** บน ESXi Host-01 สูงกว่าเกณฑ์ 10 ms พร้อม **I/O Wait ของ ERP-VM 45.2%**\n\nหลักฐานในเหตุการณ์ชี้ว่า Storage ตอบสนองช้าและกระทบการเข้าถึง ERP โดยยังต้องตรวจสอบเส้นทาง Storage และภาระ I/O เพื่อระบุสาเหตุของความหน่วงเพิ่มเติม",
+      "recommendedActions": [
+        "ตรวจสอบภาระ I/O ของ datastore1 และเส้นทางระหว่าง ESXi Host กับ Storage ผ่าน SAN Switch",
+        "ตรวจสอบความพร้อมของ ESXi-Host-02 และคำสั่ง Live Migration สำหรับ ERP-VM ใน Action Center ก่อนอนุมัติแบบ Manual",
+        "ติดตามค่า Storage Latency และทดสอบการเข้าถึง ERP หลังดำเนินการ"
+      ],
+      "recommendationIds": ["rec-01"]
+    },
+    {
+      "alertId": "alt-02",
+      "summary": "พบ **CPU Usage ของ Firewall-VM 92%** ต่อเนื่อง 180 วินาที และ **I/O Wait 28.4%** พร้อม Log ที่ระบุว่าการประมวลผล Packet ล่าช้า\n\nควรตรวจสอบภาระงานของ VM และทรัพยากรบน Hypervisor ร่วมกับ Storage ก่อนสรุปสาเหตุของ CPU ที่สูง",
+      "recommendedActions": [
+        "ตรวจสอบ Process ที่ใช้ CPU และเปรียบเทียบ CPU Ready Time กับภาระงานบน Hypervisor",
+        "ตรวจสอบข้อเสนอเพิ่มทรัพยากรของ Firewall-VM ใน Action Center และพิจารณาผลกระทบก่อนอนุมัติแบบ Manual",
+        "ติดตาม CPU, I/O Wait และการตอบสนองของเครือข่ายหลังดำเนินการ"
+      ],
+      "recommendationIds": ["rec-02"]
+    },
+    {
+      "alertId": "alt-03",
+      "summary": "พอร์ต **Gi0/1 ของ Core-Switch-01** ยังมีสถานะ Up แต่พบ **Packet Loss 2.4%** และการใช้งานพอร์ต 68%\n\nข้อมูลยืนยันว่ามี Packet Loss แต่ยังไม่เพียงพอระบุว่าเกิดจากสายสัญญาณ พอร์ต หรืออุปกรณ์ปลายทาง",
+      "recommendedActions": [
+        "ตรวจสอบ Error Counter ของ Gi0/1 และพอร์ตปลายทางในช่วงเวลาที่เกิด Packet Loss",
+        "ตรวจสอบสายสัญญาณและสถานะลิงก์ของอุปกรณ์ทั้งสองฝั่ง",
+        "ทดสอบเส้นทางเครือข่ายและติดตาม Packet Loss เพื่อยืนยันขอบเขตของปัญหา"
+      ],
+      "recommendationIds": []
+    },
+    {
+      "alertId": "alt-04",
+      "summary": "พบ **Memory Usage ของ Web-VM-01 82%** ตามข้อมูล Metric ที่มีอยู่\n\n**ยังไม่มีหลักฐานเพียงพอยืนยันสาเหตุหลัก** เพราะไม่มีข้อมูลการใช้หน่วยความจำราย Process หรือแนวโน้ม Memory ที่ระบุว่าเกิด Memory Leak",
+      "recommendedActions": [
+        "ตรวจสอบ Process ที่ใช้หน่วยความจำสูง รวมถึง Memory Cache และ Swap ของ Web-VM-01",
+        "เปรียบเทียบแนวโน้ม Memory กับจำนวน Request และช่วงเวลาที่เกิดการแจ้งเตือน",
+        "เก็บหลักฐานเพิ่มเติมก่อนพิจารณาปรับทรัพยากรหรือรีสตาร์ทบริการ"
+      ],
+      "recommendationIds": []
+    },
+    {
+      "alertId": "alt-05",
+      "summary": "พบการแจ้งเตือน **Backup Job ล้มเหลว** บน Backup-Server จำนวน 3 ครั้ง\n\n**ยังไม่มีหลักฐานเพียงพอยืนยันสาเหตุหลัก** เนื่องจากชุดข้อมูลนี้ไม่มี Job Log หรือ Metric ของ Backup-Server สำหรับตรวจสอบสาเหตุ",
+      "recommendedActions": [
+        "ตรวจสอบ Job Log และรหัสข้อผิดพลาดจากระบบ Backup ในช่วงเวลาที่ล้มเหลว",
+        "ตรวจสอบพื้นที่ว่าง สิทธิ์เข้าถึง และการเชื่อมต่อของปลายทางที่เก็บ Backup",
+        "ยืนยันสาเหตุและความพร้อมของระบบก่อนดำเนินการรัน Backup Job ใหม่แบบ Manual"
+      ],
+      "recommendationIds": []
+    }
+  ],
   "incident": {
     "id": "INC-2569-0524-0001",
     "title": "Users cannot access ERP System",
@@ -1950,6 +2002,74 @@
         { "name": "wan0", "adminStatus": "up", "operStatus": "up", "inOctets": 720000000, "outOctets": 576000000, "errorRate": 0.2, "packetLossPercent": 0, "utilizationPercent": 72 },
         { "name": "lan0", "adminStatus": "up", "operStatus": "up", "inOctets": 610000000, "outOctets": 488000000, "errorRate": 0, "packetLossPercent": 0, "utilizationPercent": 61 }
       ]
+    },
+    {
+      "id": "net-san-01",
+      "name": "SAN-Switch-01",
+      "ipAddress": "10.0.20.2",
+      "type": "switch",
+      "isVirtual": false,
+      "status": "healthy",
+      "snmpCommunity": "public",
+      "lastSeen": "30 วินาทีที่แล้ว",
+      "interfaces": [
+        {
+          "name": "Eth1/1",
+          "adminStatus": "up",
+          "operStatus": "up",
+          "inOctets": 320000000,
+          "outOctets": 240000000,
+          "errorRate": 0,
+          "packetLossPercent": 0,
+          "utilizationPercent": 32,
+          "speedMbps": 100000
+        },
+        {
+          "name": "Eth1/2",
+          "adminStatus": "up",
+          "operStatus": "up",
+          "inOctets": 320000000,
+          "outOctets": 240000000,
+          "errorRate": 0,
+          "packetLossPercent": 0,
+          "utilizationPercent": 32,
+          "speedMbps": 100000
+        },
+        {
+          "name": "Eth1/3",
+          "adminStatus": "up",
+          "operStatus": "up",
+          "inOctets": 320000000,
+          "outOctets": 240000000,
+          "errorRate": 0,
+          "packetLossPercent": 0,
+          "utilizationPercent": 32,
+          "speedMbps": 100000
+        }
+      ]
+    },
+    {
+      "id": "net-storage-01",
+      "name": "Storage-Array-01",
+      "ipAddress": "10.0.20.10",
+      "type": "storage",
+      "isVirtual": false,
+      "status": "warning",
+      "snmpCommunity": "public",
+      "lastSeen": "30 วินาทีที่แล้ว",
+      "interfaces": [
+        {
+          "name": "eth0",
+          "adminStatus": "up",
+          "operStatus": "up",
+          "inOctets": 320000000,
+          "outOctets": 240000000,
+          "errorRate": 0,
+          "packetLossPercent": 0,
+          "utilizationPercent": 32,
+          "speedMbps": 100000
+        }
+      ]
     }
   ],
   "lldpNeighbors": [
@@ -1961,6 +2081,10 @@
     { "localDeviceId": "net-sw-acc-02", "localInterface": "Gi0/2", "protocol": "lldp", "remoteSysName": "Proxmox-Node-01", "remotePortId": "eno1", "remoteMgmtIp": "10.0.0.201" },
     { "localDeviceId": "net-rtr-edge-01", "localInterface": "Gi0/0/0", "protocol": "cdp", "remoteSysName": "Core-Switch-01", "remotePortId": "Gi0/24", "remoteMgmtIp": "10.0.0.2" },
     { "localDeviceId": "net-rtr-edge-01", "localInterface": "Gi0/0/1", "protocol": "cdp", "remoteSysName": "ISP-PE-Router-BKK", "remotePortId": "GigabitEthernet0/2" },
-    { "localDeviceId": "net-fw-perimeter-01", "localInterface": "lan0", "protocol": "lldp", "remoteSysName": "Core-Switch-01", "remotePortId": "Gi0/1", "remoteMgmtIp": "10.0.0.2" }
+    { "localDeviceId": "net-fw-perimeter-01", "localInterface": "lan0", "protocol": "lldp", "remoteSysName": "Core-Switch-01", "remotePortId": "Gi0/1", "remoteMgmtIp": "10.0.0.2" },
+    { "localDeviceId": "net-san-01", "localInterface": "Eth1/1", "protocol": "lldp", "remoteSysName": "Storage-Array-01", "remotePortId": "eth0", "remoteMgmtIp": "10.0.20.10" },
+    { "localDeviceId": "net-storage-01", "localInterface": "eth0", "protocol": "lldp", "remoteSysName": "SAN-Switch-01", "remotePortId": "Eth1/1", "remoteMgmtIp": "10.0.20.2" },
+    { "localDeviceId": "net-san-01", "localInterface": "Eth1/2", "protocol": "lldp", "remoteSysName": "ESXi-Host-01", "remotePortId": "vmnic2", "remoteMgmtIp": "10.0.0.101" },
+    { "localDeviceId": "net-san-01", "localInterface": "Eth1/3", "protocol": "lldp", "remoteSysName": "ESXi-Host-02", "remotePortId": "vmnic2", "remoteMgmtIp": "10.0.0.102" }
   ]
 }

@@ -57,6 +57,7 @@ export function parseLayout(raw: unknown): TopologyLayout | null {
 
   return {
     version: 1,
+    layoutMode: candidate.layoutMode === 'auto' ? 'auto' : 'manual',
     name: typeof candidate.name === 'string' && candidate.name.trim() ? candidate.name.trim() : undefined,
     nodes,
     links,
@@ -123,6 +124,7 @@ function parseWorkspace(raw: unknown): TopologyWorkspace | null {
     const { nodes, links } = sanitizeGraph(d.nodes, d.links);
     diagrams.push({
       id: d.id,
+      layoutMode: d.layoutMode === 'auto' ? 'auto' : 'manual',
       name: d.name,
       nodes,
       links,
@@ -229,7 +231,7 @@ function writeWorkspace(next: TopologyWorkspace): void {
 
 /** แก้เฉพาะผังที่เปิดอยู่ พร้อมประทับเวลาแก้ไขล่าสุดให้เสมอ */
 function updateActiveDiagram(
-  updater: (active: TopologyDiagram) => Pick<TopologyDiagram, 'nodes' | 'links'> | null
+  updater: (active: TopologyDiagram) => (Pick<TopologyDiagram, 'nodes' | 'links'> & Partial<Pick<TopologyDiagram, 'layoutMode'>>) | null
 ): void {
   const ws = getSnapshot();
   const active = ws.diagrams.find((d) => d.id === ws.activeId);
@@ -257,6 +259,19 @@ export function useTopologyLayout() {
 
   const activeDiagram =
     workspace.diagrams.find((d) => d.id === workspace.activeId) ?? workspace.diagrams[0];
+
+  const setLayoutMode = useCallback((layoutMode: 'auto' | 'manual') => {
+    updateActiveDiagram((active) => ({ nodes: active.nodes, links: active.links, layoutMode }));
+  }, []);
+
+  const saveLayout = useCallback(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(getSnapshot()));
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
 
   /** วางอุปกรณ์ลงผัง — อุปกรณ์เดิมที่อยู่บนผังแล้วจะไม่ถูกเพิ่มซ้ำ */
   const addNode = useCallback((deviceId: string, x: number, y: number) => {
@@ -401,6 +416,7 @@ export function useTopologyLayout() {
     const source = ws.diagrams.find((d) => d.id === id);
     if (!source) return;
     const copy = createDiagramRecord(`${source.name} (สำเนา)`, source.nodes, source.links);
+    copy.layoutMode = source.layoutMode;
     writeWorkspace({ ...ws, diagrams: [...ws.diagrams, copy], activeId: copy.id });
   }, []);
 
@@ -438,15 +454,19 @@ export function useTopologyLayout() {
       layout.nodes,
       layout.links
     );
+    diagram.layoutMode = layout.layoutMode;
     writeWorkspace({ ...ws, diagrams: [...ws.diagrams, diagram], activeId: diagram.id });
   }, []);
 
   return {
+    setLayoutMode,
+    saveLayout,
     diagrams: workspace.diagrams,
     activeDiagram,
     /** เนื้อหาของผังที่เปิดอยู่ ในรูปแบบไฟล์ Export */
     layout: {
       version: 1 as const,
+      layoutMode: activeDiagram.layoutMode ?? 'manual',
       name: activeDiagram.name,
       nodes: activeDiagram.nodes,
       links: activeDiagram.links,

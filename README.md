@@ -10,7 +10,7 @@
 ## สถานะปัจจุบันของแอปพลิเคชัน
 
 > **สถานะ: Prototype / Demo (UI-complete, Mock-driven)**
-> ส่วนติดต่อผู้ใช้ครบทั้ง 7 โมดูลและใช้งานโต้ตอบได้จริงในเบราว์เซอร์
+> ส่วนติดต่อผู้ใช้แบ่งเป็น 8 เมนูหลักและใช้งานโต้ตอบได้จริงในเบราว์เซอร์
 > ข้อมูลทั้งหมดมาจากไฟล์ชุดข้อมูลจำลองไฟล์เดียวคือ `lib/mock-data.json` ยกเว้น **AI Chat Assistant** ที่เรียก Gemini API จริงผ่าน API Route
 
 **ผลการตรวจสอบเชิงลึก (30 สิงหาคม 2569):** ระบบ Build ผ่านสมบูรณ์ และผ่านการตรวจ Logic Bug
@@ -136,20 +136,49 @@
 ไม่มีการแก้โค้ดแอปในรอบนี้ — ทั้ง `/api/ai/chat` และ `lib/device-discovery.ts`
 กลับไปใช้ข้อมูลจำลองรายต้นทางอยู่แล้วเมื่อไม่มีค่าใน env
 
+**อัปเดตล่าสุด (25 กันยายน 2569):** ปรับ UI/UX และโครงสร้างการใช้งานทั้ง 5 ส่วน
+
+- **Dashboard** — ย้าย Alert Summary ขึ้นก่อนข้อมูลอื่น ขยาย Recent Alerts เต็มความกว้าง
+  นำ Top 5 Issues ออก และย้าย Network Health / AI Confidence ไป AI Analysis
+- **Infrastructure** — แยก Topology กับ Device & Hypervisor Monitoring เป็นคนละเมนูหลัก
+  เพิ่ม Auto / Manual, ปุ่มบันทึกผัง, tooltip คู่พอร์ต/สถานะ/ความเร็ว และข้อมูล Storage → SAN Switch แบบ 100G
+- **Log Explorer** — นำกราฟและ Query ดิบออก เพิ่มปฏิทินช่วงวันเวลา เหลือ Sidebar เฉพาะ Severity
+  และตัดแหล่ง Ticket ก่อนนับยอด โดยยังค้นหาข้อความและเจาะหลักฐาน Incident ได้
+- **Action Center** — เปลี่ยน Command Preview จาก Modal เป็นแผงกางในบัตร
+  ใช้ Manual เท่านั้น รวม Restart DNS Service และตรวจสิทธิ์/สถานะซ้ำที่ตัวจัดการคำสั่ง
+- **AI Analysis** — แสดง Markdown จริง พร้อมหัวข้อ รายการ ตัวหนา และบล็อกคำสั่ง
+  ปรับ System Prompt และคำตอบจำลองให้อ่านง่าย รวมทั้งปิดการแสดง HTML ดิบ
+
+การตรวจสอบรอบนี้: ผ่าน `npx tsc --noEmit`, `npm run lint` และ `npm run build`
+(5 Route, หน้าหลัก 335 kB First Load JS) พร้อมตรวจ logic แบบเฉพาะกิจด้วย Node.js
+(ขอบเขตวันเวลา/Severity/Ticket, การจัดผังโดยไม่ทับ Manual, SAN 100G/พอร์ต down,
+สิทธิ์คำสั่ง, Markdown และการบันทึกผัง) — ไม่มีการเพิ่ม Test Runner
+ยังไม่ได้ทดสอบคลิก/ลากด้วยเบราว์เซอร์จริงในรอบนี้ เพราะ session ไม่มีเบราว์เซอร์เชื่อมต่อ
+
+**อัปเดต Dashboard ตามไฟล์ HTML (25 กันยายน 2569):** ใช้ `ai_noc_dashboard.html` เป็นแบบล่าสุด
+คืน KPI 6 ใบด้านบนและ Top 5 Issues จัดแถวล่างเป็น 3 คอลัมน์ พร้อมโทนการ์ดขอบบางและเงาเบา
+เพิ่มตัวกรอง Recent Alerts และการรับทราบที่คงอยู่ข้ามหน้า โดยใช้ข้อมูล Alert ชุดเดียวกับ Infrastructure
+ปุ่มวินิจฉัยเชื่อมกับ AI Analysis และปุ่มจัดการคำสั่งเชื่อมกับ Action Center แบบ Manual
+รายละเอียดนี้แทนการจัด Dashboard ในอัปเดตรอบก่อน ส่วนเมนูและหน้าจออื่นคงการทำงานเดิม
+
+ตรวจสอบรอบ Dashboard: `npx tsc --noEmit`, `npm run lint` และ `npm run build` ผ่าน
+(5 Route, หน้าหลัก 345 kB First Load JS) ยังไม่ได้ตรวจคลิก/ภาพหน้าจอผ่านเบราว์เซอร์จริง
+เนื่องจาก session ไม่มีเบราว์เซอร์เชื่อมต่อ
+
 | ด้าน | สถานะ |
 |---|---|
-| หน้าจอ/ฟีเจอร์ UI | ✅ ครบทั้ง 7 โมดูล รวม 14 หน้าย่อย |
+| หน้าจอ/ฟีเจอร์ UI | ✅ 8 เมนูหลัก แยก Infrastructure Topology และ Device & Hypervisor Monitoring |
 | Human-in-the-Loop (อนุมัติ/ปฏิเสธ + Audit Log) | ✅ ทำงานจริงแบบ in-memory (แก้ปัญหา State ค้างข้ามคำขอแล้ว) |
 | ตัวกรอง/แท็บรายละเอียดใน Action Center และ Infrastructure | ✅ กรอง/สลับเนื้อหาได้จริงทุกปุ่ม (เดิมมีหลายจุดกดแล้วไม่มีผล) |
 | AI Chat Assistant | ✅ ต่อ Gemini API จริง (มี Mock Fallback เมื่อไม่ตั้งค่า API Key), แยกประวัติสนทนาตาม Session ถูกต้อง |
 | AI Diagnosis (RCA) | 🟡 แสดงผลจากชุดข้อมูลจำลอง ยังไม่เรียกโมเดลจริง (มี Log Evidence ประกอบแล้ว) |
-| Log Explorer (ค้นหา Syslog รวมศูนย์) | ✅ ค้นหา / กรองแบบ Facet / เจาะช่วงเวลาจากกราฟ / แบ่งหน้า / กางดู Parsed Fields ได้จริงจากชุดข้อมูล 62 ข้อความ |
+| Log Explorer (ค้นหา Syslog รวมศูนย์) | ✅ ค้นหาข้อความ / กรอง Severity / ปฏิทินช่วงวันเวลาไทย / แบ่งหน้า / กาง Parsed Fields โดยไม่แสดงกราฟและ Query ดิบ และตัดแหล่ง Ticket ออกจากผลลัพธ์ |
 | Log Evidence ในหน้า AI Analysis | ✅ ผูก Log เข้ากับ Root Cause Chain รายขั้น และข้ามไป Log Explorer แบบกรอง Incident ไว้ให้ |
 | จัดการรายการ Integration (เพิ่ม / ลบ / ทดสอบการเชื่อมต่อ) | ✅ ทำงานจริงแบบ in-memory ผ่าน Wizard และ Modal ยืนยัน (ผลการทดสอบเป็นการจำลอง) |
-| ค้นพบอุปกรณ์จาก Zabbix / vCenter / Proxmox | 🟡 เขียนโค้ดเรียก API จริงครบแล้วใน `lib/device-discovery.ts` แต่ยังไม่ได้ทดสอบกับเซิร์ฟเวอร์จริง — ถ้าไม่ตั้งค่า env จะใช้ข้อมูลจำลอง 18 อุปกรณ์ |
-| สร้างผัง Topology เอง (ลากวาง + เชื่อมเส้น) | ✅ ทำงานจริง บันทึกได้หลายผัง เก็บใน `localStorage` และ Export/Import เป็น JSON ได้ |
+| ค้นพบอุปกรณ์จาก Zabbix / vCenter / Proxmox | 🟡 เขียนโค้ดเรียก API จริงครบแล้วใน `lib/device-discovery.ts` แต่ยังไม่ได้ทดสอบกับเซิร์ฟเวอร์จริง — ถ้าไม่ตั้งค่า env จะใช้ข้อมูลจำลอง 20 อุปกรณ์ |
+| จัดผัง Topology (Auto / Manual) | ✅ Auto จัดตำแหน่งโหนดบนผังเดิม / Manual ลากวางและบันทึกตำแหน่ง เก็บหลายผังใน `localStorage` พร้อม Export/Import โดย Auto ไม่ทับตำแหน่ง Manual |
 | ตรวจจับอุปกรณ์ปลายสายอัตโนมัติด้วย LLDP/CDP | 🟡 เป็นแหล่งข้อมูลเดียวของคู่พอร์ต (ไม่มีการกรอกเอง) แสดงในแท็บ Interfaces และ tooltip บนผัง พร้อมปุ่มเพิ่มเส้นเชื่อมลงผัง — โค้ดเรียก Zabbix จริงเขียนครบแล้วแต่ยังไม่ได้ทดสอบกับเครื่องจริง |
-| ตรวจสอบว่าเส้นบนผังตรงกับการเดินสายจริง | ✅ เทียบกับ LLDP/CDP แล้วให้สีเส้น 4 สถานะ พร้อมเหตุผลตอนชี้เมาส์ (`lib/link-verification.ts`) |
+| ตรวจสอบว่าเส้นบนผังตรงกับการเดินสายจริง | ✅ เทียบกับ LLDP/CDP แล้วให้สีเส้น 4 สถานะ พร้อม tooltip คู่พอร์ต สถานะ และความเร็วที่ทราบ (`lib/link-verification.ts`) |
 | การเก็บ Telemetry จริง (vCenter / Proxmox / SNMP / Syslog) | ❌ ยังไม่เชื่อมต่อ — ยังไม่มี Collector จริงอยู่เบื้องหลังรายการ Integration |
 | การดึง Log จาก Graylog จริง | ❌ ยังไม่เชื่อมต่อ — อ่านจากข้อมูลจำลองผ่าน Adapter `lib/log-source.ts` ที่เตรียมจุดต่อไว้แล้ว |
 | ฐานข้อมูล / การคงข้อมูลถาวร | ❌ ยังไม่มีฐานข้อมูล — State ส่วนใหญ่หายเมื่อรีเฟรช ยกเว้นคลังผัง Topology ที่เก็บใน `localStorage` ของเบราว์เซอร์ |
@@ -333,11 +362,13 @@ final_project_kmutnb/
 │   ├── layout.tsx                # Root Layout (lang="th", ฟอนต์ Inter/Prompt)
 │   └── page.tsx                  # หน้าเดียวของแอป — จัดการ State และสลับ View
 ├── components/
-│   ├── Sidebar.tsx                # เมนูหลัก 7 โมดูล + Role Switcher
+│   ├── Sidebar.tsx                # เมนูหลัก 8 รายการ + Role Switcher
 │   ├── TopBar.tsx                 # ชื่อหน้า, นาฬิกาไทย (พ.ศ.), Fullscreen, Theme Toggle
 │   ├── ThemeToggle.tsx            # ปุ่มสลับ Dark/Light Mode (ผูกกับ class `dark` บน <html>)
 │   ├── StatusBar.tsx              # แถบสถานะ Collector / AI Engine / Syslog
-│   ├── CommandPreviewModal.tsx    # ตัวอย่างคำสั่งก่อนอนุมัติ (Human-in-the-Loop)
+│   ├── CommandPreview.tsx         # ตัวอย่างคำสั่งแบบกางในบัตร พร้อมยืนยันด้วยคน
+│   ├── AIHealthSummary.tsx       # Network Health / AI Confidence ใน AI Analysis
+│   ├── MarkdownContent.tsx       # แสดง Markdown ของคำตอบ AI โดยไม่เปิด HTML ดิบ
 │   ├── RejectReasonModal.tsx      # ฟอร์มระบุเหตุผลการปฏิเสธ
 │   ├── DeviceInventoryPanel.tsx   # คลังอุปกรณ์ที่ตรวจพบ (ลากไปวางบนผังได้)
 │   ├── TopologyBuilder.tsx        # พื้นที่วาดผัง — ลากวาง เชื่อมเส้น ซูม Export/Import
@@ -353,6 +384,8 @@ final_project_kmutnb/
 │   ├── log-source.ts            # Log Source Adapter — ค้นหา/กรอง Syslog + จุดต่อ Graylog API
 │   ├── device-discovery.ts      # Device Discovery Adapter — Zabbix/vCenter/Proxmox (ฝั่ง Server)
 │   ├── link-verification.ts     # ตรวจเส้นบนผังเทียบ LLDP/CDP → สีเส้น 4 สถานะ
+│   ├── execution-policy.ts      # สิทธิ์อนุมัติและนโยบาย Manual เท่านั้น
+│   ├── topology-layout.ts       # จัดตำแหน่งอัตโนมัติจากโหนดและเส้นบนผังเดิม
 │   ├── interface-map.ts         # รวมคู่ "พอร์ต → อุปกรณ์" สำหรับ tooltip บนกล่อง
 │   └── utils.ts                 # `cn()` — clsx + tailwind-merge
 ├── types/ai-noc.ts              # TypeScript Interface ของโดเมนทั้งหมด
@@ -387,25 +420,46 @@ View ทั่วไปสูงตามเนื้อหาแล้วเล
 ## ฟีเจอร์ตามโมดูล
 
 ### 1. Dashboard — ภาพรวมสุขภาพระบบ
-KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors, Active Alerts) พร้อม Sparkline,
-โดนัทสรุประดับความรุนแรงของ Alert, รายการ Alert ล่าสุด, Top 5 Issues,
-และตารางการใช้ทรัพยากรรายเครื่อง Hypervisor — คลิกลิงก์เพื่อ Deep-link ไปแท็บย่อยอื่นได้
+ใช้ดีไซน์ล่าสุดจาก `ai_noc_dashboard.html` (25 กันยายน 2569) แทนการจัดหน้าในรอบก่อน:
+- **KPI 6 การ์ด** — Network Health, AI Confidence, Active Alerts, Devices, VMs และ Hypervisors
+  ใช้การ์ดขอบบาง เงาเบา ไอคอนพื้นสีอ่อน และแถบสัดส่วนแทน Sparkline
+- **แถวล่าง 3 คอลัมน์** — Alert Summary พร้อมโดนัทและ AI Insight / Recent Alerts / Top 5 Issues
+  จอเล็กเรียงลงเป็นคอลัมน์เดียว ขยายพื้นที่ Dashboard ได้ถึง 1600px รองรับ Light/Dark Mode
+- **Recent Alerts** — แสดงข้อความเต็ม กรองทั้งหมด/วิกฤต/เตือนได้จริง และกดรับทราบได้
+  สถานะเก็บใน `app/page.tsx` จึงไม่หายเมื่อสลับหน้า แต่ยังรีเซ็ตเมื่อรีโหลด; Viewer รับทราบไม่ได้
+- **Top 5 Issues** — เรียงจาก `occurrenceCount` ของ Alert จริง พร้อมแถบจำนวนครั้งที่เกิดซ้ำ
+  ปุ่ม AI วินิจฉัยเปิด Diagnosis สำหรับรายการที่มี Incident และเปิด Chat สำหรับรายการอื่น
+- ปุ่มตรวจสอบคำสั่งเปิด Action Center โดยการอนุมัติยังเป็น **Manual**
+  ดูตารางทรัพยากร Hypervisor ต่อได้ที่เมนู Monitoring
+- Network Health, AI Confidence, Devices และ VMs ยังเป็นตัวเลขสรุปจำลองตามต้นแบบ
+  จำนวน Alert และ Hypervisor คำนวณจากข้อมูลของแอป; ตัวเลือกช่วงเวลายังเป็น UI จำลองเหมือน HTML
 
-### 2. Infrastructure — Discovery, Topology Builder & Monitoring
+### 2. Infrastructure Topology — Discovery & Topology Builder
 - **คลังอุปกรณ์ที่ตรวจพบ:** ดึงรายชื่อจาก Zabbix (SNMP / Zabbix Agent), VMware vCenter และ
   Proxmox VE ผ่าน `GET /api/discovery` ค้นหาและกรองตามวิธีที่ตรวจพบได้ พร้อมป้ายรายต้นทาง
-  ว่าข้อมูลชุดนั้นเป็น "จริง" หรือ "จำลอง" *(ยังไม่ได้ตั้งค่า env = ข้อมูลจำลอง 18 อุปกรณ์)*
+  ว่าข้อมูลชุดนั้นเป็น "จริง" หรือ "จำลอง" *(ยังไม่ได้ตั้งค่า env = ข้อมูลจำลอง 20 อุปกรณ์)*
 - **Topology Builder:** ลากอุปกรณ์จากคลังมาวางเอง ย้ายตำแหน่งแบบดูดเข้ากริด เชื่อมเส้นด้วย
   โหมดเชื่อมต่อ คลิกเส้นเพื่อลบ ซูม และ Export/Import เป็นไฟล์ JSON
-  **ไม่มีการจัดวางอัตโนมัติใด ๆ** ตำแหน่งและเส้นทุกเส้นมาจากการกระทำของผู้ใช้เท่านั้น
-  บันทึกได้หลายผัง (สร้าง / เปลี่ยนชื่อ / ทำสำเนา / ลบ) เก็บใน `localStorage`
+  เลือก **Auto** เพื่อจัดตำแหน่งอุปกรณ์บนผังเดิมตามเส้นเชื่อม หรือ **Manual** เพื่อลากย้าย
+  Auto ไม่สร้างสายเชื่อมใหม่และไม่ทับตำแหน่ง Manual เมื่อสลับกลับ
+  บันทึกได้หลายผัง (สร้าง / เปลี่ยนชื่อ / ทำสำเนา / ลบ) เก็บโหมดและตำแหน่งใน `localStorage`
+  มีปุ่มบันทึกผังและ Export/Import ที่รองรับไฟล์เดิมซึ่งไม่มีโหมด
+  **คลิกซ้ายค้างบนพื้นที่ว่างแล้วลากเพื่อเลื่อนมุมมองผังได้ทั้งแนวนอนและแนวตั้ง**
+  ใช้ได้ทั้ง Auto/Manual และโหมดเชื่อมต่อ โดยไม่เปลี่ยนตำแหน่งที่บันทึกไว้หรือยกเลิกจุดเริ่มเชื่อมเส้น
+  ส่วนการลากกล่องใน Manual ยังเป็นการย้ายอุปกรณ์ตามเดิม
 - **สีเส้นบอกผลตรวจสอบกับ LLDP/CDP** — เขียว = ยืนยันแล้ว, แดง = พอร์ตที่ใช้สถานะ down,
   เทาทึบ = ต่อผิด (ข้อมูลขัดแย้งกับผัง), เทาจางเส้นประ = ยังไม่มีข้อมูลให้ตรวจ
-  ชี้เมาส์ที่เส้นเพื่อดูเหตุผล และชี้ที่กล่องเพื่อดูว่าพอร์ตไหนต่อกับเครื่องอะไร
+  แถบคำอธิบายการใช้งานและสีสถานะอยู่เหนือพื้นที่วาด ใต้แถบเครื่องมือ เพื่ออ่านได้ทันทีโดยไม่ต้องเลื่อนลงท้ายผัง
+  ชี้เมาส์หรือโฟกัสที่เส้นเพื่อดูชื่ออุปกรณ์ คู่พอร์ต สถานะ up/down/degraded/unknown และความเร็วที่ทราบ
+  ข้อมูลที่ยังไม่มีจะแสดงว่าไม่ทราบ พร้อมเหตุผลประกอบ ส่วน tooltip บนกล่องแสดงคู่พอร์ตเดิม
+- **สถาปัตยกรรม Storage:** ข้อมูลจำลองเชื่อม Storage-Array-01 → SAN-Switch-01 ที่ **100G**
+  และ SAN ต่อไปยัง ESXi ผ่านพอร์ต Storage โดยแยกจากเส้นทาง Firewall
 - **แผงรายละเอียดอุปกรณ์ 6 แท็บ** (Overview / Interfaces / Performance / Logs / Alerts / VM Info)
   โยงอุปกรณ์ที่ตรวจพบกลับไปหาเรกคอร์ดจริงในระบบด้วย IP ก่อนแล้วค่อยใช้ชื่อ (เพราะ API ของ
   Hypervisor บางตัวไม่คืน IP ของ Guest) — แท็บ **Interfaces** อ่านค่ารายพอร์ตจริงของอุปกรณ์ SNMP
   พร้อมคอลัมน์ "เชื่อมกับ" ที่มาจาก LLDP/CDP ล้วน ๆ
+### 3. Device & Hypervisor Monitoring
+แยกเป็นเมนูหลักของตัวเอง ไม่อยู่ในแท็บหรือ dropdown ของ Topology
 - **Monitoring:** ตาราง Hypervisor พร้อมเมตริกเฉพาะทาง Virtualization —
   CPU Ready Time, Memory Ballooning, Storage Latency, Virtual Switch Dropped Packets และกราฟย้อนหลัง
   1 ชั่วโมง พร้อมแผงรายละเอียด Host 6 แท็บ (Overview / Performance / VMs / Datastores / Alerts / Logs)
@@ -413,28 +467,28 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
 - แท็บ **Logs** ของทั้งฝั่งโหนดและฝั่ง Host กรอง Syslog ตามอุปกรณ์ที่เลือกจริง
   (เดิมฝั่งโหนดแสดงของทุกโหนดปนกัน) และมีปุ่มลัดไปค้นต่อใน Log Explorer
 
-### 3. Log Explorer — ค้นหา Syslog รวมศูนย์ (Graylog)
+### 4. Log Explorer — ค้นหา Syslog รวมศูนย์ (Graylog)
 หน้าค้นหา Log จากทุก Host/VM ที่ส่งเข้า Graylog *(อ่านจากข้อมูลจำลอง 62 ข้อความ ผ่าน `lib/log-source.ts`)*
 - **ค้นหาแบบข้อความอิสระ** ครอบคลุม message, ชื่อ Source, facility, IP และ Parsed Field
-- **ตัวกรองแบบ Facet** 3 กลุ่ม (Severity ตาม RFC 5424 / Stream / Source) พร้อมจำนวนผลลัพธ์ข้างแต่ละตัวเลือก
-  โดยตัวเลขจะคำนวณจากเงื่อนไข "ด้านอื่น" ที่เลือกอยู่ เหมือนแถบ Fields ของ Graylog
-- **ช่วงเวลา** 15 นาที / 1 ชั่วโมง / 4 ชั่วโมง / ทั้งหมด และ **กราฟการกระจายช่วงละ 15 นาที**
-  (แท่งแดง = ช่วงที่มี Log ระดับ Error ขึ้นไป)
-- **คลิกที่แท่งกราฟเพื่อเจาะดูเฉพาะช่วงเวลานั้น เลือกพร้อมกันได้หลายช่วง** — แท่งที่เลือกจะถูกเน้น
-  ส่วนแท่งอื่นจางลง มีชิปสรุปช่วงที่เลือกกดเอาออกทีละช่วงได้ และปุ่มล้างช่วงทั้งหมดที่หัวการ์ด
-  (กราฟยังแสดงครบทุกแท่งเสมอแม้กำลังกรองอยู่ จึงคลิกเพิ่มช่วงอื่นต่อได้)
-- **ปุ่มล้างตัวกรองประจำการ์ด** ที่หัวการ์ด Severity / Streams / Sources ล้างเฉพาะของใบนั้น
-- **Graylog Query Echo** — แปลงเงื่อนไขที่เลือกเป็นสตริงคิวรีตามไวยากรณ์ Graylog พร้อมปุ่มคัดลอก
-  ไปวางใน Graylog Web Interface ได้ทันที
+- **Sidebar เหลือ Severity เท่านั้น** ตาม RFC 5424 พร้อมจำนวนผลลัพธ์และปุ่มล้าง
+- **ปฏิทินวันเวลาเริ่มต้น/สิ้นสุด** พร้อมช่วงลัด 15 นาที / 1 ชั่วโมง / 4 ชั่วโมง / ทั้งหมด
+  ใช้เวลาไทย (UTC+7) และแสดงวันที่ข้อมูลจำลอง 24/05/2569 ชัดเจน เลือกวันอื่นจะไม่พบข้อมูล
+  เมื่อเปลี่ยนตัวกรองจะกลับหน้าแรก และแสดงคำเตือนเมื่อวันเริ่มต้นอยู่หลังวันสิ้นสุด
+- **นำกราฟสถิติและ Graylog Query Echo ออก** เพื่อเพิ่มพื้นที่อ่านข้อความ
+  ยังมีช่องค้นหาข้อความทั่วไป ส่วนตัวสร้างคิวรีเก็บไว้ใน Adapter สำหรับเชื่อม API ในอนาคต
+- **ตัดแหล่ง Ticket** ก่อนนับยอดและสร้างตัวกรอง โดยยังเก็บหลักฐานของ Incident ไว้
 - **แบ่งหน้าครั้งละ 20 ข้อความ** พร้อมปุ่มก่อนหน้า/ถัดไป และตัวเลขช่วงที่กำลังแสดง
   (เปลี่ยนตัวกรองหรือลำดับการเรียงจะย้อนกลับไปหน้าแรกให้อัตโนมัติ)
 - **กางดูรายละเอียดรายข้อความ** — metadata (source, source_ip, facility, level) และ Parsed Fields
   ที่ Extractor แยกไว้ พร้อมปุ่มลัดกรองเฉพาะ Source นั้น และปุ่มข้ามไปดูการวิเคราะห์ของ Incident
 - **เลย์เอาต์เต็มจอสองคอลัมน์ที่เลื่อนแยกกัน** — คอลัมน์ตัวกรองด้านซ้ายและคอลัมน์
-  ช่องค้นหา/กราฟ/ตารางด้านขวา สูงเท่ากันและจบที่ขอบบนของแถบสถานะพอดี
+  ช่องค้นหา/ปฏิทิน/ตารางด้านขวา สูงเท่ากันและจบที่ขอบบนของแถบสถานะพอดี
   เลื่อนฝั่งหนึ่งอีกฝั่งไม่ขยับ และตัวหน้าเว็บเองไม่เลื่อน
 
-### 4. AI Analysis — Diagnosis & Assistant
+### 5. AI Analysis — Diagnosis & Assistant
+- **Network Health / AI Confidence:** ย้ายมาจาก Dashboard แสดงก่อนเนื้อหาวิเคราะห์ *(ข้อมูลจำลอง)*
+- **คำตอบ Markdown:** แสดงหัวข้อ รายการ ตัวหนา ตาราง และบล็อกคำสั่ง พร้อมระยะห่างระหว่างย่อหน้า
+  ใช้ `react-markdown` + `remark-gfm` โดยไม่เปิด HTML ดิบ และกำหนดรูปแบบเดียวกันใน System Prompt
 - **AI Diagnosis (RCA):** แสดง Root Cause พร้อมคะแนนความเชื่อมั่น, ห่วงโซ่เหตุการณ์ (Evidence Chain)
   และหลักฐานเชิงเมตริกเทียบกับ Threshold *(ข้อมูลจำลอง)*
 - **Log Evidence:** แต่ละขั้นของ Root Cause Chain กางดู Syslog ที่รองรับขั้นนั้นได้ (ผูกผ่านฟิลด์
@@ -443,21 +497,25 @@ KPI 6 การ์ด (Network Health, AI Confidence, Devices, VMs, Hypervisors,
   ฝังบริบท Telemetry **และ Syslog ระดับ Error ขึ้นไป 20 บรรทัดล่าสุด** ไว้ พร้อมชุดคำถามแนะนำ *(เรียกโมเดลจริง)* แยกประวัติการสนทนาตาม
   Session จริง (สลับ Session แล้วเห็นเฉพาะข้อความของ Session นั้น, "New Chat" ไม่ลบประวัติ Session อื่น)
 
-### 5. Action Center — Recommendation & Approval
+### 6. Action Center — Recommendation & Approval
 - **Recommendations:** ตารางข้อเสนอแนะจาก AI พร้อมลำดับความสำคัญ ความเชื่อมั่น และตัวกรองสถานะ
   ที่กรองข้อมูลจริง (การ์ดสรุปยอดด้านบนคำนวณจากรายการจริงเช่นกัน)
 - **Approvals (Human-in-the-Loop):** การ์ดคำขออนุมัติ 3 คอลัมน์ (บริบท / พารามิเตอร์ / ผลกระทบที่คาดการณ์),
-  Modal ดูตัวอย่างคำสั่งก่อนรัน, Modal ระบุเหตุผลการปฏิเสธ, สวิตช์ Auto-Execute Rules (ค่าเริ่มต้นปิด, เฉพาะ Admin)
+  **Command Preview แบบกาง/พับในบัตรเดียวกัน** พร้อมปุ่มยืนยัน และ Modal ระบุเหตุผลการปฏิเสธ
+- **Manual เท่านั้น:** นำสวิตช์ Auto-Execute ออก ทุกคำสั่งรวมถึง Restart DNS Service ต้องยืนยันด้วยคน
+  ตรวจสิทธิ์และสถานะทั้งในปุ่มและตัวจัดการคำสั่ง: Viewer อ่านได้, Engineer อนุมัติคำขอระดับ operator
+  และ Admin อนุมัติได้ทุกระดับ ไม่ดำเนินการซ้ำกับคำขอที่จบแล้ว
+  การรันยังเป็นการจำลองเพื่ออัปเดต State/Audit Log ไม่มีการส่ง API หรือ SSH จริง
 
 เมื่อกดอนุมัติหรือปฏิเสธ ระบบจะอัปเดตสถานะคำขอ อัปเดต Recommendation ที่เกี่ยวข้อง
 และบันทึก Audit Log ใหม่ทันที (ดูผลได้ที่ Settings → Audit Log)
 
-### 6. Reports & Analytics
+### 7. Reports & Analytics
 - **Executive Summary:** KPI ระดับผู้บริหาร (Availability, Incidents, MTTR, AI Accuracy),
   กราฟแนวโน้ม 7 วัน, การกระจายความรุนแรง และรายงานเชิงบรรยายจาก AI
 - **Incident Post-Mortem:** ไทม์ไลน์เหตุการณ์, บทเรียนที่ได้รับ และรายการงานติดตาม
 
-### 7. Settings & Administration
+### 8. Settings & Administration
 - **Integrations:** สถานะการเชื่อมต่อ vCenter, Proxmox VE, Syslog/Prometheus, LINE Notify *(UI Mock)*
   พร้อม **Add Integration Wizard** 3 ขั้นตอน (เลือกประเภท → กรอกรายละเอียดพร้อมตรวจสอบความถูกต้อง →
   ทดสอบการเชื่อมต่อและยืนยัน) การ์ดที่เพิ่มใหม่จะแสดงต่อท้ายรายการทันที และคงอยู่เมื่อสลับแท็บ

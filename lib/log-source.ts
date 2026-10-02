@@ -35,6 +35,7 @@ import { MOCK_SYSLOGS } from './mock-data';
  * เมื่อเปลี่ยนไปใช้ Graylog จริงให้แทนที่ด้วย `Date.now()`
  */
 export const TELEMETRY_NOW = '15:42:18';
+export const TELEMETRY_DATE = '2026-05-24';
 
 /** ระดับความรุนแรงตาม RFC 5424 ที่ Graylog ใช้ในฟิลด์ `level` */
 export const SEVERITY_META: Record<
@@ -134,10 +135,16 @@ export function getIncidentLogs(incidentId: string): SyslogEntry[] {
 
 /**
  * แปลงเงื่อนไขการค้นหาเป็นสตริงคิวรีตามไวยากรณ์ของ Graylog
- * ใช้ทั้งแสดงให้ผู้ใช้เห็นในหน้า Log Explorer และส่งต่อ API จริงในอนาคต
+ * เก็บไว้สำหรับส่งต่อ API จริงในอนาคต โดยหน้า Log Explorer ไม่แสดงคิวรีดิบ
  */
 export function buildGraylogQuery(query: LogQuery): string {
-  const clauses: string[] = [];
+  const clauses: string[] = ['NOT source:*ticket*'];
+  if (query.from || query.to) {
+    const bound = (value?: string) => value ? '"' + new Date(value + '+07:00').toISOString() + '"' : '*';
+    if ((!query.from || Number.isFinite(Date.parse(query.from + '+07:00'))) && (!query.to || Number.isFinite(Date.parse(query.to + '+07:00')))) {
+      clauses.push('timestamp:[' + bound(query.from) + ' TO ' + bound(query.to) + ']');
+    }
+  }
 
   const search = query.search.trim();
   if (search) {
@@ -219,13 +226,19 @@ function buildHistogram(entries: SyslogEntry[], selected: string[]): LogHistogra
  * (พฤติกรรมเดียวกับแถบ Fields ของ Graylog)
  */
 export function searchLogs(query: LogQuery): LogSearchResult {
-  const all = getAllLogs();
+  // ตัดแหล่ง Ticket ออกก่อนนับยอดและสร้างตัวกรอง
+  const all = getAllLogs().filter((log) => !/ticket/i.test(log.sourceId + ' ' + log.sourceName));
   const nowSeconds = toSeconds(TELEMETRY_NOW);
   const rangeSeconds = TIME_RANGES.find((r) => r.id === query.range)?.seconds ?? 0;
   const search = query.search.trim().toLowerCase();
 
-  const matchTime = (log: SyslogEntry) =>
-    rangeSeconds === 0 || toSeconds(log.timestamp) >= nowSeconds - rangeSeconds;
+  const from = query.from ? Date.parse(query.from + '+07:00') : -Infinity;
+  const to = query.to ? Date.parse(query.to + '+07:00') : Infinity;
+  const matchTime = (log: SyslogEntry) => {
+    const timestamp = Date.parse(TELEMETRY_DATE + 'T' + log.timestamp + '+07:00');
+    return timestamp >= from && timestamp <= to &&
+      (rangeSeconds === 0 || toSeconds(log.timestamp) >= nowSeconds - rangeSeconds);
+  };
   const matchSearch = (log: SyslogEntry) =>
     !search ||
     log.message.toLowerCase().includes(search) ||

@@ -5,13 +5,13 @@ import {
   ShieldCheck,
   CheckCircle2,
   AlertTriangle,
-  Sliders,
   Filter,
   ArrowUpDown,
   Sparkles,
   Ban,
-  Terminal,
 } from 'lucide-react';
+import CommandPreview from '@/components/CommandPreview';
+import { canManuallyExecute } from '@/lib/execution-policy';
 import { Recommendation, ApprovalRequest, UserRole } from '@/types/ai-noc';
 
 interface ActionCenterViewProps {
@@ -19,7 +19,7 @@ interface ActionCenterViewProps {
   approvals: ApprovalRequest[];
   userRole: UserRole;
   initialSubTab?: string;
-  onOpenApproveModal: (request: ApprovalRequest) => void;
+  onConfirmApprove: (id: string) => void;
   onOpenRejectModal: (request: ApprovalRequest) => void;
   onNavigateTab: (tab: string, subtab?: string) => void;
 }
@@ -29,7 +29,7 @@ export default function ActionCenterView({
   approvals: initialApprovals,
   userRole,
   initialSubTab = 'recommendations',
-  onOpenApproveModal,
+  onConfirmApprove,
   onOpenRejectModal,
   onNavigateTab,
 }: ActionCenterViewProps) {
@@ -37,7 +37,6 @@ export default function ActionCenterView({
     initialSubTab === 'approvals' ? 'approvals' : 'recommendations'
   );
   const [recFilter, setRecFilter] = useState('all');
-  const [autoExecute, setAutoExecute] = useState(false);
   const [approvalFilter, setApprovalFilter] = useState<'pending' | 'executed' | 'rejected'>('pending');
 
   const filteredApprovals = initialApprovals.filter((appr) => appr.status === approvalFilter);
@@ -329,32 +328,7 @@ export default function ActionCenterView({
               </button>
             </div>
 
-            {/* Auto-Execute Rules Toggle (Default OFF, Admin Only) */}
-            <div className="flex items-center gap-3 bg-slate-100 dark:bg-black/20 px-4 py-2 rounded-xl border border-slate-200 dark:border-white/10">
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> Auto-Execute Rules
-                </span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                  {autoExecute ? 'เปิดใช้งาน (เฉพาะ Low Risk)' : 'Off (มนุษย์ต้องอนุมัติเองเสมอ)'}
-                </span>
-              </div>
-
-              <button
-                disabled={userRole !== 'admin'}
-                onClick={() => setAutoExecute(!autoExecute)}
-                className={`w-12 h-6 rounded-full p-1 transition-colors relative ${
-                  autoExecute ? 'bg-emerald-500' : 'bg-slate-100 dark:bg-white/10'
-                } ${userRole !== 'admin' ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title={userRole !== 'admin' ? 'ต้องใช้สิทธิ์ Admin ในการเปิด Auto-Execute Rules' : undefined}
-              >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                    autoExecute ? 'translate-x-6' : 'translate-x-0'
-                  }`}
-                ></div>
-              </button>
-            </div>
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">Manual เท่านั้น — ต้องตรวจสอบและยืนยันทุกคำสั่งด้วยตนเอง</p>
           </div>
 
           {/* Approval Cards Stream */}
@@ -445,34 +419,14 @@ export default function ActionCenterView({
                     </div>
                   </div>
 
-                  {/* Card Bottom Buttons */}
-                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200 dark:border-white/10">
-                    <button
-                      onClick={() => onOpenApproveModal(appr)}
-                      className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
-                    >
-                      <Terminal className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                      รายละเอียดเพิ่มเติม (Command Preview)
-                    </button>
-
-                    <button
-                      onClick={() => onOpenRejectModal(appr)}
-                      className="px-5 py-2 rounded-xl border border-red-500/50 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold transition-all flex items-center gap-1.5"
-                    >
-                      <Ban className="w-4 h-4" />
-                      ปฏิเสธ
-                    </button>
-
-                    <button
-                      onClick={() => onOpenApproveModal(appr)}
-                      disabled={userRole === 'viewer'}
-                      className="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                      title={userRole === 'viewer' ? 'คุณไม่มีสิทธิ์ดำเนินการนี้ (Viewer Read-Only)' : undefined}
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      อนุมัติ
-                    </button>
-                  </div>
+                  <CommandPreview request={appr} userRole={userRole} onConfirmApprove={onConfirmApprove} />
+                  {appr.status === 'pending' && (
+                    <div className="flex justify-end">
+                      <button onClick={() => onOpenRejectModal(appr)} disabled={!canManuallyExecute(appr, userRole)} className="px-4 py-2 rounded-xl border border-red-500/50 text-red-600 dark:text-red-400 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+                        <Ban className="w-4 h-4" /> ปฏิเสธ
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}

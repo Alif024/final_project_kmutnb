@@ -57,13 +57,14 @@ export interface NetworkInterface {
   errorRate: number;
   packetLossPercent: number;
   utilizationPercent: number;
+  speedMbps?: number;
 }
 
 export interface NetworkDevice {
   id: string;
   name: string;
   ipAddress: string;
-  type: 'router' | 'switch' | 'firewall' | 'load-balancer';
+  type: 'router' | 'switch' | 'firewall' | 'load-balancer' | 'storage';
   isVirtual: boolean;
   status: HealthStatus;
   interfaces: NetworkInterface[];
@@ -131,6 +132,9 @@ export interface LogQuery {
   /** ช่วงเวลาบนกราฟที่คลิกเลือกไว้ เก็บเป็นป้ายเวลาเริ่มช่วง เช่น "13:15" — ว่าง = ทุกช่วง */
   buckets: string[];
   range: LogTimeRange;
+  /** วันเวลาในเขตเวลาไทยจากปฏิทิน */
+  from?: string;
+  to?: string;
   /** จำกัดเฉพาะ Log ที่ผูกกับ Incident นี้ */
   incidentId?: string;
 }
@@ -185,6 +189,14 @@ export interface Alert {
   firstSeen: string;
   lastSeen: string;
   incidentId?: string;
+}
+
+/** ผลวิเคราะห์เบื้องต้นสำหรับ Alert แต่ละรายการบน Dashboard */
+export interface AlertDiagnosis {
+  alertId: string;
+  summary: string;
+  recommendedActions: string[];
+  recommendationIds: string[];
 }
 
 export interface Incident {
@@ -438,9 +450,8 @@ export interface TopologyLayoutLink {
   linkStatus: 'up' | 'down' | 'degraded';
   label?: string;
   /**
-   * พอร์ตที่ใช้เชื่อมของแต่ละฝั่ง เช่น "Gi0/1" — ผู้ใช้ระบุเองจากแท็บ Interfaces
-   * ระบบไม่เดาให้ เพราะการจับคู่พอร์ตต้องดูจากการเดินสายจริง
-   * (ถ้าต่อ Zabbix จริงในอนาคต อาจเติมให้อัตโนมัติจาก LLDP/CDP neighbor ได้)
+   * พอร์ตของแต่ละฝั่ง เช่น "Gi0/1" จากคู่ LLDP/CDP ที่ผู้ใช้เลือกเพิ่มลงผัง
+   * เส้นที่วาดเองอาจไม่มีชื่อพอร์ต จึงต้องค้นจากข้อมูลเพื่อนบ้านเมื่อแสดง tooltip
    */
   sourceInterface?: string;
   targetInterface?: string;
@@ -448,6 +459,7 @@ export interface TopologyLayoutLink {
 
 /** ผังหนึ่งใบ — ใช้เป็นทั้งรูปแบบไฟล์ Export และเนื้อหาของผังที่กำลังแก้ไขอยู่ */
 export interface TopologyLayout {
+  layoutMode?: 'auto' | 'manual';
   /** ใช้ตรวจความเข้ากันได้ตอนอ่านจาก localStorage หรือไฟล์ที่ Import เข้ามา */
   version: 1;
   /** ชื่อผัง — ไฟล์ที่ Export จากเวอร์ชันก่อนหน้าไม่มีฟิลด์นี้ จึงเป็นตัวเลือก */
@@ -459,6 +471,7 @@ export interface TopologyLayout {
 
 /** ผังหนึ่งใบที่ถูกบันทึกไว้ในระบบ (มีชื่อและรหัสประจำผัง) */
 export interface TopologyDiagram {
+  layoutMode?: 'auto' | 'manual';
   id: string;
   name: string;
   nodes: TopologyLayoutNode[];

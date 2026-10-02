@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Network,
+  Server,
   Sparkles,
   ShieldCheck,
   BarChart3,
@@ -46,9 +47,15 @@ export default function Sidebar({
     },
     {
       id: 'infrastructure',
-      label: 'Infrastructure',
-      subtitle: 'Topology & Monitoring',
+      label: 'Infrastructure Topology',
+      subtitle: 'ผังโครงสร้างพื้นฐาน',
       icon: Network,
+    },
+    {
+      id: 'monitoring',
+      label: 'Device & Hypervisor Monitoring',
+      subtitle: 'ติดตามอุปกรณ์และ Hypervisor',
+      icon: Server,
     },
     {
       id: 'logs',

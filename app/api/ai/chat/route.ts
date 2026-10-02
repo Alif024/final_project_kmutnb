@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 - คำแนะนำ: แนะนำให้ดำเนินการ Live Migration (vMotion) ERP-VM ไปยัง ESXi-Host-02 เพื่อลดผลกระทบ
 
 **หลักฐานจาก Syslog บน Graylog (5 บรรทัดแรกจาก ${criticalLogs.length} บรรทัดที่ระดับ Error ขึ้นไป):**
-${formatLogsForPrompt(criticalLogs.slice(0, 5))}`,
+${criticalLogs.slice(0, 5).map((log) => '- ' + formatLogsForPrompt([log])).join('\n')}`,
         citedEntities: ['ESXi-Host-01', 'Firewall-VM', 'ERP-VM']
       });
     }
@@ -57,7 +57,9 @@ Syslog ระดับ Error ขึ้นไปที่เก็บรวมศ
 ${logContext}
 
 หลักการตอบ:
-1. ตอบเป็นภาษาไทยอย่างสุภาพ มีโครงสร้างชัดเจน
+1. ตอบเป็นภาษาไทยด้วย Markdown: ใช้หัวข้อ ### แยกสรุป สาเหตุ หลักฐาน และคำแนะนำ เว้นบรรทัดระหว่างหัวข้อและย่อหน้า
+   ใช้รายการ - หรือรายการลำดับเลข และ **ตัวหนา** สำหรับค่าหรือประเด็นสำคัญ แต่ละย่อหน้าไม่เกิน 2–3 ประโยค
+   ใส่คำสั่งใน fenced code block พร้อมระบุภาษา ห้ามรวมคำตอบทั้งหมดเป็นย่อหน้ายาวหรือครอบคำตอบทั้งหมดด้วย code block
 2. ระบุสาเหตุ (Root Cause) พร้อมตัวเลขจริงและ threshold ในวงเล็บเสมอ
 3. ให้คำแนะนำเป็นรายการข้อสั้นๆ พร้อมเครื่องหมาย ✅
 4. หากผู้ใช้ถามเรื่องศัพท์เทคนิค เช่น CPU Ready Time, Memory Ballooning, Storage Latency ให้อธิบายอย่างเห็นภาพ

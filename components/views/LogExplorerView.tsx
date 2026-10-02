@@ -9,30 +9,17 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Server,
-  Layers,
   AlertOctagon,
   Clock,
   Database,
   Sparkles,
-  Copy,
-  Check,
 } from 'lucide-react';
+import { LogQuery, LogTimeRange, SyslogEntry } from '@/types/ai-noc';
 import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  Tooltip,
-  Cell,
-} from 'recharts';
-import { LogQuery, LogStreamId, LogTimeRange, SyslogEntry } from '@/types/ai-noc';
-import {
-  BUCKET_MINUTES,
   DEFAULT_LOG_QUERY,
-  LOG_STREAMS,
   SEVERITY_META,
   TELEMETRY_NOW,
+  TELEMETRY_DATE,
   TIME_RANGES,
   searchLogs,
 } from '@/lib/log-source';
@@ -116,7 +103,6 @@ export default function LogExplorerView({
   const [query, setQuery] = useState<LogQuery>({ ...DEFAULT_LOG_QUERY, ...initialQuery });
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sortNewestFirst, setSortNewestFirst] = useState(true);
-  const [copiedQuery, setCopiedQuery] = useState(false);
 
   const result = useMemo(() => searchLogs(query), [query]);
 
@@ -139,7 +125,7 @@ export default function LogExplorerView({
 
   /**
    * ยุบแถวที่กางอยู่ แล้วเลื่อนคอลัมน์ขวากลับขึ้นบนสุด
-   * (ใช้ตอนเปลี่ยนเงื่อนไขค้นหา ซึ่งกราฟและตัวเลขสรุปด้านบนก็เปลี่ยนตามไปด้วย)
+   * ใช้ตอนเปลี่ยนเงื่อนไขค้นหา ซึ่งตัวเลขสรุปด้านบนเปลี่ยนตามไปด้วย
    */
   const resetColumnScroll = () => {
     setExpandedId(null);
@@ -173,27 +159,14 @@ export default function LogExplorerView({
     query.buckets.length +
     (query.search.trim() ? 1 : 0) +
     (query.range !== 'all' ? 1 : 0) +
-    (query.incidentId ? 1 : 0);
+    (query.incidentId ? 1 : 0) +
+    (query.from ? 1 : 0) + (query.to ? 1 : 0);
 
   /** สลับค่าหนึ่งค่าในตัวกรองแบบเลือกได้หลายรายการ */
   const toggle = <T,>(list: T[], value: T): T[] =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 
-  /** คลิกแท่งบนกราฟเพื่อเปิด/ปิดการกรองเฉพาะช่วงเวลานั้น เลือกพร้อมกันได้หลายช่วง */
-  const toggleBucket = (label: string) =>
-    updateQuery((q) => ({ ...q, buckets: toggle(q.buckets, label) }));
-
   const resetQuery = () => updateQuery(DEFAULT_LOG_QUERY);
-
-  const copyQuery = async () => {
-    try {
-      await navigator.clipboard.writeText(result.graylogQuery);
-      setCopiedQuery(true);
-      setTimeout(() => setCopiedQuery(false), 1500);
-    } catch {
-      // เบราว์เซอร์บล็อกคลิปบอร์ด — ไม่ต้องขัดจังหวะผู้ใช้ ปล่อยให้เลือกคัดลอกเองได้
-    }
-  };
 
   return (
     // จอ lg ขึ้นไปรับความสูงที่เหลือจาก main มาเต็ม ๆ (main เป็น flex column ให้แล้ว)
@@ -220,19 +193,10 @@ export default function LogExplorerView({
         </div>
       </div>
 
-      {/* แถวหลักของหน้า — คอลัมน์ตัวกรองอยู่ซ้ายมือ ขนาบช่องค้นหา กราฟ และตารางผลลัพธ์
-          บนจอใหญ่แถวนี้กินความสูงที่เหลือทั้งหมดของหน้า ผ่านสาย flex ที่ต่อกันมาจาก
-          main โดยตรง (main → view root → แถวนี้) จึงไม่มีตัวเลขคงที่ให้ต้องคอยแก้ตาม
-          เวลาปรับ padding หรือขนาดหัวข้อ และทั้งหน้าไม่ต้องเลื่อน เนื้อหาจึงไม่มุดใต้
-          TopBar/StatusBar ที่เป็น fixed
-
-          lg:grid-rows-1 บังคับให้แถวเดียวนี้ยืดเต็มความสูงของ grid (ไม่งั้นแถวจะสูง
-          เท่าเนื้อหาแล้วเหลือที่ว่างด้านล่าง) ทั้งสองคอลัมน์จึงสูงเท่ากันและ
-          "เลื่อนแยกกัน" — ซ้ายเลื่อนทั้งคอลัมน์ ขวาตรึงช่องค้นหากับกราฟไว้
-          แล้วเลื่อนเฉพาะตารางผลลัพธ์ */}
+      {/* รับความสูงที่เหลือจาก main แล้วให้สองคอลัมน์เลื่อนแยกกัน
+          เพื่อให้เนื้อหาไม่เลื่อนเข้าใต้ TopBar/StatusBar */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:grid-rows-1 lg:flex-1 lg:min-h-[320px]">
-        {/* Left: Facet filters — เลื่อนเป็นก้อนเดียวแยกจากคอลัมน์ขวา
-            การ์ดทั้งสามใบสูงตามเนื้อหา แล้วให้ทั้งคอลัมน์เป็นพื้นที่เลื่อนของตัวเอง */}
+        {/* แถบซ้ายแสดงเฉพาะระดับความรุนแรง */}
         <aside className="lg:col-span-3 flex flex-col gap-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 lg:pb-1">
           {/* Severity */}
           <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
@@ -276,79 +240,12 @@ export default function LogExplorerView({
             </div>
           </div>
 
-          {/* Stream */}
-          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
-            <FacetCardHeader
-              icon={<Layers className="w-4 h-4 text-purple-500 shrink-0" />}
-              title="Streams"
-              activeCount={query.streams.length}
-              onClear={() => updateQuery((q) => ({ ...q, streams: [] }))}
-            />
-            <div className="space-y-1">
-              {LOG_STREAMS.map((s) => {
-                const facet = result.streamFacets.find((f) => f.value === s.id);
-                const active = query.streams.includes(s.id);
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() =>
-                      updateQuery((q) => ({ ...q, streams: toggle<LogStreamId>(q.streams, s.id) }))
-                    }
-                    title={s.description}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] border transition-colors ${
-                      active
-                        ? 'bg-purple-500/15 border-purple-500/40 text-slate-900 dark:text-white font-semibold'
-                        : 'bg-transparent border-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
-                    }`}
-                  >
-                    <span className="truncate">{s.label}</span>
-                    <span className="font-mono text-slate-500 dark:text-slate-400 shrink-0">
-                      {facet?.count ?? 0}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Source */}
-          <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
-            <FacetCardHeader
-              icon={<Server className="w-4 h-4 text-emerald-500 shrink-0" />}
-              title="Sources"
-              activeCount={query.sources.length}
-              onClear={() => updateQuery((q) => ({ ...q, sources: [] }))}
-            />
-            <div className="space-y-1">
-              {result.sourceFacets.length === 0 && (
-                <p className="text-[11px] text-slate-500 py-2">ไม่มีข้อมูลในเงื่อนไขนี้</p>
-              )}
-              {result.sourceFacets.map((f) => {
-                const active = query.sources.includes(f.value);
-                return (
-                  <button
-                    key={f.value}
-                    onClick={() => updateQuery((q) => ({ ...q, sources: toggle(q.sources, f.value) }))}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] border transition-colors ${
-                      active
-                        ? 'bg-emerald-500/15 border-emerald-500/40 text-slate-900 dark:text-white font-semibold'
-                        : 'bg-transparent border-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
-                    }`}
-                  >
-                    <span className="truncate font-mono">{f.label}</span>
-                    <span className="font-mono text-slate-500 dark:text-slate-400 shrink-0">{f.count}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </aside>
 
-        {/* Right: ช่องค้นหา + กราฟการกระจาย + ตารางผลลัพธ์
-            เลื่อนเป็นก้อนเดียวแยกจากคอลัมน์ซ้าย การ์ดทั้งสามใบสูงตามเนื้อหา */}
+        {/* ช่องค้นหา ปฏิทิน และตารางผลลัพธ์ เลื่อนแยกจากแถบซ้าย */}
         <div
           ref={rightColumnRef}
-          className="lg:col-span-9 flex flex-col gap-6 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 lg:pb-1"
+          className="lg:col-span-9 flex flex-col gap-3 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 lg:pb-1"
         >
           {/* Search Bar + Time Range */}
           <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 space-y-3 shadow-lg shrink-0">
@@ -359,6 +256,7 @@ export default function LogExplorerView({
                   type="text"
                   value={query.search}
                   onChange={(e) => updateQuery((q) => ({ ...q, search: e.target.value }))}
+                  aria-label="ค้นหาข้อความ Log"
                   placeholder="ค้นหาใน message, source, facility หรือ parsed field เช่น latency, postgres, 10.0.1.20"
                   className="w-full bg-slate-100 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-9 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                 />
@@ -379,9 +277,9 @@ export default function LogExplorerView({
                 {TIME_RANGES.map((r) => (
                   <button
                     key={r.id}
-                    onClick={() => updateQuery((q) => ({ ...q, range: r.id as LogTimeRange }))}
+                    onClick={() => updateQuery((q) => ({ ...q, range: r.id as LogTimeRange, from: undefined, to: undefined, buckets: [] }))}
                     className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
-                      query.range === r.id
+                      query.range === r.id && !query.from && !query.to
                         ? 'bg-blue-600 text-white shadow'
                         : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/10'
                     }`}
@@ -391,6 +289,19 @@ export default function LogExplorerView({
                 ))}
               </div>
             </div>
+
+            <div className="flex flex-wrap gap-3 items-end">
+              {(['from', 'to'] as const).map((field) => (
+                <label key={field} className="flex-1 min-w-[200px] text-xs text-slate-600 dark:text-slate-300 space-y-1">
+                  <span className="block">{field === 'from' ? 'ตั้งแต่วันเวลา' : 'ถึงวันเวลา'} (เวลาไทย)</span>
+                  <input type="datetime-local" step="1" value={query[field] ?? ''} min={field === 'to' ? query.from : undefined} max={field === 'from' ? query.to : undefined}
+                    onChange={(e) => updateQuery((q) => ({ ...q, [field]: e.target.value || undefined, range: 'all', buckets: [] }))}
+                    className="w-full rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900 dark:[color-scheme:dark] px-3 py-2 text-slate-900 dark:text-white" />
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">ข้อมูลจำลองประจำวันที่ {new Date(TELEMETRY_DATE + 'T00:00:00+07:00').toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok' })} เวลาไทย (UTC+7)</p>
+            {query.from && query.to && query.from > query.to && <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">วันเวลาเริ่มต้นต้องไม่อยู่หลังวันเวลาสิ้นสุด</p>}
 
             {/* Quick filter chips */}
             <div className="flex flex-wrap items-center gap-2">
@@ -441,21 +352,6 @@ export default function LogExplorerView({
               )}
             </div>
 
-            {/* Graylog query echo */}
-            <div className="flex items-center gap-2 bg-slate-100 dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2">
-              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 shrink-0 uppercase">Graylog Query</span>
-              <code className="flex-1 text-[11px] font-mono text-slate-700 dark:text-slate-200 truncate">
-                {result.graylogQuery}
-              </code>
-              <button
-                onClick={copyQuery}
-                title="คัดลอกคิวรีไปใช้ใน Graylog Web Interface"
-                className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors shrink-0"
-              >
-                {copiedQuery ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-
             {/* Result summary */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
               <span>
@@ -468,102 +364,6 @@ export default function LogExplorerView({
               <span>เวลาอ้างอิงล่าสุด {TELEMETRY_NOW}</span>
             </div>
           </div>
-
-          {/* Histogram */}
-          {result.histogram.length > 0 && (
-            <div className="bg-white dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg shrink-0">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h3 className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-2 min-w-0">
-                  <Layers className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                  การกระจายตามช่วงเวลา (ช่วงละ {BUCKET_MINUTES} นาที)
-                  <span className="text-[10px] font-normal text-slate-500 dark:text-slate-400">
-                    — แท่งแดงคือช่วงที่มี Log ระดับ Error ขึ้นไป · คลิกที่แท่งเพื่อดูเฉพาะช่วงนั้น เลือกได้หลายช่วง
-                  </span>
-                </h3>
-
-                {query.buckets.length > 0 && (
-                  <button
-                    onClick={() => updateQuery((q) => ({ ...q, buckets: [] }))}
-                    title="ล้างช่วงเวลาที่เลือกไว้"
-                    className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold text-slate-500 dark:text-slate-400 border border-transparent hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-500/30 hover:bg-rose-500/10 transition-colors"
-                  >
-                    <X className="w-3 h-3" />
-                    ล้าง ({query.buckets.length})
-                  </button>
-                )}
-              </div>
-
-              {/* [&_*]:outline-none กันเส้นขอบโฟกัสของเบราว์เซอร์ที่ขึ้นตอนคลิกกราฟ */}
-              <div className="h-32 cursor-pointer [&_*]:outline-none">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={result.histogram}
-                    // รับคลิกที่ตัวกราฟแทนที่จะรับเฉพาะบนแท่ง — คลิกที่ไหนก็ได้ในคอลัมน์
-                    // ที่แถบ hover ครอบอยู่ก็เลือกช่วงนั้นได้ แม้แท่งจะเตี้ยมาก
-                    onClick={(state) => {
-                      const label = (state as { activeLabel?: string })?.activeLabel;
-                      if (label) toggleBucket(String(label));
-                    }}
-                  >
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fontSize: 10, fill: '#94a3b8' }}
-                      axisLine={false}
-                      tickLine={false}
-                      interval="preserveStartEnd"
-                    />
-                    <Tooltip
-                      cursor={{ fill: 'rgba(148,163,184,0.12)' }}
-                      contentStyle={{
-                        background: 'rgba(15,23,42,0.92)',
-                        border: '1px solid rgba(148,163,184,0.3)',
-                        borderRadius: 12,
-                        fontSize: 11,
-                        color: '#fff',
-                      }}
-                      // Recharts ใส่ inline color ให้บรรทัดหัวเรื่องและรายการเอง
-                      // จึงต้องกำหนดสีขาวแยก ไม่งั้นจะกลายเป็นสีเข้มบนพื้นหลังเข้ม
-                      labelStyle={{ color: '#fff', fontWeight: 700 }}
-                      itemStyle={{ color: '#fff' }}
-                      formatter={(value) => [value as number, 'จำนวนข้อความ']}
-                    />
-                    {/* คลิกรับที่ BarChart ด้านบนแล้ว ตรงนี้จึงไม่ผูก onClick ซ้ำ
-                        ไม่งั้นคลิกบนแท่งจะ toggle สองครั้งแล้วกลายเป็นไม่มีอะไรเกิดขึ้น */}
-                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                      {result.histogram.map((b, idx) => (
-                        <Cell
-                          key={idx}
-                          fill={b.errorCount > 0 ? '#EF4444' : '#3B82F6'}
-                          // เมื่อมีการเลือกช่วงไว้ ให้แท่งที่ไม่ได้เลือกจางลงเพื่อให้เห็นชัดว่ากรองอะไรอยู่
-                          fillOpacity={query.buckets.length === 0 || b.selected ? 1 : 0.25}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* สรุปช่วงที่เลือกไว้ วางไว้ใต้กราฟ เพื่อไม่ให้แถวชิปที่โผล่มา
-                  ตอนเลือกช่วงแรกดันกราฟเลื่อนลง จนคลิกจุดเดิมซ้ำแล้วไม่โดนกราฟ */}
-              {query.buckets.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-3">
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold uppercase">
-                    ช่วงที่เลือก:
-                  </span>
-                  {[...query.buckets].sort().map((b) => (
-                    <button
-                      key={b}
-                      onClick={() => toggleBucket(b)}
-                      title="เอาช่วงนี้ออก"
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-semibold bg-blue-500/15 border border-blue-500/40 text-blue-600 dark:text-blue-300 hover:bg-rose-500/15 hover:border-rose-500/40 hover:text-rose-600 dark:hover:text-rose-300 transition-colors"
-                    >
-                      {b} <X className="w-2.5 h-2.5" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Result table */}
           <div
